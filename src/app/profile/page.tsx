@@ -99,37 +99,41 @@ export default function ProfilePage() {
     }
 
     setUploading(true)
-    const supabase = createClient()
-    const nextOrder = photos.length + 1
+    try {
+      const supabase = createClient()
+      const nextOrder = photos.length + 1
 
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${profile.id}/${nextOrder}.${fileExt}`
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${profile.id}/${nextOrder}.${fileExt}`
 
-    const { error: uploadError } = await supabase.storage
-      .from('camper-photos')
-      .upload(fileName, file, { upsert: true })
+      const { error: uploadError } = await supabase.storage
+        .from('camper-photos')
+        .upload(fileName, file, { upsert: true })
 
-    if (uploadError) {
-      setMessage({ type: 'error', text: uploadError.message })
+      if (uploadError) {
+        setMessage({ type: 'error', text: uploadError.message })
+        return
+      }
+
+      const { error: dbError } = await supabase
+        .from('camper_photos')
+        .insert({
+          user_id: profile.id,
+          storage_path: fileName,
+          display_order: nextOrder,
+        } as never)
+
+      if (dbError) {
+        setMessage({ type: 'error', text: dbError.message })
+      } else {
+        setMessage({ type: 'success', text: 'Photo uploaded!' })
+        fetchProfile()
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed' })
+    } finally {
       setUploading(false)
-      return
     }
-
-    const { error: dbError } = await supabase
-      .from('camper_photos')
-      .insert({
-        user_id: profile.id,
-        storage_path: fileName,
-        display_order: nextOrder,
-      } as never)
-
-    if (dbError) {
-      setMessage({ type: 'error', text: dbError.message })
-    } else {
-      setMessage({ type: 'success', text: 'Photo uploaded!' })
-      fetchProfile()
-    }
-    setUploading(false)
   }
 
   const deletePhoto = async (photo: CamperPhotoRow) => {
