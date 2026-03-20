@@ -46,9 +46,9 @@ export default function IntakeSuccessPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Link href="/schedule" className="w-full">
+          <Link href="/login" className="w-full">
             <Button className="w-full">
-              📅 View Schedule
+              🔑 Sign In to Your Account
             </Button>
           </Link>
           <Link href="/" className="w-full">

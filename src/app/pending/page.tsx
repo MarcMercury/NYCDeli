@@ -1,5 +1,4 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import Link from 'next/link'
 
 export default function PendingPage() {
   return (
@@ -15,15 +14,11 @@ export default function PendingPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-gray-700">
-            Camp leadership will review your application and either approve or deny access.
+            Camp leadership will review your registration and either approve or deny access.
             You&apos;ll get full access to the camp system once approved.
           </p>
           <p className="text-gray-500 text-sm">
-            In the meantime, make sure you&apos;ve completed your{' '}
-            <Link href="/intake" className="font-bold text-black underline hover:text-yellow-600">
-              camp registration form
-            </Link>{' '}
-            if you haven&apos;t already — that&apos;s how we know who you are.
+            Your registration has been received — sit tight while Brian reviews it.
           </p>
           <div className="pt-4 border-t border-gray-200">
             <p className="text-xs text-gray-400 uppercase tracking-wider">

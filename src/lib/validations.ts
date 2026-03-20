@@ -22,6 +22,8 @@ export const identitySchema = z.object({
   playa_name: z.string().max(50, "Keep your playa name under 50 characters.").optional().nullable(),
   email: z.string().email(invalidEmail),
   phone: z.string().regex(/^[\d\s\-\+\(\)]*$/, "That phone number looks fake.").optional().nullable(),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+  confirmPassword: z.string(),
 })
 
 // Arrival/Departure Section
@@ -70,7 +72,7 @@ export const skillsSchema = z.object({
   custom_skills: z.string().max(200, "Keep custom skills brief.").optional().nullable(),
 })
 
-// Build Week Section
+// Build Week Section (refinement kept for standalone use; base object defined below for spreading)
 export const buildWeekSchema = z.object({
   build_week_attending: z.boolean(),
   build_week_arrival_date: z.string().optional().nullable(),
@@ -111,26 +113,43 @@ export const aboutYouSchema = z.object({
   }),
 })
 
-// Combined full intake form schema
-export const intakeFormSchema = z.object({
+// Build week base object (without refinement) for spreading into combined schemas
+const buildWeekBase = z.object({
+  build_week_attending: z.boolean(),
+  build_week_arrival_date: z.string().optional().nullable(),
+  tools_bringing: z.array(z.string()).optional(),
+  vehicle_info: z.string().max(200, "Keep vehicle info concise.").optional().nullable(),
+})
+
+// Combined full intake form base object
+const intakeFormBase = z.object({
   ...identitySchema.shape,
   ...arrivalSchema.shape,
   ...shelterSchema.shape,
   ...infrastructureSchema.shape,
   ...participationSchema.shape,
   ...skillsSchema.shape,
-  ...buildWeekSchema.shape,
+  ...buildWeekBase.shape,
   ...safetySchema.shape,
   ...aboutYouSchema.shape,
-}).refine(
+})
+
+export type IntakeFormData = z.infer<typeof intakeFormBase>
+
+// Combined full intake form schema with cross-field validations
+export const intakeFormSchema = intakeFormBase.refine(
+  (data) => data.password === data.confirmPassword,
+  { message: "Passwords do not match.", path: ['confirmPassword'] }
+).refine(
+  (data) => !data.build_week_attending || data.build_week_arrival_date,
+  { message: "If you're coming for build week, tell us when.", path: ['build_week_arrival_date'] }
+).refine(
   (data) => new Date(data.departure_date) >= new Date(data.arrival_date),
   { message: "You can't leave before you arrive. Physics exists.", path: ['departure_date'] }
 )
 
-export type IntakeFormData = z.infer<typeof intakeFormSchema>
-
 // Admin camper update schema (includes layout fields)
-export const adminCamperUpdateSchema = intakeFormSchema.extend({
+export const adminCamperUpdateSchema = intakeFormBase.extend({
   layout_x: z.number().optional().nullable(),
   layout_y: z.number().optional().nullable(),
   zone_assignment: z.string().optional().nullable(),

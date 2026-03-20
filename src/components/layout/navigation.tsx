@@ -11,7 +11,7 @@ import type { UserRole } from '@/types/database'
 
 const publicNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
-  { href: '/register', label: 'Register', icon: '📝' },
+  { href: '/intake', label: 'Register', icon: '📝' },
 ]
 
 const userNavItems = [
@@ -23,6 +23,7 @@ const userNavItems = [
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
   { href: '/shift-draft', label: 'Shift Draft', icon: '🎯' },
   { href: '/build-week', label: 'Build Week', icon: '🔨' },
+  { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
 const adminNavItem = { href: '/admin', label: 'Admin', icon: '⚙️' }

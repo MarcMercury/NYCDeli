@@ -40,6 +40,8 @@ export default function IntakePage() {
       playa_name: '',
       email: '',
       phone: '',
+      password: '',
+      confirmPassword: '',
       arrival_date: '',
       arrival_method: 'car',
       departure_date: '',
@@ -85,7 +87,7 @@ export default function IntakePage() {
 
   const validateCurrentStep = async () => {
     const fieldsToValidate: (keyof IntakeFormData)[][] = [
-      ['full_name', 'playa_name', 'email', 'phone'],
+      ['full_name', 'playa_name', 'email', 'phone', 'password', 'confirmPassword'],
       ['arrival_date', 'arrival_method', 'departure_date', 'early_arrival'],
       ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference'],
       ['power_required', 'power_type', 'shade_required', 'special_requests'],
@@ -122,16 +124,26 @@ export default function IntakePage() {
     try {
       const supabase = createClient()
       
+      // Step 1: Create auth account
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+      })
+
+      if (signUpError) throw signUpError
+
+      // Step 2: Insert camper record (strip password fields)
+      const { password: _pw, confirmPassword: _cpw, ...camperFields } = data
       const camperData = {
-        ...data,
-        shelter_height_ft: data.shelter_height_ft || null,
-        playa_name: data.playa_name || null,
-        phone: data.phone || null,
-        special_requests: data.special_requests || null,
-        build_week_arrival_date: data.build_week_attending ? data.build_week_arrival_date : null,
-        tools_bringing: data.tools_bringing || [],
-        vehicle_info: data.vehicle_info || null,
-        custom_skills: data.custom_skills || null,
+        ...camperFields,
+        shelter_height_ft: camperFields.shelter_height_ft || null,
+        playa_name: camperFields.playa_name || null,
+        phone: camperFields.phone || null,
+        special_requests: camperFields.special_requests || null,
+        build_week_arrival_date: camperFields.build_week_attending ? camperFields.build_week_arrival_date : null,
+        tools_bringing: camperFields.tools_bringing || [],
+        vehicle_info: camperFields.vehicle_info || null,
+        custom_skills: camperFields.custom_skills || null,
       }
       
       const { error } = await supabase
@@ -142,7 +154,6 @@ export default function IntakePage() {
 
       router.push('/intake/success')
     } catch (err) {
-      console.error('Submission error:', err)
       setSubmitError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
     } finally {
       setIsSubmitting(false)
@@ -191,7 +202,7 @@ export default function IntakePage() {
                 Step {currentStep + 1}: {steps[currentStep].title}
               </CardTitle>
               <CardDescription>
-                {currentStep === 0 && "Who are you? Let's find out."}
+                {currentStep === 0 && "Who are you? Let's get you set up with an account."}
                 {currentStep === 1 && "When are you arriving and leaving?"}
                 {currentStep === 2 && "What are you sleeping in? Measure it. Actually measure it."}
                 {currentStep === 3 && "What infrastructure do you need?"}
@@ -204,7 +215,7 @@ export default function IntakePage() {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              {/* Step 1: Identity */}
+              {/* Step 1: Identity & Account */}
               {currentStep === 0 && (
                 <>
                   <Controller
@@ -265,6 +276,43 @@ export default function IntakePage() {
                       />
                     )}
                   />
+
+                  <div className="border-t-2 border-black pt-6 mt-2">
+                    <h3 className="font-black uppercase text-sm mb-4">Create Your Account</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      This creates your login so you can track your application status and access camp tools once approved.
+                    </p>
+                    <div className="space-y-6">
+                      <Controller
+                        name="password"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            label="Password"
+                            type="password"
+                            placeholder="At least 8 characters"
+                            required
+                            error={errors.password?.message}
+                            {...field}
+                          />
+                        )}
+                      />
+                      <Controller
+                        name="confirmPassword"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            label="Confirm Password"
+                            type="password"
+                            placeholder="Type it again"
+                            required
+                            error={errors.confirmPassword?.message}
+                            {...field}
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
                 </>
               )}
 
