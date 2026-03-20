@@ -15,7 +15,7 @@ const modules = [
   {
     href: '/camp-selection',
     icon: '🏕️',
-    title: 'Camp Spot Selection',
+    title: 'Camp Map Selection',
     description: 'Pick your spot on the map — airline seat selection style. First come, first served.',
     status: 'New',
     statusColor: 'text-purple-600',

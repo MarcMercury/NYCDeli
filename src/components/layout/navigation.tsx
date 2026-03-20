@@ -19,9 +19,8 @@ const userNavItems = [
   { href: '/campers', label: 'Campers', icon: '🐀' },
   { href: '/profile', label: 'Profile', icon: '👤' },
   { href: '/events', label: 'Events', icon: '🗓️' },
-  { href: '/map', label: 'Camp Spots', icon: '🏕️' },
+  { href: '/map', label: 'Camp Map', icon: '🏕️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
-  { href: '/schedule', label: 'Schedule', icon: '📅' },
   { href: '/build-week', label: 'Build Week', icon: '🔨' },
 ]
 

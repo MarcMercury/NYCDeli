@@ -204,7 +204,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">🏕️</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Camp Spots Admin</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Camp Map Admin</p>
               </CardContent>
             </Card>
           </Link>

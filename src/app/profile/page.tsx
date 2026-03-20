@@ -8,13 +8,21 @@ import {
   Badge, Alert, Button, Textarea, Input, Select, Checkbox, CheckboxGroup,
   Tabs, TabPanel
 } from '@/components/ui'
+import { cn, formatDate, formatTime } from '@/lib/utils'
 import { shelterTypes, arrivalMethods, powerTypes, orientationPreferences, shiftTypes, skillTags } from '@/lib/validations'
-import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole } from '@/types/database'
+import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole, KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 import type { Tab } from '@/components/ui/tabs'
+
+interface EnrichedAssignment extends ScheduleAssignment {
+  shift?: KitchenShift & { role?: KitchenRole }
+  camper?: Camper
+}
 
 const profileTabs: Tab[] = [
   { id: 'about', label: 'About Me & Photos' },
   { id: 'details', label: 'Camper Details' },
+  { id: 'my-schedule', label: 'My Schedule' },
+  { id: 'all-schedule', label: 'All Schedule' },
 ]
 
 export default function ProfilePage() {
@@ -35,6 +43,10 @@ export default function ProfilePage() {
   // Editable camper detail fields
   const [editCamper, setEditCamper] = useState<Partial<CamperRow>>({})
 
+  // Schedule state
+  const [allAssignments, setAllAssignments] = useState<EnrichedAssignment[]>([])
+  const [myAssignments, setMyAssignments] = useState<EnrichedAssignment[]>([])
+
   const fetchProfile = useCallback(async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -45,6 +57,8 @@ export default function ProfilePage() {
       supabase.from('camper_photos').select('*').eq('user_id', user.id).order('display_order') as unknown as { data: CamperPhotoRow[] | null },
     ])
 
+    let camperData: CamperRow | null = null
+
     if (profileResult.data) {
       setProfile(profileResult.data)
       setBio(profileResult.data.bio || '')
@@ -52,7 +66,6 @@ export default function ProfilePage() {
       setIsOwnProfile(true)
 
       // Fetch linked camper
-      let camperData: CamperRow | null = null
       if (profileResult.data.camper_id) {
         const result = await supabase
           .from('campers')
@@ -76,6 +89,37 @@ export default function ProfilePage() {
     }
 
     setPhotos(photosResult.data || [])
+
+    // Fetch schedule data
+    const [rolesRes, shiftsRes, assignmentsRes, allCampersRes] = await Promise.all([
+      supabase.from('kitchen_roles').select('*'),
+      supabase.from('kitchen_shifts').select('*').order('date').order('start_time'),
+      supabase.from('schedule_assignments').select('*'),
+      supabase.from('campers').select('*'),
+    ])
+
+    const roles = (rolesRes.data as KitchenRole[]) || []
+    const shiftsData = (shiftsRes.data as KitchenShift[]) || []
+    const assignmentsData = (assignmentsRes.data as ScheduleAssignment[]) || []
+    const allCampers = (allCampersRes.data as Camper[]) || []
+
+    const enrichedShifts = shiftsData.map(shift => ({
+      ...shift,
+      role: roles.find(r => r.id === shift.role_id),
+    }))
+
+    const enrichedAssignments = assignmentsData.map(assignment => ({
+      ...assignment,
+      shift: enrichedShifts.find(s => s.id === assignment.shift_id),
+      camper: allCampers.find(c => c.id === assignment.camper_id),
+    }))
+    setAllAssignments(enrichedAssignments)
+
+    // Filter my assignments if we have a linked camper
+    if (camperData) {
+      setMyAssignments(enrichedAssignments.filter(a => a.camper_id === camperData.id))
+    }
+
     setLoading(false)
   }, [])
 
@@ -284,7 +328,7 @@ export default function ProfilePage() {
         </Alert>
       )}
 
-      <Tabs tabs={canViewDetails ? profileTabs : [profileTabs[0]]} activeTab={activeTab} onChange={setActiveTab} className="mb-0" />
+      <Tabs tabs={canViewDetails ? profileTabs : [profileTabs[0], profileTabs[2], profileTabs[3]]} activeTab={activeTab} onChange={setActiveTab} className="mb-0" />
 
       {/* ───── TAB 1: About Me & Photos (publicly viewable) ───── */}
       <TabPanel tabId="about" activeTab={activeTab}>
@@ -748,6 +792,132 @@ export default function ProfilePage() {
           )}
         </TabPanel>
       )}
+      {/* ───── TAB 3: My Schedule ───── */}
+      <TabPanel tabId="my-schedule" activeTab={activeTab}>
+        {!camper ? (
+          <Alert variant="warning">
+            No registration record linked. Complete your{' '}
+            <a href="/intake" className="font-bold text-black underline">registration</a>{' '}
+            to see your schedule.
+          </Alert>
+        ) : myAssignments.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-gray-500">
+                No shifts assigned yet. Either you haven&apos;t been scheduled, or the schedule hasn&apos;t been released yet.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            <Card variant="warning">
+              <CardContent className="py-4">
+                <p className="font-bold text-center">
+                  You have {myAssignments.length} shift{myAssignments.length !== 1 ? 's' : ''} assigned.
+                  {' '}Don&apos;t miss them.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <ScheduleTable assignments={myAssignments} highlightCamperId={camper.id} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </TabPanel>
+
+      {/* ───── TAB 4: All Schedule ───── */}
+      <TabPanel tabId="all-schedule" activeTab={activeTab}>
+        <Card>
+          <CardHeader>
+            <CardTitle>All Assignments</CardTitle>
+            <CardDescription>
+              Everyone&apos;s schedule at a glance.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScheduleTable assignments={allAssignments} highlightCamperId={camper?.id} />
+          </CardContent>
+        </Card>
+      </TabPanel>
+    </div>
+  )
+}
+
+/* ── Shared schedule table component ── */
+function ScheduleTable({
+  assignments,
+  highlightCamperId,
+}: {
+  assignments: EnrichedAssignment[]
+  highlightCamperId?: string
+}) {
+  const sorted = [...assignments].sort((a, b) => {
+    if (!a.shift || !b.shift) return 0
+    return a.shift.date.localeCompare(b.shift.date) ||
+           a.shift.start_time.localeCompare(b.shift.start_time) ||
+           (a.shift.role?.name || '').localeCompare(b.shift.role?.name || '')
+  })
+
+  if (sorted.length === 0) {
+    return (
+      <p className="text-center text-gray-500 py-8">
+        No assignments yet.
+      </p>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b-2 border-black">
+            <th className="text-left p-3 font-bold uppercase tracking-wider">Name</th>
+            <th className="text-left p-3 font-bold uppercase tracking-wider">Shift / Role</th>
+            <th className="text-left p-3 font-bold uppercase tracking-wider">Date</th>
+            <th className="text-left p-3 font-bold uppercase tracking-wider">Time</th>
+            <th className="text-left p-3 font-bold uppercase tracking-wider">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(assignment => (
+            <tr
+              key={assignment.id}
+              className={cn(
+                "border-b border-gray-200 hover:bg-gray-50 transition-colors",
+                assignment.camper_id === highlightCamperId && "bg-yellow-50 hover:bg-yellow-100"
+              )}
+            >
+              <td className="p-3 font-medium">
+                {assignment.camper?.playa_name || assignment.camper?.full_name || '—'}
+              </td>
+              <td className="p-3">
+                {assignment.shift?.role?.name || '—'}
+              </td>
+              <td className="p-3 whitespace-nowrap">
+                {assignment.shift ? formatDate(assignment.shift.date) : '—'}
+              </td>
+              <td className="p-3 whitespace-nowrap">
+                {assignment.shift
+                  ? `${formatTime(assignment.shift.start_time)} – ${formatTime(assignment.shift.end_time)}`
+                  : '—'}
+              </td>
+              <td className="p-3">
+                <Badge
+                  variant={
+                    assignment.status === 'confirmed' ? 'success' :
+                    assignment.status === 'completed' ? 'info' :
+                    assignment.status === 'no-show' ? 'error' : 'warning'
+                  }
+                >
+                  {assignment.status}
+                </Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
