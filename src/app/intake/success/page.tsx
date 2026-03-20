@@ -14,25 +14,34 @@ export default function IntakeSuccessPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-center text-gray-700">
-            Your registration has been submitted. We&apos;ve got your dimensions, 
-            your dates, and your promises. Now we need you to actually show up.
+            Your registration has been submitted and will be reviewed by Camp Lead Brian.
           </p>
           
           <div className="bg-yellow-50 border-2 border-yellow-400 p-4">
             <h3 className="font-bold uppercase text-sm mb-2">What Happens Next</h3>
             <ul className="text-sm space-y-2 text-gray-700">
-              <li>✓ Your data is now in the system</li>
-              <li>✓ Layout engine will assign your spot</li>
-              <li>✓ Scheduling engine will assign your shifts</li>
-              <li>→ Check your email for updates</li>
-              <li>→ Come back to check your schedule</li>
+              <li>✓ Your registration is now being reviewed</li>
+              <li>→ You&apos;ll receive an email to schedule a short 20-30 min Zoom with Brian to talk about your burn</li>
+              <li>→ You&apos;ll also get a link to a private Google Photos album from Burning Man 2025 so you can see what camp looks like</li>
+              <li>→ After the Zoom, Brian will confirm your spot and next steps</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border-2 border-blue-400 p-4">
+            <h3 className="font-bold uppercase text-sm mb-2">Key Reminders</h3>
+            <ul className="text-sm space-y-2 text-gray-700">
+              <li>💰 Camp fees ($900 or $450 for builders) are due May 1, 2026</li>
+              <li>📅 All campers must arrive by Event Sunday at 12pm</li>
+              <li>🚪 All campers must stay through 2pm on Exodus Monday</li>
+              <li>🎫 Need a ticket? Brian can help source face-value opportunities</li>
             </ul>
           </div>
 
           <div className="bg-gray-50 border-2 border-gray-300 p-4">
-            <h3 className="font-bold uppercase text-sm mb-2">Remember</h3>
-            <p className="text-sm text-gray-600 italic">
-              &ldquo;If you guess, we will treat it as fact. And then judge you for it.&rdquo;
+            <h3 className="font-bold uppercase text-sm mb-2">Check Your Email</h3>
+            <p className="text-sm text-gray-600">
+              Keep an eye on your inbox for the Zoom scheduling link and photo album. 
+              If you don&apos;t hear back within a few days, reach out.
             </p>
           </div>
         </CardContent>

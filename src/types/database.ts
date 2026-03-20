@@ -21,6 +21,9 @@ export type SkillTag =
   | 'bartending'
   | 'vibes'
 
+export type SpotSize = 'small' | 'medium' | 'large' | 'xlarge'
+export type ReservationStatus = 'reserved' | 'released' | 'admin_moved'
+
 // Camper types
 export interface CamperRow {
   id: string
@@ -338,6 +341,31 @@ export interface Database {
           updated_by?: string | null
         }
       }
+      camp_spots: {
+        Row: CampSpotRow
+        Insert: CampSpotInsert
+        Update: CampSpotUpdate
+      }
+      camp_reservations: {
+        Row: CampReservationRow
+        Insert: CampReservationInsert
+        Update: CampReservationUpdate
+      }
+      floorplan_configs: {
+        Row: FloorplanConfigRow
+        Insert: FloorplanConfigInsert
+        Update: FloorplanConfigUpdate
+      }
+      floorplan_objects: {
+        Row: FloorplanObjectRow
+        Insert: FloorplanObjectInsert
+        Update: FloorplanObjectUpdate
+      }
+      camp_events: {
+        Row: CampEventRow
+        Insert: CampEventInsert
+        Update: CampEventUpdate
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -349,6 +377,9 @@ export interface Database {
       task_status: TaskStatus
       schedule_status: ScheduleStatus
       skill_tag: SkillTag
+      spot_size: SpotSize
+      reservation_status: ReservationStatus
+      floorplan_object_type: FloorplanObjectType
     }
   }
 }
@@ -358,6 +389,95 @@ export interface ChecklistItem {
   text: string
   required: boolean
   category?: string
+}
+
+// Camp Spot types
+export interface CampSpotRow {
+  id: string
+  created_at: string
+  updated_at: string
+  row_label: string
+  spot_number: number
+  label: string
+  x_position: number
+  y_position: number
+  spot_width_ft: number
+  spot_length_ft: number
+  size_category: SpotSize
+  min_tent_width_ft: number
+  max_tent_width_ft: number
+  min_tent_length_ft: number
+  max_tent_length_ft: number
+  has_power: boolean
+  has_shade: boolean
+  is_accessible: boolean
+  is_available: boolean
+  notes: string | null
+}
+
+export interface CampSpotInsert {
+  row_label: string
+  spot_number: number
+  x_position: number
+  y_position: number
+  spot_width_ft: number
+  spot_length_ft: number
+  size_category?: SpotSize
+  min_tent_width_ft?: number
+  max_tent_width_ft: number
+  min_tent_length_ft?: number
+  max_tent_length_ft: number
+  has_power?: boolean
+  has_shade?: boolean
+  is_accessible?: boolean
+  is_available?: boolean
+  notes?: string | null
+}
+
+export interface CampSpotUpdate {
+  row_label?: string
+  spot_number?: number
+  x_position?: number
+  y_position?: number
+  spot_width_ft?: number
+  spot_length_ft?: number
+  size_category?: SpotSize
+  min_tent_width_ft?: number
+  max_tent_width_ft?: number
+  min_tent_length_ft?: number
+  max_tent_length_ft?: number
+  has_power?: boolean
+  has_shade?: boolean
+  is_accessible?: boolean
+  is_available?: boolean
+  notes?: string | null
+}
+
+export interface CampReservationRow {
+  id: string
+  created_at: string
+  updated_at: string
+  spot_id: string
+  camper_id: string
+  status: ReservationStatus
+  reserved_by: string | null
+  admin_notes: string | null
+}
+
+export interface CampReservationInsert {
+  spot_id: string
+  camper_id: string
+  status?: ReservationStatus
+  reserved_by?: string | null
+  admin_notes?: string | null
+}
+
+export interface CampReservationUpdate {
+  spot_id?: string
+  camper_id?: string
+  status?: ReservationStatus
+  reserved_by?: string | null
+  admin_notes?: string | null
 }
 
 // Convenience types
@@ -370,3 +490,170 @@ export type BuildTask = Database['public']['Tables']['build_tasks']['Row']
 export type ChecklistTemplate = Database['public']['Tables']['checklist_templates']['Row']
 export type CamperChecklist = Database['public']['Tables']['camper_checklists']['Row']
 export type SystemSetting = Database['public']['Tables']['system_settings']['Row']
+export type CampSpot = CampSpotRow
+export type CampReservation = CampReservationRow
+
+// Extended type for spot with reservation info
+export interface CampSpotWithReservation extends CampSpotRow {
+  reservation: CampReservationRow | null
+  camper: Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'shelter_type' | 'shelter_width_ft' | 'shelter_length_ft'> | null
+}
+
+// ==========================================
+// Floorplan Editor Types
+// ==========================================
+
+export type FloorplanObjectType =
+  | 'tent'
+  | 'kitchen'
+  | 'grill'
+  | 'prep_area'
+  | 'service_area'
+  | 'shade_structure'
+  | 'common_area'
+  | 'stage'
+  | 'bar'
+  | 'art_car'
+  | 'porta_potty'
+  | 'generator'
+  | 'water_station'
+  | 'first_aid'
+  | 'fire_pit'
+  | 'storage'
+  | 'entrance'
+  | 'fence'
+  | 'custom'
+
+export interface FloorplanObjectProperties {
+  reservable?: boolean
+  capacity?: number
+  responsibilities?: string[]
+  linked_to?: string
+  sub_type?: string
+  description?: string
+  icon?: string
+}
+
+export interface FloorplanConfigRow {
+  id: string
+  name: string
+  width_ft: number
+  length_ft: number
+  grid_size_ft: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FloorplanConfigInsert {
+  name?: string
+  width_ft?: number
+  length_ft?: number
+  grid_size_ft?: number
+  is_active?: boolean
+}
+
+export interface FloorplanConfigUpdate {
+  name?: string
+  width_ft?: number
+  length_ft?: number
+  grid_size_ft?: number
+  is_active?: boolean
+}
+
+export interface FloorplanObjectRow {
+  id: string
+  floorplan_id: string
+  object_type: FloorplanObjectType
+  label: string
+  x: number
+  y: number
+  width_ft: number
+  height_ft: number
+  rotation: number
+  color: string
+  z_index: number
+  is_locked: boolean
+  parent_id: string | null
+  properties: FloorplanObjectProperties
+  created_at: string
+  updated_at: string
+}
+
+export interface FloorplanObjectInsert {
+  floorplan_id: string
+  object_type: FloorplanObjectType
+  label?: string
+  x?: number
+  y?: number
+  width_ft?: number
+  height_ft?: number
+  rotation?: number
+  color?: string
+  z_index?: number
+  is_locked?: boolean
+  parent_id?: string | null
+  properties?: FloorplanObjectProperties
+}
+
+export interface FloorplanObjectUpdate {
+  object_type?: FloorplanObjectType
+  label?: string
+  x?: number
+  y?: number
+  width_ft?: number
+  height_ft?: number
+  rotation?: number
+  color?: string
+  z_index?: number
+  is_locked?: boolean
+  parent_id?: string | null
+  properties?: FloorplanObjectProperties
+}
+
+export type FloorplanConfig = FloorplanConfigRow
+export type FloorplanObject = FloorplanObjectRow
+
+// ==========================================
+// Camp Events Types
+// ==========================================
+
+export type EventCategory = 'general' | 'social' | 'planning' | 'fundraiser' | 'build' | 'shopping' | 'other'
+
+export interface CampEventRow {
+  id: string
+  created_at: string
+  updated_at: string
+  title: string
+  description: string | null
+  event_date: string
+  start_time: string | null
+  end_time: string | null
+  location: string | null
+  category: EventCategory
+  created_by: string | null
+}
+
+export interface CampEventInsert {
+  title: string
+  description?: string | null
+  event_date: string
+  start_time?: string | null
+  end_time?: string | null
+  location?: string | null
+  category?: EventCategory
+  created_by?: string | null
+}
+
+export interface CampEventUpdate {
+  title?: string
+  description?: string | null
+  event_date?: string
+  start_time?: string | null
+  end_time?: string | null
+  location?: string | null
+  category?: EventCategory
+  created_by?: string | null
+}
+
+export type CampEvent = CampEventRow

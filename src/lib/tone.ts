@@ -36,13 +36,13 @@ export const globalPhrases = {
 // Page-specific copy
 export const pageCopy: Record<string, PageCopy> = {
   intake: {
-    pageTitle: "Camper Registration",
-    pageSubtitle: "Fill this out completely or don't bother showing up.",
-    helpText: "Every field matters. We use this data to not lose you in the desert.",
+    pageTitle: "NYC Deli Registration for Burning Man 2026",
+    pageSubtitle: "Camp NYC Deli strives to provide a kind, safe and nurturing home for your Burning Man adventure.",
+    helpText: "Every field matters. We use this data to coordinate camp and keep you safe in the desert.",
     errorPrefix: "Problem:",
-    successMessage: "You're in the system. Don't ghost us.",
+    successMessage: "You're in the system. Check your email for next steps.",
     warningMessage: "Incomplete registration = no spot. Simple math.",
-    ctaText: "Submit & Pray",
+    ctaText: "Submit Registration",
   },
   layout: {
     pageTitle: "Camp Layout",
@@ -116,6 +116,19 @@ export const fieldHelp = {
   buildWeekAttending: "Coming early to build? We need you.",
   skills: "What can you actually do? Not what you've seen on YouTube.",
   toolsBringing: "What tools are you bringing? Be specific.",
+  emergencyContact: "Name and phone number. Example: Mom, 212-555-5555",
+  medicalConditions: "Known only to Brian. There's no wrong answers.",
+  medications: "Do you need medication to keep you alive? Camp keeps refrigerated meds cool in the 33° truck.",
+  allergies: "What are they and what happens if triggered? There's no wrong answers.",
+  dietaryRestrictions: "We want to feed you. Help us help you.",
+  burnCount: "Burns or regional burns. Zero is a perfectly valid answer.",
+  whatAttractedYou: "Burning Man has 1,400 theme camps. What brought you here?",
+  referralSource: "If this is your first time with NYC Deli, who gave you the link?",
+  characterReferences: "Two people, ideally folks you've camped with. Include email or phone. If you've never camped, someone who's seen you stressed.",
+  firstBurnHopes: "What do you hope to get out of your first Burning Man with NYC Deli?",
+  volunteerCommitment: "Three 2.5-hour shifts during burn week. As camps go, very reasonable.",
+  soberShifts: "Sober during your volunteer shifts. There's only three of them.",
+  backgroundCheck: "We check for red flags: violence, creepy behavior. NOT red flags: drug possession, traffic tickets.",
 }
 
 // Validation error messages (tone-appropriate)

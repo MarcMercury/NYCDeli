@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
   Badge, Alert, Button, Input, Tabs, TabPanel, Select
@@ -173,7 +174,7 @@ export default function AdminPage() {
         )}
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardContent className="py-4 text-center">
               <p className="text-3xl font-black">{campers.length}</p>
@@ -198,6 +199,14 @@ export default function AdminPage() {
               <p className="text-xs uppercase tracking-wider text-gray-500">Shift Assignments</p>
             </CardContent>
           </Card>
+          <Link href="/admin/camp-spots" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🏕️</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Camp Spots Admin</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Tabs */}

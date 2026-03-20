@@ -1,0 +1,6 @@
+export { FloorplanEditor } from './floorplan-editor'
+export { GridCanvas } from './grid-canvas'
+export { ObjectPalette } from './object-palette'
+export { PropertiesPanel } from './properties-panel'
+export { OBJECT_TEMPLATES, CATEGORY_LABELS, getTemplateForType } from './object-templates'
+export type { ObjectTemplate } from './object-templates'

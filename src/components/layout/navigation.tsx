@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/', label: 'Home', icon: '🥪' },
   { href: '/intake', label: 'Register', icon: '📝' },
+  { href: '/events', label: 'Events', icon: '🗓️' },
+  { href: '/camp-selection', label: 'Camp Spots', icon: '🏕️' },
   { href: '/layout-view', label: 'Layout', icon: '🗺️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
   { href: '/schedule', label: 'Schedule', icon: '📅' },
@@ -25,7 +28,13 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-3xl">🐀</span>
+            <Image
+              src="/Images/logo.png"
+              alt="NYC Deli Rats Logo"
+              width={40}
+              height={40}
+              className="rounded-sm"
+            />
             <span className="font-black text-xl uppercase tracking-wider text-black hidden sm:block">
               NYC Deli Rats
             </span>

@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
+import { FloorplanEditor } from '@/components/floorplan'
 
-export default function LayoutPageRedirect() {
-  redirect('/layout-view')
+export default function LayoutPage() {
+  return <FloorplanEditor />
 }

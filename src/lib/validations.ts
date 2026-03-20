@@ -81,6 +81,36 @@ export const buildWeekSchema = z.object({
   { message: "If you're coming for build week, tell us when.", path: ['build_week_arrival_date'] }
 )
 
+// Vehicle Intention
+export const vehicleOptions = ['no_vehicle', 'want_to_discuss'] as const
+
+// Safety & Medical Section
+export const safetySchema = z.object({
+  emergency_contact: z.string().min(5, "We need a name and number. Example: Mom, 212-555-5555"),
+  medical_conditions: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
+  medications: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
+  allergies: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
+  dietary_restrictions: z.string().max(200, "Keep it concise.").optional().nullable(),
+})
+
+// About You Section
+export const aboutYouSchema = z.object({
+  burn_count: z.string().min(1, "Tell us how many burns you've done. Zero is a valid answer."),
+  what_attracted_you: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
+  referral_source: z.string().max(200, "Keep it concise.").optional().nullable(),
+  character_references: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
+  first_burn_hopes: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
+  volunteer_commitment: z.boolean().refine(val => val === true, {
+    message: "Three 2.5-hour shifts is the deal. Everyone contributes.",
+  }),
+  sober_shifts: z.boolean().refine(val => val === true, {
+    message: "Sober during shifts. There's only three of them.",
+  }),
+  background_check_consent: z.boolean().refine(val => val === true, {
+    message: "Background checks are required for all campers.",
+  }),
+})
+
 // Combined full intake form schema
 export const intakeFormSchema = z.object({
   ...identitySchema.shape,
@@ -90,6 +120,8 @@ export const intakeFormSchema = z.object({
   ...participationSchema.shape,
   ...skillsSchema.shape,
   ...buildWeekSchema.shape,
+  ...safetySchema.shape,
+  ...aboutYouSchema.shape,
 }).refine(
   (data) => new Date(data.departure_date) >= new Date(data.arrival_date),
   { message: "You can't leave before you arrive. Physics exists.", path: ['departure_date'] }

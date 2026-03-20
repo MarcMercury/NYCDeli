@@ -1,0 +1,249 @@
+import type { FloorplanObjectType } from '@/types/database'
+
+// Object template definitions for the palette
+export interface ObjectTemplate {
+  type: FloorplanObjectType
+  label: string
+  icon: string
+  defaultWidth: number
+  defaultHeight: number
+  defaultColor: string
+  category: 'structures' | 'kitchen' | 'utilities' | 'boundaries'
+  description: string
+  defaultProperties: Record<string, unknown>
+}
+
+export const OBJECT_TEMPLATES: ObjectTemplate[] = [
+  // Structures
+  {
+    type: 'tent',
+    label: 'Tent',
+    icon: '⛺',
+    defaultWidth: 10,
+    defaultHeight: 10,
+    defaultColor: '#60a5fa',
+    category: 'structures',
+    description: 'Camper tent — can be marked reservable',
+    defaultProperties: { reservable: true },
+  },
+  {
+    type: 'shade_structure',
+    label: 'Shade Structure',
+    icon: '⛱️',
+    defaultWidth: 40,
+    defaultHeight: 30,
+    defaultColor: '#93c5fd',
+    category: 'structures',
+    description: 'Shade canopy or structure',
+    defaultProperties: {},
+  },
+  {
+    type: 'common_area',
+    label: 'Common Area',
+    icon: '🏕️',
+    defaultWidth: 30,
+    defaultHeight: 20,
+    defaultColor: '#86efac',
+    category: 'structures',
+    description: 'Shared gathering space',
+    defaultProperties: { capacity: 50 },
+  },
+  {
+    type: 'stage',
+    label: 'Stage',
+    icon: '🎤',
+    defaultWidth: 20,
+    defaultHeight: 15,
+    defaultColor: '#c084fc',
+    category: 'structures',
+    description: 'Performance stage area',
+    defaultProperties: {},
+  },
+  {
+    type: 'bar',
+    label: 'Bar',
+    icon: '🍹',
+    defaultWidth: 15,
+    defaultHeight: 8,
+    defaultColor: '#f97316',
+    category: 'structures',
+    description: 'Bar / drink service area',
+    defaultProperties: {},
+  },
+  {
+    type: 'art_car',
+    label: 'Art Car',
+    icon: '🚗',
+    defaultWidth: 20,
+    defaultHeight: 8,
+    defaultColor: '#f472b6',
+    category: 'structures',
+    description: 'Art car parking pad',
+    defaultProperties: {},
+  },
+  // Kitchen
+  {
+    type: 'kitchen',
+    label: 'Kitchen',
+    icon: '🍳',
+    defaultWidth: 40,
+    defaultHeight: 30,
+    defaultColor: '#fbbf24',
+    category: 'kitchen',
+    description: 'Full kitchen zone — break down into sub-areas',
+    defaultProperties: {
+      responsibilities: ['Food prep', 'Cooking', 'Service', 'Cleanup'],
+    },
+  },
+  {
+    type: 'grill',
+    label: 'Grill',
+    icon: '🔥',
+    defaultWidth: 8,
+    defaultHeight: 4,
+    defaultColor: '#ef4444',
+    category: 'kitchen',
+    description: 'Grill station inside kitchen',
+    defaultProperties: {
+      responsibilities: ['Grilling', 'Temperature monitoring', 'Propane management'],
+    },
+  },
+  {
+    type: 'prep_area',
+    label: 'Prep Area',
+    icon: '🔪',
+    defaultWidth: 10,
+    defaultHeight: 8,
+    defaultColor: '#a3e635',
+    category: 'kitchen',
+    description: 'Food preparation station',
+    defaultProperties: {
+      responsibilities: ['Chopping', 'Portioning', 'Sanitation'],
+    },
+  },
+  {
+    type: 'service_area',
+    label: 'Service Area',
+    icon: '🍽️',
+    defaultWidth: 12,
+    defaultHeight: 6,
+    defaultColor: '#22d3ee',
+    category: 'kitchen',
+    description: 'Food service / distribution point',
+    defaultProperties: {
+      responsibilities: ['Plating', 'Serving', 'Queue management'],
+    },
+  },
+  {
+    type: 'storage',
+    label: 'Storage',
+    icon: '📦',
+    defaultWidth: 10,
+    defaultHeight: 8,
+    defaultColor: '#a1887f',
+    category: 'kitchen',
+    description: 'Food / supply storage',
+    defaultProperties: {},
+  },
+  // Utilities
+  {
+    type: 'porta_potty',
+    label: 'Porta Potty',
+    icon: '🚻',
+    defaultWidth: 4,
+    defaultHeight: 4,
+    defaultColor: '#64748b',
+    category: 'utilities',
+    description: 'Portable toilet unit',
+    defaultProperties: {},
+  },
+  {
+    type: 'generator',
+    label: 'Generator',
+    icon: '⚡',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    defaultColor: '#facc15',
+    category: 'utilities',
+    description: 'Power generator placement',
+    defaultProperties: {},
+  },
+  {
+    type: 'water_station',
+    label: 'Water Station',
+    icon: '💧',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    defaultColor: '#38bdf8',
+    category: 'utilities',
+    description: 'Water distribution point',
+    defaultProperties: {},
+  },
+  {
+    type: 'first_aid',
+    label: 'First Aid',
+    icon: '🏥',
+    defaultWidth: 8,
+    defaultHeight: 6,
+    defaultColor: '#f87171',
+    category: 'utilities',
+    description: 'Medical / first aid station',
+    defaultProperties: {},
+  },
+  {
+    type: 'fire_pit',
+    label: 'Fire Pit',
+    icon: '🔥',
+    defaultWidth: 8,
+    defaultHeight: 8,
+    defaultColor: '#fb923c',
+    category: 'utilities',
+    description: 'Communal fire area',
+    defaultProperties: { capacity: 20 },
+  },
+  // Boundaries
+  {
+    type: 'entrance',
+    label: 'Entrance',
+    icon: '🚪',
+    defaultWidth: 10,
+    defaultHeight: 4,
+    defaultColor: '#4ade80',
+    category: 'boundaries',
+    description: 'Camp entrance / exit point',
+    defaultProperties: {},
+  },
+  {
+    type: 'fence',
+    label: 'Fence',
+    icon: '🧱',
+    defaultWidth: 30,
+    defaultHeight: 2,
+    defaultColor: '#78716c',
+    category: 'boundaries',
+    description: 'Fence / barrier segment',
+    defaultProperties: {},
+  },
+  {
+    type: 'custom',
+    label: 'Custom',
+    icon: '✏️',
+    defaultWidth: 10,
+    defaultHeight: 10,
+    defaultColor: '#94a3b8',
+    category: 'structures',
+    description: 'Custom shape — define your own',
+    defaultProperties: {},
+  },
+]
+
+export function getTemplateForType(type: FloorplanObjectType): ObjectTemplate | undefined {
+  return OBJECT_TEMPLATES.find(t => t.type === type)
+}
+
+export const CATEGORY_LABELS: Record<ObjectTemplate['category'], string> = {
+  structures: '🏗️ Structures',
+  kitchen: '🍳 Kitchen',
+  utilities: '⚙️ Utilities',
+  boundaries: '🧱 Boundaries',
+}

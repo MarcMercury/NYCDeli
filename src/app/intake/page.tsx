@@ -22,6 +22,8 @@ const steps: Step[] = [
   { id: 'participation', title: 'Participate' },
   { id: 'skills', title: 'Skills' },
   { id: 'build', title: 'Build Week' },
+  { id: 'safety', title: 'Safety' },
+  { id: 'about', title: 'About You' },
 ]
 
 export default function IntakePage() {
@@ -60,6 +62,19 @@ export default function IntakePage() {
       vehicle_info: '',
       skills: [],
       custom_skills: '',
+      emergency_contact: '',
+      medical_conditions: '',
+      medications: '',
+      allergies: '',
+      dietary_restrictions: '',
+      burn_count: '',
+      what_attracted_you: '',
+      referral_source: '',
+      character_references: '',
+      first_burn_hopes: '',
+      volunteer_commitment: false,
+      sober_shifts: false,
+      background_check_consent: false,
     },
     mode: 'onBlur',
   })
@@ -77,6 +92,8 @@ export default function IntakePage() {
       ['kitchen_participation', 'preferred_shift_types', 'strike_participation'],
       ['skills', 'custom_skills'],
       ['build_week_attending', 'build_week_arrival_date', 'tools_bringing', 'vehicle_info'],
+      ['emergency_contact', 'medical_conditions', 'medications', 'allergies', 'dietary_restrictions'],
+      ['burn_count', 'what_attracted_you', 'referral_source', 'character_references', 'first_burn_hopes', 'volunteer_commitment', 'sober_shifts', 'background_check_consent'],
     ]
     
     const fields = fieldsToValidate[currentStep]
@@ -155,8 +172,15 @@ export default function IntakePage() {
         </div>
 
         {/* Alert */}
-        <Alert variant="warning" title="Read This" className="mb-6">
-          {copy.helpText}
+        <Alert variant="warning" title="Before You Begin" className="mb-6">
+          {copy.helpText} Friends and partners traveling together must each submit this form individually.
+        </Alert>
+
+        {/* Camp Status Banner */}
+        <Alert variant="info" title="Camp Update — 3/15/2026" className="mb-6">
+          Camp is nearly full and subsequent interviews will be prioritizing builders. If you cannot be 
+          on build you can still register and be interviewed — we&apos;re just making sure we have 22 builders 
+          to build camp.
         </Alert>
 
         {/* Form */}
@@ -174,6 +198,8 @@ export default function IntakePage() {
                 {currentStep === 4 && "Everyone participates. No exceptions."}
                 {currentStep === 5 && "What can you actually do?"}
                 {currentStep === 6 && "Are you coming early to build?"}
+                {currentStep === 7 && "Your safety matters. Answers known only to Brian."}
+                {currentStep === 8 && "Last step. Tell us about yourself and confirm the commitments."}
               </CardDescription>
             </CardHeader>
 
@@ -306,8 +332,9 @@ export default function IntakePage() {
               {currentStep === 2 && (
                 <>
                   <Alert variant="warning" className="mb-4">
-                    Measure your tent. Not vibes. Actual measurements with a tape measure.
-                    These values feed directly into the layout engine.
+                    Camp builds 10.5&apos; tall shade over every tent. Maximum footprint guidelines:
+                    Solo 10x10, Two People 10x12.5, Three People 10x15, Four People 10x17.5.
+                    Please use format: [Brand] [Model] [LxWxH] [Population]
                   </Alert>
                   <Controller
                     name="shelter_type"
@@ -622,6 +649,224 @@ export default function IntakePage() {
                       />
                     </>
                   )}
+                </>
+              )}
+
+              {/* Step 8: Safety & Medical */}
+              {currentStep === 7 && (
+                <>
+                  <Alert variant="info" className="mb-4">
+                    All answers on this page are known only to Brian. There&apos;s no wrong answers.
+                  </Alert>
+                  <Controller
+                    name="emergency_contact"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Emergency Contact"
+                        placeholder="Example: Mom, 212-555-5555"
+                        required
+                        error={errors.emergency_contact?.message}
+                        helpText={fieldHelp.emergencyContact}
+                        {...field}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="medical_conditions"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="Medical Conditions"
+                        placeholder="Known only to Brian. There's no wrong answers."
+                        rows={2}
+                        error={errors.medical_conditions?.message}
+                        helpText={fieldHelp.medicalConditions}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="medications"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="Required Medications"
+                        placeholder="Example: Insulin. Camp keeps refrigerated meds cool at 33°."
+                        rows={2}
+                        error={errors.medications?.message}
+                        helpText={fieldHelp.medications}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="allergies"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="Allergies"
+                        placeholder="What are they and what happens if triggered?"
+                        rows={2}
+                        error={errors.allergies?.message}
+                        helpText={fieldHelp.allergies}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="dietary_restrictions"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Dietary Restrictions"
+                        placeholder="We want to feed you. Help us help you."
+                        error={errors.dietary_restrictions?.message}
+                        helpText={fieldHelp.dietaryRestrictions}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                </>
+              )}
+
+              {/* Step 9: About You */}
+              {currentStep === 8 && (
+                <>
+                  <Controller
+                    name="burn_count"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="How many burns or regional burns have you participated in?"
+                        placeholder="Zero is a perfectly valid answer"
+                        required
+                        error={errors.burn_count?.message}
+                        helpText={fieldHelp.burnCount}
+                        {...field}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="what_attracted_you"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="What attracted you to camping with NYC Deli?"
+                        placeholder="Burning Man has 1,400 theme camps..."
+                        rows={2}
+                        error={errors.what_attracted_you?.message}
+                        helpText={fieldHelp.whatAttractedYou}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="referral_source"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="If first time with NYC Deli, who gave you the registration link?"
+                        placeholder="Name of the person who referred you"
+                        error={errors.referral_source?.message}
+                        helpText={fieldHelp.referralSource}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="character_references"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="Character References (two people, with contact info)"
+                        placeholder="Ideally folks you've camped with. Include email or phone."
+                        rows={3}
+                        error={errors.character_references?.message}
+                        helpText={fieldHelp.characterReferences}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="first_burn_hopes"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        label="If this is your first burn with us, what do you hope to get out of it?"
+                        placeholder="Optional"
+                        rows={2}
+                        error={errors.first_burn_hopes?.message}
+                        helpText={fieldHelp.firstBurnHopes}
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    )}
+                  />
+
+                  <div className="border-t-2 border-black pt-6 mt-6">
+                    <h3 className="font-black uppercase text-sm mb-4">Commitments</h3>
+                    <div className="space-y-4">
+                      <Controller
+                        name="volunteer_commitment"
+                        control={control}
+                        render={({ field }) => (
+                          <div>
+                            <Checkbox
+                              label="I will volunteer three 2.5-hour shifts during burn week"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              helpText={fieldHelp.volunteerCommitment}
+                            />
+                            {errors.volunteer_commitment?.message && (
+                              <p className="text-red-600 text-sm mt-1">{errors.volunteer_commitment.message}</p>
+                            )}
+                          </div>
+                        )}
+                      />
+                      <Controller
+                        name="sober_shifts"
+                        control={control}
+                        render={({ field }) => (
+                          <div>
+                            <Checkbox
+                              label="I will be sober during my volunteer shifts"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              helpText={fieldHelp.soberShifts}
+                            />
+                            {errors.sober_shifts?.message && (
+                              <p className="text-red-600 text-sm mt-1">{errors.sober_shifts.message}</p>
+                            )}
+                          </div>
+                        )}
+                      />
+                      <Controller
+                        name="background_check_consent"
+                        control={control}
+                        render={({ field }) => (
+                          <div>
+                            <Checkbox
+                              label="I consent to a background check"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              helpText={fieldHelp.backgroundCheck}
+                            />
+                            {errors.background_check_consent?.message && (
+                              <p className="text-red-600 text-sm mt-1">{errors.background_check_consent.message}</p>
+                            )}
+                          </div>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </>
               )}
 
