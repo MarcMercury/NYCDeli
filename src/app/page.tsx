@@ -86,24 +86,24 @@ export default function HomePage() {
       <CountdownTimer />
 
       {/* Hero Section */}
-      <section className="bg-yellow-400 border-b-4 border-black">
+      <section className="bg-yellow-400 border-b-4 border-black font-nunito">
         <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
           <div className="flex items-center justify-between gap-8">
             <div className="max-w-3xl">
-              <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight text-black mb-4">
+              <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-black mb-4">
                 NYC Deli
               </h1>
-              <p className="text-xl md:text-2xl font-bold text-black/80 mb-2">
+              <p className="text-xl md:text-2xl font-semibold text-black/80 mb-2">
                 Burning Man 2026 • Black Rock City
               </p>
-              <p className="text-lg text-black/70 max-w-2xl mb-8">
+              <p className="text-lg text-black/70 max-w-2xl mb-8 leading-relaxed">
                 Hot New York Deli food on the playa. A 70° cooling center for thousands.
                 And a kind, safe home base for your Burning Man adventure. 🥯🥶
               </p>
               <div className="flex flex-wrap items-center gap-4">
                 <Link
                   href="/intake"
-                  className="inline-flex items-center px-8 py-4 bg-black text-yellow-400 font-black uppercase tracking-wider text-lg hover:bg-gray-900 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]"
+                  className="inline-flex items-center px-8 py-4 bg-black text-yellow-400 font-bold tracking-wide text-lg rounded-md hover:bg-gray-900 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]"
                 >
                   📝 Register Now
                 </Link>
@@ -111,7 +111,7 @@ export default function HomePage() {
                   href="https://www.instagram.com/campnycdeli"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-4 bg-white text-black font-bold uppercase tracking-wider text-sm hover:bg-gray-100 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]"
+                  className="inline-flex items-center gap-2 px-6 py-4 bg-white text-black font-semibold tracking-wide text-sm rounded-md hover:bg-gray-100 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]"
                 >
                   📸 @campnycdeli
                 </a>
@@ -555,20 +555,20 @@ export default function HomePage() {
       </section>
 
       {/* Call to Action */}
-      <section className="py-16 px-4 bg-yellow-400 border-t-4 border-black">
+      <section className="py-16 px-4 bg-yellow-400 border-t-4 border-black font-nunito">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-black uppercase tracking-wider mb-4">
+          <h2 className="text-3xl font-extrabold tracking-tight mb-4">
             Ready to Join?
           </h2>
-          <p className="text-lg mb-4 text-black/80">
+          <p className="text-lg mb-4 text-black/80 leading-relaxed">
             Friends and partners traveling together must each register individually.
           </p>
-          <p className="text-base mb-8 text-black/60">
+          <p className="text-base mb-8 text-black/60 leading-relaxed">
             Complete your registration now. Every field matters. Every deadline is real.
           </p>
           <Link
             href="/intake"
-            className="inline-flex items-center px-8 py-4 bg-black text-yellow-400 font-black uppercase tracking-wider text-lg hover:bg-gray-900 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)]"
+            className="inline-flex items-center px-8 py-4 bg-black text-yellow-400 font-bold tracking-wide text-lg rounded-md hover:bg-gray-900 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)]"
           >
             Start Registration →
           </Link>

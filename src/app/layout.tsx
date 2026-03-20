@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Nunito } from "next/font/google";
 import "./globals.css";
 import { Navigation } from "@/components/layout/navigation";
 import { Footer } from "@/components/layout/footer";
@@ -7,6 +7,12 @@ import { Footer } from "@/components/layout/footer";
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
+});
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-nunito",
 });
 
 export const metadata: Metadata = {
@@ -21,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.className} h-full antialiased`}>
+    <html lang="en" className={`${inter.className} ${nunito.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gray-100">
         <Navigation />
         <main className="flex-1">{children}</main>

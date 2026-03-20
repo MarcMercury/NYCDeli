@@ -34,18 +34,18 @@ export function CountdownTimer() {
 
   if (!mounted) {
     return (
-      <section className="bg-red-600 border-b-4 border-black py-8 px-4">
+      <section className="bg-red-600 border-b-4 border-black py-8 px-4 font-nunito">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-6">
             💣 This Page Will Self-Destruct In:
           </h2>
           <div className="flex justify-center gap-4 md:gap-8">
             {['Days', 'Hours', 'Min', 'Sec'].map((label) => (
               <div key={label} className="flex flex-col items-center">
-                <div className="bg-black text-red-400 font-mono text-3xl md:text-5xl font-black px-4 py-3 md:px-6 md:py-4 border-2 border-red-400 min-w-[70px] md:min-w-[100px]">
+                <div className="bg-black text-red-400 font-mono text-3xl md:text-5xl font-bold px-4 py-3 md:px-6 md:py-4 border-2 border-red-400 rounded-md min-w-[70px] md:min-w-[100px]">
                   --
                 </div>
-                <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-white/80 mt-2">
+                <span className="text-xs md:text-sm font-semibold tracking-wide text-white/80 mt-2">
                   {label}
                 </span>
               </div>
@@ -58,9 +58,9 @@ export function CountdownTimer() {
 
   if (timeLeft.expired) {
     return (
-      <section className="bg-red-600 border-b-4 border-black py-8 px-4">
+      <section className="bg-red-600 border-b-4 border-black py-8 px-4 font-nunito">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-black uppercase tracking-wider text-white animate-pulse">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white animate-pulse">
             💥 BOOM. SEE YOU ON THE PLAYA. 💥
           </h2>
         </div>
@@ -69,9 +69,9 @@ export function CountdownTimer() {
   }
 
   return (
-    <section className="bg-red-600 border-b-4 border-black py-8 px-4">
+    <section className="bg-red-600 border-b-4 border-black py-8 px-4 font-nunito">
       <div className="max-w-4xl mx-auto text-center">
-        <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white mb-6">
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-6">
           💣 This Page Will Self-Destruct In:
         </h2>
         <div className="flex justify-center gap-4 md:gap-8">
@@ -82,10 +82,10 @@ export function CountdownTimer() {
             { value: timeLeft.seconds, label: 'Sec' },
           ].map(({ value, label }) => (
             <div key={label} className="flex flex-col items-center">
-              <div className="bg-black text-red-400 font-mono text-3xl md:text-5xl font-black px-4 py-3 md:px-6 md:py-4 border-2 border-red-400 min-w-[70px] md:min-w-[100px]">
+              <div className="bg-black text-red-400 font-mono text-3xl md:text-5xl font-bold px-4 py-3 md:px-6 md:py-4 border-2 border-red-400 rounded-md min-w-[70px] md:min-w-[100px]">
                 {String(value).padStart(2, '0')}
               </div>
-              <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-white/80 mt-2">
+              <span className="text-xs md:text-sm font-semibold tracking-wide text-white/80 mt-2">
                 {label}
               </span>
             </div>
