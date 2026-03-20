@@ -55,6 +55,19 @@ export interface CamperRow {
   vehicle_info: string | null
   skills: SkillTag[]
   custom_skills: string | null
+  emergency_contact: string | null
+  medical_conditions: string | null
+  medications: string | null
+  allergies: string | null
+  dietary_restrictions: string | null
+  burn_count: string | null
+  what_attracted_you: string | null
+  referral_source: string | null
+  character_references: string | null
+  first_burn_hopes: string | null
+  volunteer_commitment: boolean
+  sober_shifts: boolean
+  background_check_consent: boolean
   layout_x: number | null
   layout_y: number | null
   zone_assignment: string | null
@@ -90,6 +103,19 @@ export interface CamperInsert {
   vehicle_info?: string | null
   skills?: SkillTag[]
   custom_skills?: string | null
+  emergency_contact?: string | null
+  medical_conditions?: string | null
+  medications?: string | null
+  allergies?: string | null
+  dietary_restrictions?: string | null
+  burn_count?: string | null
+  what_attracted_you?: string | null
+  referral_source?: string | null
+  character_references?: string | null
+  first_burn_hopes?: string | null
+  volunteer_commitment?: boolean
+  sober_shifts?: boolean
+  background_check_consent?: boolean
   layout_x?: number | null
   layout_y?: number | null
   zone_assignment?: string | null
@@ -125,12 +151,79 @@ export interface CamperUpdate {
   vehicle_info?: string | null
   skills?: SkillTag[]
   custom_skills?: string | null
+  emergency_contact?: string | null
+  medical_conditions?: string | null
+  medications?: string | null
+  allergies?: string | null
+  dietary_restrictions?: string | null
+  burn_count?: string | null
+  what_attracted_you?: string | null
+  referral_source?: string | null
+  character_references?: string | null
+  first_burn_hopes?: string | null
+  volunteer_commitment?: boolean
+  sober_shifts?: boolean
+  background_check_consent?: boolean
   layout_x?: number | null
   layout_y?: number | null
   zone_assignment?: string | null
   placement_locked?: boolean
   is_admin?: boolean
   notes?: string | null
+}
+
+// Auth & User Profile Types (defined before Database interface for type resolution)
+export type UserRole = 'pending' | 'user' | 'admin'
+
+export interface UserProfileRow {
+  id: string
+  created_at: string
+  updated_at: string
+  email: string
+  role: UserRole
+  camper_id: string | null
+  approved_at: string | null
+  approved_by: string | null
+  denied_at: string | null
+  denied_reason: string | null
+  bio: string | null
+}
+
+export interface UserProfileInsert {
+  id: string
+  email: string
+  role?: UserRole
+  camper_id?: string | null
+  bio?: string | null
+}
+
+export interface UserProfileUpdate {
+  role?: UserRole
+  camper_id?: string | null
+  approved_at?: string | null
+  approved_by?: string | null
+  denied_at?: string | null
+  denied_reason?: string | null
+  bio?: string | null
+}
+
+export interface CamperPhotoRow {
+  id: string
+  created_at: string
+  user_id: string
+  storage_path: string
+  display_order: number
+}
+
+export interface CamperPhotoInsert {
+  user_id: string
+  storage_path: string
+  display_order: number
+}
+
+export interface CamperPhotoUpdate {
+  storage_path?: string
+  display_order?: number
 }
 
 export interface Database {
@@ -140,6 +233,7 @@ export interface Database {
         Row: CamperRow
         Insert: CamperInsert
         Update: CamperUpdate
+        Relationships: []
       }
       kitchen_roles: {
         Row: {
@@ -174,6 +268,7 @@ export interface Database {
           max_per_shift?: number
           requires_skills?: SkillTag[]
         }
+        Relationships: []
       }
       kitchen_shifts: {
         Row: {
@@ -205,6 +300,7 @@ export interface Database {
           max_coverage?: number
           notes?: string | null
         }
+        Relationships: []
       }
       schedule_assignments: {
         Row: {
@@ -233,6 +329,7 @@ export interface Database {
           locked?: boolean
           notes?: string | null
         }
+        Relationships: []
       }
       build_tasks: {
         Row: {
@@ -280,6 +377,7 @@ export interface Database {
           completed_at?: string | null
           completed_by?: string | null
         }
+        Relationships: []
       }
       checklist_templates: {
         Row: {
@@ -302,6 +400,7 @@ export interface Database {
           phase?: number | null
           items?: ChecklistItem[]
         }
+        Relationships: []
       }
       camper_checklists: {
         Row: {
@@ -321,6 +420,7 @@ export interface Database {
           template_id?: string
           completed_items?: string[]
         }
+        Relationships: []
       }
       system_settings: {
         Row: {
@@ -340,31 +440,79 @@ export interface Database {
           value?: string
           updated_by?: string | null
         }
+        Relationships: []
       }
       camp_spots: {
         Row: CampSpotRow
         Insert: CampSpotInsert
         Update: CampSpotUpdate
+        Relationships: []
       }
       camp_reservations: {
         Row: CampReservationRow
         Insert: CampReservationInsert
         Update: CampReservationUpdate
+        Relationships: []
       }
       floorplan_configs: {
         Row: FloorplanConfigRow
         Insert: FloorplanConfigInsert
         Update: FloorplanConfigUpdate
+        Relationships: []
       }
       floorplan_objects: {
         Row: FloorplanObjectRow
         Insert: FloorplanObjectInsert
         Update: FloorplanObjectUpdate
+        Relationships: []
       }
       camp_events: {
         Row: CampEventRow
         Insert: CampEventInsert
         Update: CampEventUpdate
+        Relationships: []
+      }
+      user_profiles: {
+        Row: UserProfileRow
+        Insert: UserProfileInsert
+        Update: UserProfileUpdate
+        Relationships: []
+      }
+      camper_photos: {
+        Row: CamperPhotoRow
+        Insert: CamperPhotoInsert
+        Update: CamperPhotoUpdate
+        Relationships: []
+      }
+      build_stages: {
+        Row: BuildStageRow
+        Insert: Omit<BuildStageRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildStageRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
+      build_goals: {
+        Row: BuildGoalRow
+        Insert: Omit<BuildGoalRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildGoalRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
+      build_resources: {
+        Row: BuildResourceRow
+        Insert: Omit<BuildResourceRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildResourceRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
+      build_procedures: {
+        Row: BuildProcedureRow
+        Insert: Omit<BuildProcedureRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildProcedureRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
+      build_questions: {
+        Row: BuildQuestionRow
+        Insert: Omit<BuildQuestionRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildQuestionRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
       }
     }
     Views: Record<string, never>
@@ -380,6 +528,7 @@ export interface Database {
       spot_size: SpotSize
       reservation_status: ReservationStatus
       floorplan_object_type: FloorplanObjectType
+      user_role: UserRole
     }
   }
 }
@@ -760,4 +909,17 @@ export type BuildQuestion = BuildQuestionRow
 // Extended type for stage with its goals
 export interface BuildStageWithGoals extends BuildStageRow {
   goals: BuildGoalRow[]
+}
+
+// ==========================================
+// Auth & User Profile Types
+// ==========================================
+
+export type UserProfile = UserProfileRow
+export type CamperPhoto = CamperPhotoRow
+
+// Extended profile with camper data
+export interface UserProfileWithCamper extends UserProfileRow {
+  camper: CamperRow | null
+  photos: CamperPhotoRow[]
 }

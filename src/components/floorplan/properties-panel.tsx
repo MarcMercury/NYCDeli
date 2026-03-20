@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Select } from '@/components/ui'
-import type { FloorplanObjectRow, FloorplanObjectType } from '@/types/database'
-import { getTemplateForType, OBJECT_TEMPLATES } from './object-templates'
+import type { FloorplanObjectRow } from '@/types/database'
+import { getTemplateForType } from './object-templates'
 
 interface PropertiesPanelProps {
   selectedObject: FloorplanObjectRow | null

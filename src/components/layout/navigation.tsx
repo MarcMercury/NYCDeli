@@ -1,26 +1,76 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { signOut } from '@/app/actions/auth'
+import type { UserRole } from '@/types/database'
 
-const navItems = [
+const publicNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
-  { href: '/intake', label: 'Register', icon: '📝' },
+  { href: '/register', label: 'Register', icon: '📝' },
+]
+
+const userNavItems = [
+  { href: '/', label: 'Home', icon: '🥪' },
+  { href: '/campers', label: 'Campers', icon: '🐀' },
+  { href: '/profile', label: 'Profile', icon: '👤' },
+  { href: '/intake', label: 'Intake Form', icon: '📝' },
   { href: '/events', label: 'Events', icon: '🗓️' },
+  { href: '/map', label: 'Camp Map', icon: '🗺️' },
   { href: '/camp-selection', label: 'Camp Spots', icon: '🏕️' },
-  { href: '/layout-view', label: 'Layout', icon: '🗺️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
   { href: '/schedule', label: 'Schedule', icon: '📅' },
   { href: '/build-week', label: 'Build Week', icon: '🔨' },
-  { href: '/admin', label: 'Admin', icon: '⚙️' },
 ]
+
+const adminNavItem = { href: '/admin', label: 'Admin', icon: '⚙️' }
 
 export function Navigation() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [userRole, setUserRole] = useState<UserRole | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        setIsLoggedIn(true)
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single() as unknown as { data: { role: UserRole } | null }
+        setUserRole(profile?.role || null)
+      } else {
+        setIsLoggedIn(false)
+        setUserRole(null)
+      }
+    }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAuth()
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const navItems = (() => {
+    if (!isLoggedIn || userRole === 'pending') return publicNavItems
+    const items = [...userNavItems]
+    if (userRole === 'admin') items.push(adminNavItem)
+    return items
+  })()
 
   return (
     <header className="bg-yellow-400 border-b-4 border-black sticky top-0 z-50">
@@ -60,6 +110,28 @@ export function Navigation() {
                 </Link>
               )
             })}
+            {isLoggedIn ? (
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="px-3 py-2 text-sm font-bold uppercase tracking-wider transition-all hover:bg-black hover:text-yellow-400 border-2 border-transparent"
+                >
+                  🚪 Sign Out
+                </button>
+              </form>
+            ) : (
+              <Link
+                href="/login"
+                className={cn(
+                  "px-3 py-2 text-sm font-bold uppercase tracking-wider transition-all",
+                  "hover:bg-black hover:text-yellow-400",
+                  "border-2 border-transparent",
+                  pathname === '/login' && "bg-black text-yellow-400"
+                )}
+              >
+                🔑 Sign In
+              </Link>
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
@@ -93,6 +165,31 @@ export function Navigation() {
                 </Link>
               )
             })}
+            {isLoggedIn ? (
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  onClick={() => setMobileOpen(false)}
+                  className="block w-full text-left px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all hover:bg-black hover:text-yellow-400"
+                >
+                  <span className="mr-2">🚪</span>
+                  Sign Out
+                </button>
+              </form>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "block px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all",
+                  "hover:bg-black hover:text-yellow-400",
+                  pathname === '/login' && "bg-black text-yellow-400"
+                )}
+              >
+                <span className="mr-2">🔑</span>
+                Sign In
+              </Link>
+            )}
           </nav>
         )}
       </div>

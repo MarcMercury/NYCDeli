@@ -66,7 +66,8 @@ export default function SchedulePage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    void fetchData()
   }, [fetchData])
 
   const lookupSchedule = async () => {

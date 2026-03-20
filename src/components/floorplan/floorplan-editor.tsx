@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, Button, Badge, Input, Alert } from '@/components/ui'
-import { cn, generateId } from '@/lib/utils'
+import { generateId } from '@/lib/utils'
 import type { FloorplanConfigRow, FloorplanObjectRow, FloorplanObjectType } from '@/types/database'
 import {
   fetchActiveFloorplan,
@@ -315,6 +315,7 @@ export function FloorplanEditor() {
   }, [selectedObjectId, objects])
 
   // Drag start callback (noop for now, could highlight drop zone)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function handlePaletteDragStart(_template: ObjectTemplate) {
     // Could show visual feedback
   }

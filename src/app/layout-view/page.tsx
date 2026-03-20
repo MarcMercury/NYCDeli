@@ -35,6 +35,58 @@ const zones = [
   { id: 'shade', name: 'Shade Structure', x: 110, y: 0, width: 40, height: 30, color: 'bg-blue-200 border-blue-500' },
 ]
 
+// Simple auto-placement algorithm (defined outside component to avoid reference-before-declaration)
+function autoPlaceCampers(camperList: Camper[]): PlacedCamper[] {
+  const placed: PlacedCamper[] = []
+  let currentX = MIN_SPACING
+  let currentY = 40 // Start below the fixed zones
+  let rowHeight = 0
+
+  for (const camper of camperList) {
+    const width = camper.shelter_length_ft
+    const height = camper.shelter_width_ft
+
+    // Use existing position if available
+    if (camper.layout_x !== null && camper.layout_y !== null) {
+      placed.push({
+        ...camper,
+        displayX: camper.layout_x,
+        displayY: camper.layout_y,
+        displayWidth: width,
+        displayHeight: height,
+      })
+      continue
+    }
+
+    // Check if fits in current row
+    if (currentX + width + MIN_SPACING > CAMP_WIDTH) {
+      // Move to next row
+      currentX = MIN_SPACING
+      currentY += rowHeight + MIN_SPACING
+      rowHeight = 0
+    }
+
+    // Check if fits in camp
+    if (currentY + height > CAMP_LENGTH) {
+      console.warn(`Camp is full! Cannot place ${camper.full_name}`)
+      continue
+    }
+
+    placed.push({
+      ...camper,
+      displayX: currentX,
+      displayY: currentY,
+      displayWidth: width,
+      displayHeight: height,
+    })
+
+    currentX += width + MIN_SPACING
+    rowHeight = Math.max(rowHeight, height)
+  }
+
+  return placed
+}
+
 export default function LayoutPage() {
   const [campers, setCampers] = useState<PlacedCamper[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,60 +119,9 @@ export default function LayoutPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     fetchCampers()
   }, [fetchCampers])
-
-  // Simple auto-placement algorithm
-  function autoPlaceCampers(camperList: Camper[]): PlacedCamper[] {
-    const placed: PlacedCamper[] = []
-    let currentX = MIN_SPACING
-    let currentY = 40 // Start below the fixed zones
-    let rowHeight = 0
-
-    for (const camper of camperList) {
-      const width = camper.shelter_length_ft
-      const height = camper.shelter_width_ft
-
-      // Use existing position if available
-      if (camper.layout_x !== null && camper.layout_y !== null) {
-        placed.push({
-          ...camper,
-          displayX: camper.layout_x,
-          displayY: camper.layout_y,
-          displayWidth: width,
-          displayHeight: height,
-        })
-        continue
-      }
-
-      // Check if fits in current row
-      if (currentX + width + MIN_SPACING > CAMP_WIDTH) {
-        // Move to next row
-        currentX = MIN_SPACING
-        currentY += rowHeight + MIN_SPACING
-        rowHeight = 0
-      }
-
-      // Check if fits in camp
-      if (currentY + height > CAMP_LENGTH) {
-        console.warn(`Camp is full! Cannot place ${camper.full_name}`)
-        continue
-      }
-
-      placed.push({
-        ...camper,
-        displayX: currentX,
-        displayY: currentY,
-        displayWidth: width,
-        displayHeight: height,
-      })
-
-      currentX += width + MIN_SPACING
-      rowHeight = Math.max(rowHeight, height)
-    }
-
-    return placed
-  }
 
   const toggleLayer = (layer: keyof typeof showLayers) => {
     setShowLayers(prev => ({ ...prev, [layer]: !prev[layer] }))

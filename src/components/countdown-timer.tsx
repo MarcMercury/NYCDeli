@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 
 const TARGET_DATE = new Date('2026-08-30T00:00:00-07:00') // Aug 30, 2026 PDT (Black Rock City time)
 
@@ -20,12 +20,13 @@ function getTimeLeft() {
   return { days, hours, minutes, seconds, expired: false }
 }
 
+const emptySubscribe = () => () => {}
+
 export function CountdownTimer() {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   useEffect(() => {
-    setMounted(true)
     const interval = setInterval(() => {
       setTimeLeft(getTimeLeft())
     }, 1000)

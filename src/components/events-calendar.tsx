@@ -93,7 +93,8 @@ export function EventsCalendar() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    fetchEvents()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    void fetchEvents()
   }, [fetchEvents])
 
   const openAddForm = (date: Date) => {

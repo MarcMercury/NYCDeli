@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
   Badge, Tabs, TabPanel, Alert, Button
@@ -28,11 +28,7 @@ export default function KitchenPage() {
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     const supabase = createClient()
     
     // Fetch roles
@@ -68,7 +64,12 @@ export default function KitchenPage() {
     }
 
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    fetchData()
+  }, [fetchData])
 
   if (loading) {
     return (

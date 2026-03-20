@@ -7,7 +7,7 @@ import {
   Badge, Alert, Button, Input, Tabs, TabPanel, Select
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatDate, getStatusColor, getSkillDisplayName } from '@/lib/utils'
+import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
 import type { Camper, BuildTask, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate } from '@/types/database'
 
 type Tab = { id: string; label: string }
@@ -51,6 +51,7 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     fetchData()
   }, [fetchData])
 
@@ -204,6 +205,30 @@ export default function AdminPage() {
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">🏕️</p>
                 <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Camp Spots Admin</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/layout-builder" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🗺️</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Layout Builder</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/applicants" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">📋</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Applicant Review</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/permissions" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🔐</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Permissions</p>
               </CardContent>
             </Card>
           </Link>
