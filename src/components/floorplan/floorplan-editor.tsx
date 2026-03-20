@@ -693,14 +693,6 @@ export function FloorplanEditor() {
                 <span className="font-bold">Locked:</span>{' '}
                 {objects.filter(o => o.is_locked).length}
               </div>
-              <div className="flex items-center gap-1.5 bg-yellow-50 border-2 border-yellow-500 px-3 py-1.5">
-                <span className="font-bold">⚡ Power:</span>{' '}
-                {utilityLines.filter(l => l.line_type === 'power').length}
-              </div>
-              <div className="flex items-center gap-1.5 bg-blue-50 border-2 border-blue-500 px-3 py-1.5">
-                <span className="font-bold">💧 Water:</span>{' '}
-                {utilityLines.filter(l => l.line_type === 'water').length}
-              </div>
             </div>
 
             {/* Keyboard shortcuts hint */}

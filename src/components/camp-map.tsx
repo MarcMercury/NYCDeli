@@ -44,6 +44,7 @@ export function CampMap() {
   const [showGrid, setShowGrid] = useState(false)
   const [showLabels, setShowLabels] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Layers
   const [layers, setLayers] = useState({
@@ -156,6 +157,7 @@ export function CampMap() {
 
   // Click on an object
   function handleObjectClick(obj: FloorplanObjectRow) {
+    setSidebarOpen(true)
     // Check if it's a reservable tent
     if (obj.properties?.reservable && mode === 'reserve') {
       // Try to find a matching camp spot for this tent
@@ -294,9 +296,9 @@ export function CampMap() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* Header Bar */}
-      <div className="bg-black text-white px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sticky top-16 z-40">
+      <div className="bg-black text-white px-4 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2 z-40 flex-shrink-0">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-black uppercase tracking-wider text-yellow-400">
             🏕️ Camp Map
@@ -388,24 +390,23 @@ export function CampMap() {
         </div>
       </div>
 
-      {/* Alerts */}
-      <div className="max-w-7xl mx-auto px-4 pt-3 space-y-2">
-        {error && <Alert variant="error">{error} <button className="ml-2 underline" onClick={() => setError(null)}>Dismiss</button></Alert>}
-        {success && <Alert variant="success">{success} <button className="ml-2 underline" onClick={() => setSuccess(null)}>Dismiss</button></Alert>}
-      </div>
-
-      <div className="flex flex-col lg:flex-row">
+      <div className="flex flex-col lg:flex-row relative" style={{ height: 'calc(100vh - 120px)' }}>
         {/* Map Canvas */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing"
-          style={{ height: 'calc(100vh - 180px)' }}
+          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing relative"
+          style={{ height: '100%' }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
           onWheel={handleWheel}
         >
+          {/* Alerts overlaid on map */}
+          <div className="absolute top-2 left-2 right-2 z-50 space-y-2 pointer-events-none">
+            {error && <div className="pointer-events-auto"><Alert variant="error">{error} <button className="ml-2 underline" onClick={() => setError(null)}>Dismiss</button></Alert></div>}
+            {success && <div className="pointer-events-auto"><Alert variant="success">{success} <button className="ml-2 underline" onClick={() => setSuccess(null)}>Dismiss</button></Alert></div>}
+          </div>
           <div
             style={{
               transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
@@ -523,8 +524,23 @@ export function CampMap() {
           </div>
         </div>
 
+        {/* Sidebar toggle button */}
+        <button
+          onClick={() => setSidebarOpen(prev => !prev)}
+          className="absolute top-2 right-2 z-50 bg-black text-yellow-400 px-3 py-2 font-black text-xs uppercase tracking-wider hover:bg-gray-800 transition-colors shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)] border-2 border-yellow-400"
+          style={sidebarOpen ? { right: '348px' } : undefined}
+        >
+          {sidebarOpen ? '✕ Close' : '☰ Panel'}
+        </button>
+
         {/* Sidebar */}
-        <div className="w-full lg:w-[340px] lg:max-h-[calc(100vh-180px)] overflow-y-auto border-l-4 border-black bg-white p-4 space-y-4">
+        <div
+          className={cn(
+            'lg:max-h-full overflow-y-auto border-l-4 border-black bg-white transition-all duration-300',
+            sidebarOpen ? 'w-full lg:w-[340px]' : 'w-0 lg:w-0 overflow-hidden border-l-0'
+          )}
+        >
+          <div className="min-w-[340px] p-4 space-y-4">
           {/* Layer Controls */}
           <Card>
             <CardHeader>
@@ -798,6 +814,7 @@ export function CampMap() {
           <div className="text-[10px] text-gray-400 text-center space-y-0.5 pt-2">
             <p>{config.name} — {config.width_ft}×{config.length_ft}ft</p>
             <p>{objects.length} objects • {spots.filter(s => !s.reservation).length}/{spots.length} spots available</p>
+          </div>
           </div>
         </div>
       </div>

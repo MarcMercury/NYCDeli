@@ -203,7 +203,7 @@ export async function fetchDraftOrder(draftId: string): Promise<ShiftDraftOrderW
   const { data: campers } = await supabase
     .from('campers')
     .select('id, full_name, playa_name, email')
-    .in('id', camperIds)
+    .in('id', camperIds) as unknown as { data: { id: string; full_name: string; playa_name: string | null; email: string }[] | null }
 
   const camperMap = new Map((campers ?? []).map(c => [c.id, c]))
 

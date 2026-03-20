@@ -8,7 +8,7 @@ const modules = [
     href: '/intake',
     icon: '📝',
     title: 'Register',
-    description: 'Start here. 9-step intake form covering identity, shelter, skills, safety, and more.',
+    description: 'Start here. 9-step intake covering identity, arrival, shelter, infrastructure, participation, skills, build week, safety, and bio.',
     status: 'Required',
     statusColor: 'text-red-600',
   },
@@ -16,7 +16,7 @@ const modules = [
     href: '/profile',
     icon: '👤',
     title: 'Your Profile',
-    description: 'Your bio, photos, camper details and shift assignments — all in one place.',
+    description: 'Four-tab hub: bio & photo uploads, camper details, your personal shift schedule, and the full team schedule.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -24,7 +24,7 @@ const modules = [
     href: '/campers',
     icon: '🐀',
     title: 'Campers Directory',
-    description: 'Searchable directory of your fellow Deli Rats. Browse profiles and photos.',
+    description: 'Search by name, playa name, or email. View photos, bios, shelter info, and build week / kitchen participation.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -32,7 +32,7 @@ const modules = [
     href: '/map',
     icon: '🏕️',
     title: 'Camp Map',
-    description: 'Interactive camp layout with zone assignments and camper placement.',
+    description: 'Interactive camp map with spot selection, zone assignments, and real-time camper placement.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -40,7 +40,7 @@ const modules = [
     href: '/layout-view',
     icon: '🗺️',
     title: 'Camp Layout',
-    description: 'Auto-placed shelters on a grid with kitchen, common, and shade zones.',
+    description: 'Zoomable 2D grid view with layer toggles for tents, shade, kitchen, and zones — color-coded by shelter type.',
     status: 'View Only',
     statusColor: 'text-blue-600',
   },
@@ -48,7 +48,7 @@ const modules = [
     href: '/events',
     icon: '🗓️',
     title: 'Events Calendar',
-    description: 'Pre-burn gatherings, fundraisers, shopping trips, socials — all color-coded.',
+    description: 'Pre-burn gatherings, fundraisers, shopping trips, and socials — color-coded across 6 event categories.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -56,7 +56,7 @@ const modules = [
     href: '/kitchen',
     icon: '🍳',
     title: 'Kitchen Shifts',
-    description: '6 shift categories with role assignments. Sign up and keep the deli running.',
+    description: 'Sign-up sheet, role definitions, shift coverage, and scheduling across deli, prep, grill, assembly, runners, and more.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -64,7 +64,7 @@ const modules = [
     href: '/schedule',
     icon: '📅',
     title: 'Your Schedule',
-    description: "All your shift assignments in one view. Show up. Don't be that person.",
+    description: 'All Shifts and My Schedule tabs with email lookup, status badges, and date/time sorting. Show up.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -72,7 +72,7 @@ const modules = [
     href: '/build-week',
     icon: '🔨',
     title: 'Build Week',
-    description: 'Tasks by phase, resource tracking, issue log, and builder coordination.',
+    description: 'Four tabs: phased tasks with progress tracking, resource management, issue log, and builder coordination info.',
     status: 'Upcoming',
     statusColor: 'text-yellow-600',
   },
@@ -486,7 +486,7 @@ export default function HomePage() {
             Camp System Modules
           </h2>
           <p className="text-center text-gray-600 mb-12">
-            Everything you need to manage your burn — registration, shifts, maps, events, and more.
+            Nine modules to manage your burn — registration, profile, directory, maps, events, kitchen, schedule, and build week.
           </p>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

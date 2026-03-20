@@ -27,12 +27,15 @@ export default function AdminPage() {
   const [shifts, setShifts] = useState<KitchenShift[]>([])
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchErrors, setFetchErrors] = useState<Record<string, string>>({})
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [selectedCamper, setSelectedCamper] = useState<Camper | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
+    const errors: Record<string, string> = {}
     
     const [campersRes, tasksRes, settingsRes, shiftsRes, assignmentsRes] = await Promise.all([
       supabase.from('campers').select('*').order('created_at', { ascending: false }),
@@ -42,11 +45,19 @@ export default function AdminPage() {
       supabase.from('schedule_assignments').select('*'),
     ])
 
+    if (campersRes.error) errors.campers = campersRes.error.message
+    if (tasksRes.error) errors.tasks = tasksRes.error.message
+    if (settingsRes.error) errors.settings = settingsRes.error.message
+    if (shiftsRes.error) errors.shifts = shiftsRes.error.message
+    if (assignmentsRes.error) errors.assignments = assignmentsRes.error.message
+
     setCampers(campersRes.data || [])
     setTasks(tasksRes.data || [])
     setSettings(settingsRes.data || [])
     setShifts(shiftsRes.data || [])
     setAssignments(assignmentsRes.data || [])
+    setFetchErrors(errors)
+    setLastRefreshed(new Date())
     setLoading(false)
   }, [])
 
@@ -174,29 +185,79 @@ export default function AdminPage() {
           </Alert>
         )}
 
+        {/* Data Connection Status */}
+        {Object.keys(fetchErrors).length > 0 && (
+          <Alert variant="error" className="mb-4">
+            <strong>Data fetch errors:</strong>{' '}
+            {Object.entries(fetchErrors).map(([key, msg]) => (
+              <span key={key} className="block text-sm">
+                {key}: {msg}
+              </span>
+            ))}
+            <button className="ml-2 underline" onClick={() => fetchData()}>Retry</button>
+          </Alert>
+        )}
+
         {/* Quick Stats */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className={`inline-block w-2 h-2 rounded-full ${Object.keys(fetchErrors).length === 0 ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-xs text-gray-500 uppercase tracking-wider">
+              {Object.keys(fetchErrors).length === 0 ? 'Live Data' : 'Partial Data'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastRefreshed && (
+              <span className="text-xs text-gray-400">
+                Updated {lastRefreshed.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              className="text-xs underline text-gray-500 hover:text-black"
+              onClick={() => fetchData()}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardContent className="py-4 text-center">
-              <p className="text-3xl font-black">{campers.length}</p>
+              {fetchErrors.campers ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.campers}>⚠</p>
+              ) : (
+                <p className="text-3xl font-black">{campers.length}</p>
+              )}
               <p className="text-xs uppercase tracking-wider text-gray-500">Registered</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
-              <p className="text-3xl font-black">{campers.filter(c => c.build_week_attending).length}</p>
+              {fetchErrors.campers ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.campers}>⚠</p>
+              ) : (
+                <p className="text-3xl font-black">{campers.filter(c => c.build_week_attending).length}</p>
+              )}
               <p className="text-xs uppercase tracking-wider text-gray-500">Build Week</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
-              <p className="text-3xl font-black">{tasks.filter(t => t.status !== 'done').length}</p>
+              {fetchErrors.tasks ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.tasks}>⚠</p>
+              ) : (
+                <p className="text-3xl font-black">{tasks.filter(t => t.status !== 'done').length}</p>
+              )}
               <p className="text-xs uppercase tracking-wider text-gray-500">Open Tasks</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
-              <p className="text-3xl font-black">{assignments.length}</p>
+              {fetchErrors.assignments ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.assignments}>⚠</p>
+              ) : (
+                <p className="text-3xl font-black">{assignments.length}</p>
+              )}
               <p className="text-xs uppercase tracking-wider text-gray-500">Shift Assignments</p>
             </CardContent>
           </Card>
@@ -221,6 +282,14 @@ export default function AdminPage() {
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">🔐</p>
                 <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Permissions</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/shift-draft" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🎯</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Shift Draft</p>
               </CardContent>
             </Card>
           </Link>
