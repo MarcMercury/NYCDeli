@@ -12,6 +12,9 @@ import {
   fetchBuildProcedures,
   fetchBuildQuestions,
   fetchBuildWeekBuilders,
+  updateGoalStatus,
+  updateQuestionStatus,
+  updateResourceStatus,
   STAGE_ICONS,
   CATEGORY_ICONS,
   CATEGORY_COLORS,
@@ -23,6 +26,9 @@ import type {
   BuildProcedure,
   BuildQuestion,
   BuildGoal,
+  TaskStatus,
+  BuildResourceStatus,
+  BuildQuestionStatus,
   Camper,
 } from '@/types/database'
 
@@ -53,6 +59,11 @@ export default function BuildWeekPage() {
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [resourceStatusFilter, setResourceStatusFilter] = useState<string>('all')
+  const [updatingGoals, setUpdatingGoals] = useState<Record<string, boolean>>({})
+  const [updatingResources, setUpdatingResources] = useState<Record<string, boolean>>({})
+  const [updatingQuestions, setUpdatingQuestions] = useState<Record<string, boolean>>({})
+  const [resolutionInputs, setResolutionInputs] = useState<Record<string, string>>({})
+  const [showResolutionInput, setShowResolutionInput] = useState<Record<string, boolean>>({})
 
   const fetchData = useCallback(async () => {
     try {
@@ -87,6 +98,66 @@ export default function BuildWeekPage() {
 
   const toggleStage = (stageId: string) => {
     setExpandedStages(prev => ({ ...prev, [stageId]: !prev[stageId] }))
+  }
+
+  const GOAL_STATUS_CYCLE: Record<TaskStatus, TaskStatus> = {
+    pending: 'active',
+    active: 'done',
+    done: 'pending',
+  }
+
+  const handleGoalStatusChange = async (goalId: string, currentStatus: TaskStatus) => {
+    const newStatus = GOAL_STATUS_CYCLE[currentStatus]
+    setUpdatingGoals(prev => ({ ...prev, [goalId]: true }))
+    try {
+      await updateGoalStatus(goalId, newStatus)
+      setStages(prev =>
+        prev.map(stage => ({
+          ...stage,
+          goals: stage.goals.map(g =>
+            g.id === goalId ? { ...g, status: newStatus } : g
+          ),
+        }))
+      )
+    } catch {
+      // Silently fail — UI stays in sync
+    } finally {
+      setUpdatingGoals(prev => ({ ...prev, [goalId]: false }))
+    }
+  }
+
+  const handleResourceStatusChange = async (resourceId: string, newStatus: BuildResourceStatus) => {
+    setUpdatingResources(prev => ({ ...prev, [resourceId]: true }))
+    try {
+      await updateResourceStatus(resourceId, newStatus)
+      setResources(prev =>
+        prev.map(r => (r.id === resourceId ? { ...r, status: newStatus } : r))
+      )
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingResources(prev => ({ ...prev, [resourceId]: false }))
+    }
+  }
+
+  const handleQuestionStatusChange = async (questionId: string, newStatus: BuildQuestionStatus, resolution?: string) => {
+    setUpdatingQuestions(prev => ({ ...prev, [questionId]: true }))
+    try {
+      await updateQuestionStatus(questionId, newStatus, resolution)
+      setQuestions(prev =>
+        prev.map(q =>
+          q.id === questionId
+            ? { ...q, status: newStatus, ...(resolution !== undefined ? { resolution } : {}) }
+            : q
+        )
+      )
+      setShowResolutionInput(prev => ({ ...prev, [questionId]: false }))
+      setResolutionInputs(prev => ({ ...prev, [questionId]: '' }))
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingQuestions(prev => ({ ...prev, [questionId]: false }))
+    }
   }
 
   const getStageProgress = (goals: BuildGoal[]) => {
@@ -258,10 +329,18 @@ export default function BuildWeekPage() {
                               )}
                             >
                               <div className="flex items-start gap-3">
-                                {/* Status indicator */}
-                                <div className="mt-1 text-lg">
+                                {/* Clickable status toggle */}
+                                <button
+                                  onClick={() => handleGoalStatusChange(goal.id, goal.status)}
+                                  disabled={updatingGoals[goal.id]}
+                                  className={cn(
+                                    'mt-1 text-lg flex-shrink-0 transition-transform hover:scale-125 focus:outline-none',
+                                    updatingGoals[goal.id] && 'opacity-50 animate-pulse'
+                                  )}
+                                  title={`Status: ${goal.status} — Click to change to ${GOAL_STATUS_CYCLE[goal.status]}`}
+                                >
                                   {goal.status === 'done' ? '✅' : goal.status === 'active' ? '🔄' : '⬜'}
-                                </div>
+                                </button>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap mb-1">
                                     <span className={cn(
@@ -413,6 +492,25 @@ export default function BuildWeekPage() {
                           💡 {resource.notes}
                         </p>
                       )}
+                      {/* Resource status change buttons */}
+                      <div className="flex flex-wrap gap-1 mt-3">
+                        {(['have', 'need', 'fix', 'discard'] as const).map(status => (
+                          <button
+                            key={status}
+                            onClick={() => handleResourceStatusChange(resource.id, status)}
+                            disabled={resource.status === status || updatingResources[resource.id]}
+                            className={cn(
+                              'px-2 py-0.5 text-[10px] font-bold uppercase border rounded transition-colors',
+                              resource.status === status
+                                ? cn(RESOURCE_STATUS_COLORS[status], 'ring-2 ring-black')
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-100',
+                              updatingResources[resource.id] && 'opacity-50 cursor-not-allowed'
+                            )}
+                          >
+                            {status === 'have' ? '✅ Have' : status === 'need' ? '🔴 Need' : status === 'fix' ? '🔧 Fix' : '🗑️ Discard'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -549,6 +647,67 @@ export default function BuildWeekPage() {
                             ✅ Resolution: {q.resolution}
                           </p>
                         )}
+                        {/* Action buttons */}
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          {q.status !== 'resolved' && !showResolutionInput[q.id] && (
+                            <button
+                              onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
+                              disabled={updatingQuestions[q.id]}
+                              className="px-2 py-1 text-xs font-bold uppercase border-2 border-green-500 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                            >
+                              ✅ Resolve
+                            </button>
+                          )}
+                          {q.status !== 'deferred' && (
+                            <button
+                              onClick={() => handleQuestionStatusChange(q.id, 'deferred')}
+                              disabled={updatingQuestions[q.id]}
+                              className={cn(
+                                'px-2 py-1 text-xs font-bold uppercase border-2 border-gray-400 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors',
+                                updatingQuestions[q.id] && 'opacity-50 cursor-not-allowed'
+                              )}
+                            >
+                              ⏸️ Defer
+                            </button>
+                          )}
+                          {q.status !== 'open' && (
+                            <button
+                              onClick={() => handleQuestionStatusChange(q.id, 'open')}
+                              disabled={updatingQuestions[q.id]}
+                              className={cn(
+                                'px-2 py-1 text-xs font-bold uppercase border-2 border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors',
+                                updatingQuestions[q.id] && 'opacity-50 cursor-not-allowed'
+                              )}
+                            >
+                              🔄 Reopen
+                            </button>
+                          )}
+                        </div>
+                        {/* Resolution input */}
+                        {showResolutionInput[q.id] && (
+                          <div className="mt-3 flex gap-2">
+                            <input
+                              type="text"
+                              value={resolutionInputs[q.id] || ''}
+                              onChange={e => setResolutionInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                              placeholder="How was this resolved?"
+                              className="flex-1 px-3 py-1 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            />
+                            <button
+                              onClick={() => handleQuestionStatusChange(q.id, 'resolved', resolutionInputs[q.id] || '')}
+                              disabled={updatingQuestions[q.id]}
+                              className="px-3 py-1 text-xs font-bold uppercase bg-green-500 text-white border-2 border-green-600 hover:bg-green-600 transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: false }))}
+                              className="px-3 py-1 text-xs font-bold uppercase bg-gray-200 border-2 border-gray-300 hover:bg-gray-300 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -607,6 +766,67 @@ export default function BuildWeekPage() {
                           <p className="text-sm text-green-700 bg-green-50 border border-green-200 p-2 mt-2 rounded">
                             ✅ Resolution: {q.resolution}
                           </p>
+                        )}
+                        {/* Action buttons */}
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          {q.status !== 'resolved' && !showResolutionInput[q.id] && (
+                            <button
+                              onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
+                              disabled={updatingQuestions[q.id]}
+                              className="px-2 py-1 text-xs font-bold uppercase border-2 border-green-500 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                            >
+                              ✅ Resolve
+                            </button>
+                          )}
+                          {q.status !== 'deferred' && (
+                            <button
+                              onClick={() => handleQuestionStatusChange(q.id, 'deferred')}
+                              disabled={updatingQuestions[q.id]}
+                              className={cn(
+                                'px-2 py-1 text-xs font-bold uppercase border-2 border-gray-400 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors',
+                                updatingQuestions[q.id] && 'opacity-50 cursor-not-allowed'
+                              )}
+                            >
+                              ⏸️ Defer
+                            </button>
+                          )}
+                          {q.status !== 'open' && (
+                            <button
+                              onClick={() => handleQuestionStatusChange(q.id, 'open')}
+                              disabled={updatingQuestions[q.id]}
+                              className={cn(
+                                'px-2 py-1 text-xs font-bold uppercase border-2 border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors',
+                                updatingQuestions[q.id] && 'opacity-50 cursor-not-allowed'
+                              )}
+                            >
+                              🔄 Reopen
+                            </button>
+                          )}
+                        </div>
+                        {/* Resolution input */}
+                        {showResolutionInput[q.id] && (
+                          <div className="mt-3 flex gap-2">
+                            <input
+                              type="text"
+                              value={resolutionInputs[q.id] || ''}
+                              onChange={e => setResolutionInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                              placeholder="How was this resolved?"
+                              className="flex-1 px-3 py-1 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            />
+                            <button
+                              onClick={() => handleQuestionStatusChange(q.id, 'resolved', resolutionInputs[q.id] || '')}
+                              disabled={updatingQuestions[q.id]}
+                              className="px-3 py-1 text-xs font-bold uppercase bg-green-500 text-white border-2 border-green-600 hover:bg-green-600 transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: false }))}
+                              className="px-3 py-1 text-xs font-bold uppercase bg-gray-200 border-2 border-gray-300 hover:bg-gray-300 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

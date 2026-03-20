@@ -269,8 +269,8 @@ export function CampMap() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin text-5xl mb-4">🗺️</div>
-          <p className="font-black uppercase tracking-wider text-lg">Loading Camp Map...</p>
+          <div className="animate-spin text-5xl mb-4">🏕️</div>
+          <p className="font-black uppercase tracking-wider text-lg">Loading Camp Spots...</p>
           <p className="text-sm text-gray-600">Rendering the playa from above</p>
         </div>
       </div>
@@ -299,7 +299,7 @@ export function CampMap() {
       <div className="bg-black text-white px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sticky top-16 z-40">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-black uppercase tracking-wider text-yellow-400">
-            🗺️ Camp Map
+            🏕️ Camp Spots
           </h1>
           <Badge variant={mode === 'explore' ? 'default' : 'success'}>
             {mode === 'explore' ? '👁️ Explore' : '🏕️ Reserve'}

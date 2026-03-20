@@ -101,6 +101,15 @@ export async function updateQuestionStatus(questionId: string, status: 'open' | 
   if (error) throw error
 }
 
+export async function updateResourceStatus(resourceId: string, status: 'have' | 'need' | 'fix' | 'discard') {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_resources')
+    .update({ status } as never)
+    .eq('id', resourceId)
+  if (error) throw error
+}
+
 export const STAGE_ICONS: Record<string, string> = {
   planning: '📋',
   monday: '📍',
