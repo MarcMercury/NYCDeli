@@ -2,8 +2,15 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import type { FloorplanObjectRow } from '@/types/database'
+import type { FloorplanObjectRow, UtilityLineRow, UtilityLineType, UtilityLinePoint } from '@/types/database'
 import { getTemplateForType } from './object-templates'
+
+export type DrawingMode = null | 'power' | 'water'
+
+const LINE_COLORS: Record<UtilityLineType, string> = {
+  power: '#EAB308', // yellow-500
+  water: '#3B82F6', // blue-500
+}
 
 interface GridCanvasProps {
   widthFt: number
@@ -18,6 +25,12 @@ interface GridCanvasProps {
   onDropNew: (objectType: string, x: number, y: number) => void
   showGrid: boolean
   showLabels: boolean
+  utilityLines: UtilityLineRow[]
+  drawingMode: DrawingMode
+  onFinishLine: (lineType: UtilityLineType, points: UtilityLinePoint[]) => void
+  selectedLineId: string | null
+  onSelectLine: (id: string | null) => void
+  showUtilityLines: boolean
 }
 
 export function GridCanvas({
@@ -33,6 +46,12 @@ export function GridCanvas({
   onDropNew,
   showGrid,
   showLabels,
+  utilityLines,
+  drawingMode,
+  onFinishLine,
+  selectedLineId,
+  onSelectLine,
+  showUtilityLines,
 }: GridCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [dragState, setDragState] = useState<{
@@ -50,6 +69,10 @@ export function GridCanvas({
     objStartH: number
   } | null>(null)
   const [dragOverPos, setDragOverPos] = useState<{ x: number; y: number } | null>(null)
+
+  // Line drawing state
+  const [drawingPoints, setDrawingPoints] = useState<UtilityLinePoint[]>([])
+  const [currentMousePos, setCurrentMousePos] = useState<UtilityLinePoint | null>(null)
 
   const snapToGrid = useCallback(
     (value: number) => Math.round(value / gridSizeFt) * gridSizeFt,
@@ -156,7 +179,56 @@ export function GridCanvas({
   }
 
   function handleCanvasClick(e: React.MouseEvent) {
+    // Line drawing mode: click to add points
+    if (drawingMode) {
+      const x = snapToGrid(toFeetX(e.clientX))
+      const y = snapToGrid(toFeetY(e.clientY))
+      setDrawingPoints(prev => [...prev, { x, y }])
+      return
+    }
     if (e.target === canvasRef.current) {
+      onSelectObject(null)
+      onSelectLine(null)
+    }
+  }
+
+  function handleCanvasDoubleClick(e: React.MouseEvent) {
+    // Finish line drawing on double-click
+    if (drawingMode && drawingPoints.length >= 1) {
+      const x = snapToGrid(toFeetX(e.clientX))
+      const y = snapToGrid(toFeetY(e.clientY))
+      const finalPoints = [...drawingPoints, { x, y }]
+      onFinishLine(drawingMode, finalPoints)
+      setDrawingPoints([])
+      setCurrentMousePos(null)
+    }
+  }
+
+  function handleCanvasMouseMove(e: React.MouseEvent) {
+    if (drawingMode && drawingPoints.length > 0) {
+      const x = snapToGrid(toFeetX(e.clientX))
+      const y = snapToGrid(toFeetY(e.clientY))
+      setCurrentMousePos({ x, y })
+    }
+  }
+
+  // Reset drawing when mode changes off
+  if (!drawingMode && drawingPoints.length > 0) {
+    setDrawingPoints([])
+    setCurrentMousePos(null)
+  }
+
+  function pointsToSvgPath(pts: UtilityLinePoint[]): string {
+    if (pts.length === 0) return ''
+    return pts
+      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scale} ${p.y * scale}`)
+      .join(' ')
+  }
+
+  function handleLineClick(e: React.MouseEvent, lineId: string) {
+    e.stopPropagation()
+    if (!drawingMode) {
+      onSelectLine(lineId)
       onSelectObject(null)
     }
   }
@@ -183,6 +255,8 @@ export function GridCanvas({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={handleCanvasClick}
+      onDoubleClick={handleCanvasDoubleClick}
+      onMouseMove={handleCanvasMouseMove}
     >
       {/* Grid numbers along top */}
       {showGrid &&
@@ -298,6 +372,129 @@ export function GridCanvas({
           </div>
         )
       })}
+
+      {/* Utility Lines SVG Overlay */}
+      {showUtilityLines && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={widthFt * scale}
+          height={lengthFt * scale}
+          style={{ zIndex: 40 }}
+        >
+          {/* Existing saved lines */}
+          {utilityLines.map(line => {
+            const color = LINE_COLORS[line.line_type]
+            const isSelected = selectedLineId === line.id
+            return (
+              <g key={line.id}>
+                {/* Wider invisible hit area for clicking */}
+                <path
+                  d={pointsToSvgPath(line.points)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={12}
+                  className="pointer-events-stroke cursor-pointer"
+                  onClick={e => handleLineClick(e, line.id)}
+                />
+                {/* Visible line */}
+                <path
+                  d={pointsToSvgPath(line.points)}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={isSelected ? 5 : 3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={line.line_type === 'water' ? '8 4' : 'none'}
+                  opacity={isSelected ? 1 : 0.8}
+                  className="pointer-events-stroke cursor-pointer"
+                  onClick={e => handleLineClick(e, line.id)}
+                />
+                {/* Selection indicators at vertices */}
+                {isSelected && line.points.map((pt, i) => (
+                  <circle
+                    key={i}
+                    cx={pt.x * scale}
+                    cy={pt.y * scale}
+                    r={4}
+                    fill="white"
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                ))}
+                {/* Label at midpoint */}
+                {line.label && line.points.length >= 2 && (
+                  <text
+                    x={(line.points[0].x + line.points[line.points.length - 1].x) / 2 * scale}
+                    y={(line.points[0].y + line.points[line.points.length - 1].y) / 2 * scale - 8}
+                    textAnchor="middle"
+                    className="text-[9px] font-bold uppercase fill-current pointer-events-none"
+                    style={{ color }}
+                  >
+                    {line.label}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+
+          {/* Currently drawing line preview */}
+          {drawingMode && drawingPoints.length > 0 && (
+            <g>
+              <path
+                d={pointsToSvgPath(
+                  currentMousePos
+                    ? [...drawingPoints, currentMousePos]
+                    : drawingPoints
+                )}
+                fill="none"
+                stroke={LINE_COLORS[drawingMode]}
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={drawingMode === 'water' ? '8 4' : 'none'}
+                opacity={0.6}
+              />
+              {/* Dots at each placed point */}
+              {drawingPoints.map((pt, i) => (
+                <circle
+                  key={i}
+                  cx={pt.x * scale}
+                  cy={pt.y * scale}
+                  r={5}
+                  fill={LINE_COLORS[drawingMode]}
+                  stroke="white"
+                  strokeWidth={2}
+                />
+              ))}
+              {/* Cursor dot */}
+              {currentMousePos && (
+                <circle
+                  cx={currentMousePos.x * scale}
+                  cy={currentMousePos.y * scale}
+                  r={4}
+                  fill="white"
+                  stroke={LINE_COLORS[drawingMode]}
+                  strokeWidth={2}
+                  opacity={0.7}
+                />
+              )}
+            </g>
+          )}
+        </svg>
+      )}
+
+      {/* Drawing mode indicator */}
+      {drawingMode && (
+        <div
+          className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-2 text-xs font-black uppercase tracking-wider border-2 border-black z-50 select-none"
+          style={{
+            backgroundColor: drawingMode === 'power' ? '#FEF08A' : '#BFDBFE',
+            color: '#000',
+          }}
+        >
+          Drawing {drawingMode} line — Click to place points, Double-click to finish
+        </div>
+      )}
 
       {/* Compass */}
       <div className="absolute top-2 right-2 bg-white/80 border-2 border-black p-2 text-xs pointer-events-none select-none">

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, Button, Badge, Input, Alert } from '@/components/ui'
-import { generateId } from '@/lib/utils'
-import type { FloorplanConfigRow, FloorplanObjectRow, FloorplanObjectType } from '@/types/database'
+import { generateId, cn } from '@/lib/utils'
+import type { FloorplanConfigRow, FloorplanObjectRow, FloorplanObjectType, UtilityLineRow, UtilityLineType, UtilityLinePoint } from '@/types/database'
 import {
   fetchActiveFloorplan,
   fetchFloorplanObjects,
@@ -12,8 +12,11 @@ import {
   deleteFloorplanObject,
   updateFloorplan,
   createFloorplan,
+  fetchUtilityLines,
+  createUtilityLine,
+  deleteUtilityLine,
 } from '@/lib/floorplan'
-import { GridCanvas } from './grid-canvas'
+import { GridCanvas, type DrawingMode } from './grid-canvas'
 import { ObjectPalette } from './object-palette'
 import { PropertiesPanel } from './properties-panel'
 import { getTemplateForType, type ObjectTemplate } from './object-templates'
@@ -32,6 +35,12 @@ export function FloorplanEditor() {
   const [showGrid, setShowGrid] = useState(true)
   const [showLabels, setShowLabels] = useState(true)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Utility lines
+  const [utilityLines, setUtilityLines] = useState<UtilityLineRow[]>([])
+  const [drawingMode, setDrawingMode] = useState<DrawingMode>(null)
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
+  const [showUtilityLines, setShowUtilityLines] = useState(true)
 
   // Dimension editing
   const [editingDimensions, setEditingDimensions] = useState(false)
@@ -71,6 +80,10 @@ export function FloorplanEditor() {
 
     const objs = await fetchFloorplanObjects(floorplan.id)
     setObjects(objs)
+
+    const lines = await fetchUtilityLines(floorplan.id)
+    setUtilityLines(lines)
+
     setLoading(false)
   }, [])
 
@@ -261,6 +274,41 @@ export function FloorplanEditor() {
     setHasUnsavedChanges(true)
   }
 
+  // Utility line: finish drawing
+  async function handleFinishLine(lineType: UtilityLineType, points: UtilityLinePoint[]) {
+    if (!config || points.length < 2) return
+    setDrawingMode(null)
+
+    const tempLine: UtilityLineRow = {
+      id: generateId(),
+      floorplan_id: config.id,
+      line_type: lineType,
+      points,
+      label: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    setUtilityLines(prev => [...prev, tempLine])
+
+    const saved = await createUtilityLine({
+      floorplan_id: config.id,
+      line_type: lineType,
+      points,
+    })
+
+    if (saved) {
+      setUtilityLines(prev => prev.map(l => (l.id === tempLine.id ? saved : l)))
+    }
+  }
+
+  // Delete utility line
+  async function handleDeleteLine(id: string) {
+    setUtilityLines(prev => prev.filter(l => l.id !== id))
+    setSelectedLineId(null)
+    await deleteUtilityLine(id)
+  }
+
   // Save all changes
   async function handleSaveAll() {
     setSaving(true)
@@ -300,9 +348,18 @@ export function FloorplanEditor() {
           e.preventDefault()
           handleDeleteObject(selectedObjectId)
         }
+        if (selectedLineId && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+          e.preventDefault()
+          handleDeleteLine(selectedLineId)
+        }
       }
       if (e.key === 'Escape') {
-        setSelectedObjectId(null)
+        if (drawingMode) {
+          setDrawingMode(null)
+        } else {
+          setSelectedObjectId(null)
+          setSelectedLineId(null)
+        }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
@@ -369,6 +426,108 @@ export function FloorplanEditor() {
           {/* LEFT: Object Palette */}
           <div className="xl:max-h-[calc(100vh-200px)] xl:overflow-y-auto space-y-4">
             <ObjectPalette onDragStart={handlePaletteDragStart} />
+
+            {/* Utility Lines */}
+            <Card>
+              <CardHeader>
+                <CardTitle>🔌 Utility Lines</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+                  Click to start, click to add points, double-click to finish
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setDrawingMode(drawingMode === 'power' ? null : 'power')
+                      setSelectedObjectId(null)
+                      setSelectedLineId(null)
+                    }}
+                    className={cn(
+                      'flex flex-col items-center gap-1 p-3 border-2 transition-all select-none',
+                      drawingMode === 'power'
+                        ? 'border-yellow-500 bg-yellow-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                        : 'border-gray-300 bg-white hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                    )}
+                  >
+                    <span className="text-lg">⚡</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      Power Line
+                    </span>
+                    <div className="w-full h-1 bg-yellow-500 rounded-full" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDrawingMode(drawingMode === 'water' ? null : 'water')
+                      setSelectedObjectId(null)
+                      setSelectedLineId(null)
+                    }}
+                    className={cn(
+                      'flex flex-col items-center gap-1 p-3 border-2 transition-all select-none',
+                      drawingMode === 'water'
+                        ? 'border-blue-500 bg-blue-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                        : 'border-gray-300 bg-white hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                    )}
+                  >
+                    <span className="text-lg">💧</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      Water Line
+                    </span>
+                    <div className="w-full h-1 bg-blue-500 rounded-full" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #3B82F6 0px, #3B82F6 8px, transparent 8px, transparent 12px)' }} />
+                  </button>
+                </div>
+
+                {/* Line visibility toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showUtilityLines}
+                    onChange={e => setShowUtilityLines(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-xs font-bold uppercase">Show Lines</span>
+                </label>
+
+                {/* Line list */}
+                {utilityLines.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                      {utilityLines.length} line{utilityLines.length !== 1 ? 's' : ''} placed
+                    </p>
+                    {utilityLines.map(line => (
+                      <div
+                        key={line.id}
+                        onClick={() => {
+                          setSelectedLineId(line.id)
+                          setSelectedObjectId(null)
+                        }}
+                        className={cn(
+                          'flex items-center gap-2 px-2 py-1.5 border-2 cursor-pointer text-xs transition-all',
+                          selectedLineId === line.id
+                            ? 'border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                            : 'border-gray-200 hover:border-gray-400'
+                        )}
+                      >
+                        <span>{line.line_type === 'power' ? '⚡' : '💧'}</span>
+                        <span className="font-bold uppercase flex-1">
+                          {line.label || `${line.line_type} line`}
+                        </span>
+                        <span className="text-[10px] text-gray-400">{line.points.length}pts</span>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleDeleteLine(line.id)
+                          }}
+                          className="text-red-500 hover:text-red-700 font-bold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Dimension Settings */}
             <Card>
@@ -504,6 +663,12 @@ export function FloorplanEditor() {
                     onDropNew={handleDropNew}
                     showGrid={showGrid}
                     showLabels={showLabels}
+                    utilityLines={utilityLines}
+                    drawingMode={drawingMode}
+                    onFinishLine={handleFinishLine}
+                    selectedLineId={selectedLineId}
+                    onSelectLine={setSelectedLineId}
+                    showUtilityLines={showUtilityLines}
                   />
                 )}
               </CardContent>
@@ -527,6 +692,14 @@ export function FloorplanEditor() {
               <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
                 <span className="font-bold">Locked:</span>{' '}
                 {objects.filter(o => o.is_locked).length}
+              </div>
+              <div className="flex items-center gap-1.5 bg-yellow-50 border-2 border-yellow-500 px-3 py-1.5">
+                <span className="font-bold">⚡ Power:</span>{' '}
+                {utilityLines.filter(l => l.line_type === 'power').length}
+              </div>
+              <div className="flex items-center gap-1.5 bg-blue-50 border-2 border-blue-500 px-3 py-1.5">
+                <span className="font-bold">💧 Water:</span>{' '}
+                {utilityLines.filter(l => l.line_type === 'water').length}
               </div>
             </div>
 

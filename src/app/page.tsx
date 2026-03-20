@@ -8,31 +8,55 @@ const modules = [
     href: '/intake',
     icon: '📝',
     title: 'Register',
-    description: 'Start here. Fill out your info so we know who you are and what you need.',
+    description: 'Start here. 9-step intake form covering identity, shelter, skills, safety, and more.',
     status: 'Required',
     statusColor: 'text-red-600',
   },
   {
-    href: '/camp-selection',
+    href: '/profile',
+    icon: '👤',
+    title: 'Your Profile',
+    description: 'Your bio, photos, camper details and shift assignments — all in one place.',
+    status: 'Active',
+    statusColor: 'text-green-600',
+  },
+  {
+    href: '/campers',
+    icon: '🐀',
+    title: 'Campers Directory',
+    description: 'Searchable directory of your fellow Deli Rats. Browse profiles and photos.',
+    status: 'Active',
+    statusColor: 'text-green-600',
+  },
+  {
+    href: '/map',
     icon: '🏕️',
-    title: 'Camp Map Selection',
-    description: 'Pick your spot on the map — airline seat selection style. First come, first served.',
-    status: 'New',
-    statusColor: 'text-purple-600',
+    title: 'Camp Map',
+    description: 'Interactive camp layout with zone assignments and camper placement.',
+    status: 'Active',
+    statusColor: 'text-green-600',
   },
   {
     href: '/layout-view',
     icon: '🗺️',
     title: 'Camp Layout',
-    description: "See where your tent goes. Spoiler: where we put it, not where you want it.",
+    description: 'Auto-placed shelters on a grid with kitchen, common, and shade zones.',
     status: 'View Only',
     statusColor: 'text-blue-600',
   },
   {
+    href: '/events',
+    icon: '🗓️',
+    title: 'Events Calendar',
+    description: 'Pre-burn gatherings, fundraisers, shopping trips, socials — all color-coded.',
+    status: 'Active',
+    statusColor: 'text-green-600',
+  },
+  {
     href: '/kitchen',
     icon: '🍳',
-    title: 'Kitchen Ops',
-    description: "Sandwiches don't make themselves. Learn the roles, see the schedule.",
+    title: 'Kitchen Shifts',
+    description: '6 shift categories with role assignments. Sign up and keep the deli running.',
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -40,7 +64,7 @@ const modules = [
     href: '/schedule',
     icon: '📅',
     title: 'Your Schedule',
-    description: "Check your shifts. Show up. Don't be the person who doesn't show up.",
+    description: "All your shift assignments in one view. Show up. Don't be that person.",
     status: 'Active',
     statusColor: 'text-green-600',
   },
@@ -48,7 +72,7 @@ const modules = [
     href: '/build-week',
     icon: '🔨',
     title: 'Build Week',
-    description: 'Early arrival coordination. Tasks, checklists, and controlled chaos.',
+    description: 'Tasks by phase, resource tracking, issue log, and builder coordination.',
     status: 'Upcoming',
     statusColor: 'text-yellow-600',
   },
@@ -459,10 +483,10 @@ export default function HomePage() {
       <section className="py-16 px-4">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-2">
-            System Modules
+            Camp System Modules
           </h2>
           <p className="text-center text-gray-600 mb-12">
-            Each module feeds the others. No data exists in isolation.
+            Everything you need to manage your burn — registration, shifts, maps, events, and more.
           </p>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -466,6 +466,12 @@ export interface Database {
         Update: FloorplanObjectUpdate
         Relationships: []
       }
+      floorplan_utility_lines: {
+        Row: UtilityLineRow
+        Insert: UtilityLineInsert
+        Update: UtilityLineUpdate
+        Relationships: []
+      }
       camp_events: {
         Row: CampEventRow
         Insert: CampEventInsert
@@ -514,6 +520,24 @@ export interface Database {
         Update: Partial<Omit<BuildQuestionRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: []
       }
+      shift_drafts: {
+        Row: ShiftDraftRow
+        Insert: ShiftDraftInsert
+        Update: ShiftDraftUpdate
+        Relationships: []
+      }
+      shift_draft_order: {
+        Row: ShiftDraftOrderRow
+        Insert: ShiftDraftOrderInsert
+        Update: Partial<ShiftDraftOrderInsert>
+        Relationships: []
+      }
+      shift_draft_picks: {
+        Row: ShiftDraftPickRow
+        Insert: ShiftDraftPickInsert
+        Update: ShiftDraftPickUpdate
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -528,7 +552,10 @@ export interface Database {
       spot_size: SpotSize
       reservation_status: ReservationStatus
       floorplan_object_type: FloorplanObjectType
+      utility_line_type: UtilityLineType
       user_role: UserRole
+      draft_status: DraftStatus
+      draft_pick_status: DraftPickStatus
     }
   }
 }
@@ -763,6 +790,37 @@ export interface FloorplanObjectUpdate {
 export type FloorplanConfig = FloorplanConfigRow
 export type FloorplanObject = FloorplanObjectRow
 
+// Utility Lines
+export type UtilityLineType = 'power' | 'water'
+
+export interface UtilityLinePoint {
+  x: number
+  y: number
+}
+
+export interface UtilityLineRow {
+  id: string
+  floorplan_id: string
+  line_type: UtilityLineType
+  points: UtilityLinePoint[]
+  label: string
+  created_at: string
+  updated_at: string
+}
+
+export interface UtilityLineInsert {
+  floorplan_id: string
+  line_type: UtilityLineType
+  points: UtilityLinePoint[]
+  label?: string
+}
+
+export interface UtilityLineUpdate {
+  line_type?: UtilityLineType
+  points?: UtilityLinePoint[]
+  label?: string
+}
+
 // ==========================================
 // Camp Events Types
 // ==========================================
@@ -922,4 +980,107 @@ export type CamperPhoto = CamperPhotoRow
 export interface UserProfileWithCamper extends UserProfileRow {
   camper: CamperRow | null
   photos: CamperPhotoRow[]
+}
+
+// ==========================================
+// Shift Draft Types
+// ==========================================
+
+export type DraftStatus = 'setup' | 'active' | 'paused' | 'completed'
+export type DraftPickStatus = 'pending' | 'picking' | 'picked' | 'skipped' | 'auto_skipped'
+
+export interface ShiftDraftRow {
+  id: string
+  created_at: string
+  updated_at: string
+  name: string
+  status: DraftStatus
+  current_round: number
+  current_pick_index: number
+  pick_time_limit_seconds: number
+  total_rounds: number
+  started_at: string | null
+  completed_at: string | null
+  created_by: string | null
+}
+
+export interface ShiftDraftInsert {
+  name?: string
+  status?: DraftStatus
+  current_round?: number
+  current_pick_index?: number
+  pick_time_limit_seconds?: number
+  total_rounds?: number
+  created_by?: string | null
+}
+
+export interface ShiftDraftUpdate {
+  name?: string
+  status?: DraftStatus
+  current_round?: number
+  current_pick_index?: number
+  pick_time_limit_seconds?: number
+  total_rounds?: number
+  started_at?: string | null
+  completed_at?: string | null
+}
+
+export interface ShiftDraftOrderRow {
+  id: string
+  created_at: string
+  draft_id: string
+  camper_id: string
+  draft_position: number
+}
+
+export interface ShiftDraftOrderInsert {
+  draft_id: string
+  camper_id: string
+  draft_position: number
+}
+
+export interface ShiftDraftPickRow {
+  id: string
+  created_at: string
+  draft_id: string
+  camper_id: string
+  round_number: number
+  pick_index: number
+  shift_category: string | null
+  shift_role: string | null
+  shift_time: string | null
+  status: DraftPickStatus
+  picked_at: string | null
+  expired_at: string | null
+  turn_started_at: string | null
+}
+
+export interface ShiftDraftPickInsert {
+  draft_id: string
+  camper_id: string
+  round_number: number
+  pick_index: number
+  shift_category?: string | null
+  shift_role?: string | null
+  shift_time?: string | null
+  status?: DraftPickStatus
+  turn_started_at?: string | null
+}
+
+export interface ShiftDraftPickUpdate {
+  shift_category?: string | null
+  shift_role?: string | null
+  shift_time?: string | null
+  status?: DraftPickStatus
+  picked_at?: string | null
+  expired_at?: string | null
+  turn_started_at?: string | null
+}
+
+export type ShiftDraft = ShiftDraftRow
+export type ShiftDraftOrder = ShiftDraftOrderRow
+export type ShiftDraftPick = ShiftDraftPickRow
+
+export interface ShiftDraftOrderWithCamper extends ShiftDraftOrderRow {
+  camper: Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'email'> | null
 }

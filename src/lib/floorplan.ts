@@ -6,6 +6,9 @@ import type {
   FloorplanObjectUpdate,
   FloorplanConfigInsert,
   FloorplanConfigUpdate,
+  UtilityLineRow,
+  UtilityLineInsert,
+  UtilityLineUpdate,
 } from '@/types/database'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,6 +171,69 @@ export async function batchUpdateObjects(
   const hasError = results.some(r => r.error)
   if (hasError) {
     console.error('Error in batch update')
+    return false
+  }
+  return true
+}
+
+// ========== Utility Lines ==========
+
+export async function fetchUtilityLines(floorplanId: string): Promise<UtilityLineRow[]> {
+  const { data, error } = await supabase()
+    .from('floorplan_utility_lines')
+    .select('*')
+    .eq('floorplan_id', floorplanId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching utility lines:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function createUtilityLine(
+  line: UtilityLineInsert
+): Promise<UtilityLineRow | null> {
+  const { data, error } = await supabase()
+    .from('floorplan_utility_lines')
+    .insert(line)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating utility line:', error)
+    return null
+  }
+  return data
+}
+
+export async function updateUtilityLine(
+  id: string,
+  updates: UtilityLineUpdate
+): Promise<UtilityLineRow | null> {
+  const { data, error } = await supabase()
+    .from('floorplan_utility_lines')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating utility line:', error)
+    return null
+  }
+  return data
+}
+
+export async function deleteUtilityLine(id: string): Promise<boolean> {
+  const { error } = await supabase()
+    .from('floorplan_utility_lines')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting utility line:', error)
     return false
   }
   return true

@@ -12,9 +12,209 @@ import type { KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/ty
 type Tab = { id: string; label: string; icon?: React.ReactNode }
 
 const tabs: Tab[] = [
+  { id: 'signup', label: 'Sign-Up Sheet' },
   { id: 'roles', label: 'Roles' },
   { id: 'shifts', label: 'Shifts' },
   { id: 'coverage', label: 'Coverage' },
+]
+
+interface ShiftPosition {
+  role: string
+  time?: string
+  note?: string
+  countsDouble?: boolean
+  requiresExp?: boolean
+}
+
+interface ShiftCategory {
+  name: string
+  time?: string
+  note?: string
+  positions: ShiftPosition[]
+}
+
+const deliShiftCategories: ShiftCategory[] = [
+  {
+    name: 'Deli Shifts (M\u2013Sat)',
+    note: 'Core daily shifts running the NYC Deli',
+    positions: [
+      { role: 'Kitchen Lead', note: 'as needed' },
+      { role: 'Kitchen Supervisor', time: '8:30AM\u201312:30PM', requiresExp: true, countsDouble: true },
+      { role: 'Camp Manager Day', time: '10AM\u20134PM', countsDouble: true },
+      { role: 'Camp Manager Day Deputy', time: '10AM\u20131PM' },
+      { role: 'Camp Manager Day Deputy', time: '1PM\u20134PM' },
+      { role: 'Camp Manager Night', time: '4PM\u201310PM', countsDouble: true },
+      { role: 'Camp Manager Night Deputy', time: '4PM\u20137PM' },
+      { role: 'Camp Manager Night Deputy', time: '7PM\u201310PM' },
+    ],
+  },
+  {
+    name: 'Prep Crew',
+    time: '8:30\u201311:00 AM',
+    note: '5 positions',
+    positions: [
+      { role: 'Prep Crew' },
+      { role: 'Prep Crew' },
+      { role: 'Prep Crew' },
+      { role: 'Prep Crew' },
+      { role: 'Prep Crew' },
+    ],
+  },
+  {
+    name: 'Order Taker',
+    time: '9:30\u201312:00',
+    note: '1 position',
+    positions: [
+      { role: 'Order Taker & Counter', note: 'Basically Entertainer' },
+    ],
+  },
+  {
+    name: 'Grill \u2013 Service Shift',
+    time: '9:30\u201312:00',
+    note: '4 positions',
+    positions: [
+      { role: 'Grill Lead', requiresExp: true },
+      { role: 'Grill' },
+      { role: 'Grill' },
+      { role: 'Grill' },
+    ],
+  },
+  {
+    name: 'Assembly / Deli Service',
+    time: '9:30\u201312:00',
+    note: '5 positions',
+    positions: [
+      { role: 'Assembly (Egg + Egg+Cheese)' },
+      { role: 'Assembly (Schmearer)' },
+      { role: 'Assembly (Bacon)' },
+      { role: 'Assembly (Coffee + Milk)' },
+      { role: 'Assembly (Sandwich Counter)' },
+    ],
+  },
+  {
+    name: 'Runner',
+    time: '9:30\u201312:00',
+    note: '2 positions',
+    positions: [
+      { role: 'Runner (Assist)' },
+      { role: 'Runner (Assist)' },
+    ],
+  },
+  {
+    name: 'Security',
+    time: '10:00\u201312:30',
+    note: '1 position',
+    positions: [
+      { role: 'Security' },
+    ],
+  },
+  {
+    name: 'Clean-up Crew',
+    time: '12:00\u20132:30',
+    note: '5 positions',
+    positions: [
+      { role: 'Clean-up & Service Kitchen Reset' },
+      { role: 'Clean-up & Service Kitchen Reset' },
+      { role: 'Clean-up & Service Kitchen Reset' },
+      { role: 'Clean-up & Service Kitchen Reset' },
+      { role: 'Clean-up & Service Kitchen Reset' },
+    ],
+  },
+  {
+    name: 'Entertainers',
+    time: '10:00\u201312:30',
+    note: 'Up to 4 positions',
+    positions: [
+      { role: 'Entertainer / Bike Manager Shift' },
+      { role: 'Entertainer / Bike Manager Shift' },
+      { role: 'Entertainer / Line Manager Shift' },
+      { role: 'Entertainer / Line Manager Shift' },
+    ],
+  },
+  {
+    name: 'Music & DJs',
+    time: '9:30\u201312:30',
+    note: '3 hours',
+    positions: [
+      { role: 'DJ' },
+    ],
+  },
+]
+
+const specialShiftCategories: ShiftCategory[] = [
+  {
+    name: 'Friday 8/29 Deep Playa Food Service',
+    note: 'Soup for 1,000 \u2013 Supporting food service in Deep Playa',
+    positions: [
+      { role: 'Kitchen Lead', time: '3PM\u20136:30PM' },
+      { role: 'Grill Lead', time: '3PM\u20136:30PM', requiresExp: true },
+      { role: 'Supervise 15\u201320 Volunteers (Camp Milk & Honey)', time: '3PM\u20136:30PM' },
+      { role: 'Supervise 15\u201320 Volunteers (Camp Milk & Honey)', time: '3PM\u20136:30PM' },
+      { role: 'Supervise 15\u201320 Volunteers (Camp Milk & Honey)', time: '3PM\u20136:30PM' },
+      { role: 'Transport & Serving Crew', time: '6:30PM\u20139PM' },
+      { role: 'Transport & Serving Crew', time: '6:30PM\u20139PM' },
+      { role: 'Transport & Serving Crew', time: '6:30PM\u20139PM' },
+      { role: 'Transport & Serving Crew', time: '6:30PM\u20139PM' },
+    ],
+  },
+]
+
+const strikeCategories: ShiftCategory[] = [
+  {
+    name: 'Strike Deco + Public Chill Tent',
+    note: 'Sunday 8/31',
+    positions: [
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+    ],
+  },
+  {
+    name: 'Strike Service Kitchen',
+    note: 'Sunday 8/31',
+    positions: [
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+    ],
+  },
+  {
+    name: 'Strike Plumbing + Shower Container',
+    note: 'Sunday 8/31',
+    positions: [
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+    ],
+  },
+  {
+    name: 'Strike Power',
+    note: 'Sunday 8/31',
+    positions: [
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+    ],
+  },
+  {
+    name: 'Strike Lighting + Shade Squares + Evap Coolers + Bike Racks',
+    note: 'Sunday 8/31 \u2013 ONLY for campers who must depart Sunday afternoon. This is their Exodus Monday strike commitment and does not count as a shift.',
+    positions: [
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+      { role: 'Striker', time: '8:30AM\u201311AM' },
+    ],
+  },
 ]
 
 interface ShiftWithAssignments extends KitchenShift {
@@ -23,7 +223,7 @@ interface ShiftWithAssignments extends KitchenShift {
 }
 
 export default function KitchenPage() {
-  const [activeTab, setActiveTab] = useState('roles')
+  const [activeTab, setActiveTab] = useState('signup')
   const [roles, setRoles] = useState<KitchenRole[]>([])
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,6 +305,154 @@ export default function KitchenPage() {
 
         {/* Tabs */}
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+
+        {/* Sign-Up Sheet Tab */}
+        <TabPanel tabId="signup" activeTab={activeTab}>
+          <div className="space-y-10">
+            {/* Deli Shifts Section */}
+            <section>
+              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
+                🥪 Deli Shifts (M\u2013Sat)
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">Daily service shifts to keep the deli running</p>
+              <div className="space-y-6">
+                {deliShiftCategories.map((category, catIdx) => (
+                  <Card key={catIdx}>
+                    <CardHeader className="pb-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="text-lg">{category.name}</CardTitle>
+                        <div className="flex gap-2">
+                          {category.time && (
+                            <Badge variant="info">{category.time}</Badge>
+                          )}
+                          {category.note && (
+                            <Badge variant="default">{category.note}</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                      <div className="divide-y divide-gray-200">
+                        {category.positions.map((pos, posIdx) => (
+                          <div key={posIdx} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
+                                {posIdx + 1}
+                              </span>
+                              <span className="font-medium">{pos.role}</span>
+                              {pos.note && (
+                                <span className="text-xs text-gray-500">({pos.note})</span>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {pos.time && (
+                                <Badge variant="info">{pos.time}</Badge>
+                              )}
+                              {pos.requiresExp && (
+                                <Badge variant="warning">Kitchen Exp. Required</Badge>
+                              )}
+                              {pos.countsDouble && (
+                                <Badge variant="success">Counts 2\u00d7</Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+
+            {/* Special Events Section */}
+            <section>
+              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
+                🍜 Special Event Shifts
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">One-off event support shifts</p>
+              <div className="space-y-6">
+                {specialShiftCategories.map((category, catIdx) => (
+                  <Card key={catIdx} variant="warning">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">{category.name}</CardTitle>
+                      {category.note && (
+                        <CardDescription>{category.note}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                      <div className="divide-y divide-gray-200">
+                        {category.positions.map((pos, posIdx) => (
+                          <div key={posIdx} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
+                                {posIdx + 1}
+                              </span>
+                              <span className="font-medium">{pos.role}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              {pos.time && (
+                                <Badge variant="info">{pos.time}</Badge>
+                              )}
+                              {pos.requiresExp && (
+                                <Badge variant="warning">Kitchen Exp. Required</Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+
+            {/* Strike Section */}
+            <section>
+              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
+                🔨 Strike Shifts
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">Teardown and pack-out \u2014 everyone pitches in</p>
+              <div className="space-y-6">
+                {strikeCategories.map((category, catIdx) => (
+                  <Card key={catIdx}>
+                    <CardHeader className="pb-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="text-lg">{category.name}</CardTitle>
+                        {category.note && (
+                          <Badge variant={category.note.includes('does not count') ? 'error' : 'default'}>
+                            {category.note.includes('ONLY') ? 'Sunday Departure Only' : category.note}
+                          </Badge>
+                        )}
+                      </div>
+                      {category.note && category.note.includes('ONLY') && (
+                        <Alert variant="warning" className="mt-2">
+                          <strong>Note:</strong> {category.note}
+                        </Alert>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                      <div className="divide-y divide-gray-200">
+                        {category.positions.map((pos, posIdx) => (
+                          <div key={posIdx} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
+                                {posIdx + 1}
+                              </span>
+                              <span className="font-medium">{pos.role}</span>
+                            </div>
+                            {pos.time && (
+                              <Badge variant="info">{pos.time}</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          </div>
+        </TabPanel>
 
         {/* Roles Tab */}
         <TabPanel tabId="roles" activeTab={activeTab}>
