@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
 import { CountdownTimer } from '@/components/countdown-timer'
 
 const modules = [
@@ -105,29 +104,37 @@ const tentGuidelines = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#1a1a1a]">
       {/* Countdown Timer */}
       <CountdownTimer />
 
-      {/* Hero Section */}
-      <section className="bg-yellow-400 border-b-4 border-black font-nunito">
-        <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
+      {/* Hero Section — NYC Subway/Graffiti Background */}
+      <section className="relative overflow-hidden font-nunito nyc-photo-overlay">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/Images/nyc/subway-graffiti.jpg')" }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-20 md:py-32">
           <div className="flex items-center justify-between gap-8">
             <div className="max-w-3xl">
-              <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-black mb-4">
-                NYC Deli
+              <div className="inline-block mb-4 px-3 py-1 bg-[#fccc0a] text-black text-xs font-black uppercase tracking-[0.3em]">
+                Est. Black Rock City
+              </div>
+              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-white nyc-stencil mb-2">
+                NYC DELI
               </h1>
-              <p className="text-xl md:text-2xl font-semibold text-black/80 mb-2">
+              <div className="nyc-stripe w-48 mb-6" />
+              <p className="text-xl md:text-2xl font-semibold text-[#fccc0a] nyc-neon-subtle mb-2">
                 Burning Man 2026 • Black Rock City
               </p>
-              <p className="text-lg text-black/70 max-w-2xl mb-8 leading-relaxed">
+              <p className="text-lg text-gray-200 max-w-2xl mb-8 leading-relaxed">
                 Hot New York Deli food on the playa. A 70° cooling center for thousands.
                 And a kind, safe home base for your Burning Man adventure. 🥯🥶
               </p>
               <div className="flex flex-wrap items-center gap-4">
                 <Link
                   href="/intake"
-                  className="inline-flex items-center px-8 py-4 bg-black text-yellow-400 font-bold tracking-wide text-lg rounded-md hover:bg-gray-900 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]"
+                  className="inline-flex items-center px-8 py-4 bg-[#fccc0a] text-black font-black tracking-wide text-lg uppercase hover:bg-[#ffd93d] transition-all border-2 border-[#fccc0a] shadow-[4px_4px_0px_0px_rgba(252,204,10,0.4)] hover:shadow-[2px_2px_0px_0px_rgba(252,204,10,0.4)] hover:translate-x-[2px] hover:translate-y-[2px]"
                 >
                   📝 Register Now
                 </Link>
@@ -135,40 +142,42 @@ export default function HomePage() {
                   href="https://www.instagram.com/campnycdeli"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-4 bg-white text-black font-semibold tracking-wide text-sm rounded-md hover:bg-gray-100 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]"
+                  className="inline-flex items-center gap-2 px-6 py-4 bg-transparent text-white font-semibold tracking-wide text-sm hover:bg-white/10 transition-all border-2 border-white/60 hover:border-white"
                 >
                   📸 @campnycdeli
                 </a>
               </div>
             </div>
             <div className="hidden md:block flex-shrink-0">
-              <Image
-                src="/Images/logo.png"
-                alt="NYC Deli Rats Logo"
-                width={240}
-                height={240}
-                className="rounded-md"
-                priority
-              />
+              <div className="p-3 border-2 border-white/20 bg-black/40 backdrop-blur-sm rotate-2 hover:rotate-0 transition-transform">
+                <Image
+                  src="/Images/logo.png"
+                  alt="NYC Deli Rats Logo"
+                  width={240}
+                  height={240}
+                  priority
+                />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Our Mission */}
-      <section className="bg-black text-white py-12">
-        <div className="max-w-7xl mx-auto px-4">
+      {/* Our Mission — Dark grungy section */}
+      <section className="relative nyc-grain nyc-concrete py-12">
+        <div className="relative z-10 max-w-7xl mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-yellow-400 mb-4">
+            <div className="nyc-stripe w-24 mx-auto mb-4" />
+            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-[#fccc0a] mb-4">
               Our Mission
             </h2>
-            <p className="text-xl md:text-2xl font-medium leading-relaxed">
-              Our camp&apos;s gift to playa is <span className="text-yellow-400">hot New York Deli food</span> served 
+            <p className="text-xl md:text-2xl font-medium leading-relaxed text-gray-100">
+              Our camp&apos;s gift to playa is <span className="text-[#fccc0a] nyc-neon-subtle">hot New York Deli food</span> served 
               for two hours per day, six days during Burning Man — Friday through Sunday. Over the entire 
-              Burn, NYC Deli serves nutritious food to approximately <span className="text-yellow-400">5,500 people</span>.
+              Burn, NYC Deli serves nutritious food to approximately <span className="text-[#fccc0a] nyc-neon-subtle">5,500 people</span>.
             </p>
             <p className="text-lg text-gray-300 mt-4 leading-relaxed">
-              We also provide a public <span className="text-yellow-400">70° cooling center</span> in a dedicated 
+              We also provide a public <span className="text-[#fccc0a]">70° cooling center</span> in a dedicated 
               100-person circus tent during daylight hours, cumulatively serving several thousand more 
               burners during the event.
             </p>
@@ -176,13 +185,13 @@ export default function HomePage() {
               The playa appreciates our camp&apos;s gifts and we have fun delivering them! 🥯🥶
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm">
-              <span className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500">
+              <span className="px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/40">
                 🥪 5,500 meals served
               </span>
-              <span className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500">
+              <span className="px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/40">
                 🥶 Public cooling center
               </span>
-              <span className="px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500">
+              <span className="px-4 py-2 bg-yellow-500/10 text-[#fccc0a] border border-yellow-500/40">
                 ⛺ ~70 person camp
               </span>
             </div>
@@ -190,62 +199,65 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Camp Overview */}
-      <section className="py-16 px-4 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-2">
+      {/* Camp Overview — Brick wall background */}
+      <section className="relative py-16 px-4 nyc-brick nyc-grain">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
             About Camp
           </h2>
-          <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+          <p className="text-center text-gray-300 mb-12 max-w-2xl mx-auto">
             Camp NYC Deli at Burning Man 2026 will be a ~70 person camp: 70% veteran burners and 
             30% brand new burners. This is by design — to create space on-playa for new burners 
             in a friendly, veteran-majority camp.
           </p>
           
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="text-5xl font-black text-yellow-500 mb-2">~70</div>
-              <div className="font-bold uppercase tracking-wider text-sm">Campers</div>
-              <div className="text-xs text-gray-500 mt-1">Tight-knit community</div>
+            <div className="text-center p-6 bg-black/60 border border-white/10 backdrop-blur-sm">
+              <div className="text-5xl font-black text-[#fccc0a] mb-2 nyc-neon-subtle">~70</div>
+              <div className="font-black uppercase tracking-[0.2em] text-sm text-white">Campers</div>
+              <div className="text-xs text-gray-400 mt-1">Tight-knit community</div>
             </div>
-            <div className="text-center">
-              <div className="text-5xl font-black text-yellow-500 mb-2">70%</div>
-              <div className="font-bold uppercase tracking-wider text-sm">Veteran Burners</div>
-              <div className="text-xs text-gray-500 mt-1">Experienced playa wisdom</div>
+            <div className="text-center p-6 bg-black/60 border border-white/10 backdrop-blur-sm">
+              <div className="text-5xl font-black text-[#fccc0a] mb-2 nyc-neon-subtle">70%</div>
+              <div className="font-black uppercase tracking-[0.2em] text-sm text-white">Veteran Burners</div>
+              <div className="text-xs text-gray-400 mt-1">Experienced playa wisdom</div>
             </div>
-            <div className="text-center">
-              <div className="text-5xl font-black text-yellow-500 mb-2">30%</div>
-              <div className="font-bold uppercase tracking-wider text-sm">New Burners</div>
-              <div className="text-xs text-gray-500 mt-1">Welcome to the dust</div>
+            <div className="text-center p-6 bg-black/60 border border-white/10 backdrop-blur-sm">
+              <div className="text-5xl font-black text-[#fccc0a] mb-2 nyc-neon-subtle">30%</div>
+              <div className="font-black uppercase tracking-[0.2em] text-sm text-white">New Burners</div>
+              <div className="text-xs text-gray-400 mt-1">Welcome to the dust</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Camp Amenities */}
-      <section className="py-16 px-4">
+      {/* Camp Amenities — Deli Menu Board Style */}
+      <section className="py-16 px-4 bg-[#1a1a1a]">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-2">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
             Camp Amenities
           </h2>
-          <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+          <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
             Camp NYC Deli strives to provide our campers a kind, safe and nurturing home 
             to enable your healthy Burning Man adventure in the desert.
           </p>
           
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
-            {amenities.map((item) => (
-              <div key={item.text} className="flex items-start gap-3 p-4 bg-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                <span className="text-2xl flex-shrink-0">{item.icon}</span>
-                <span className="text-sm font-medium">{item.text}</span>
-              </div>
-            ))}
+          <div className="max-w-5xl mx-auto nyc-menu-board p-6 md:p-10 relative">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 nyc-awning h-3 w-full max-w-[calc(100%-16px)] opacity-80" />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              {amenities.map((item) => (
+                <div key={item.text} className="flex items-start gap-3 p-3 border-b border-white/10 last:border-0 hover:bg-white/5 transition-colors">
+                  <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                  <span className="text-sm font-medium nyc-chalk">{item.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-8 max-w-3xl mx-auto">
-            <div className="bg-yellow-50 border-2 border-yellow-400 p-6">
-              <h3 className="font-black uppercase text-sm mb-2">RV Services Available</h3>
-              <p className="text-sm text-gray-700">
+            <div className="bg-yellow-500/10 border-2 border-[#fccc0a]/40 p-6">
+              <h3 className="font-black uppercase text-sm mb-2 text-[#fccc0a]">RV Services Available</h3>
+              <p className="text-sm text-gray-300">
                 RVs can be provided power, potable water, and grey-water removal. There will be an 
                 additional charge per RV receiving extra services. All vehicles parked in camp require 
                 prior discussion with Brian before playa.
@@ -255,67 +267,67 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Camp Fees & Tickets */}
-      <section className="py-16 px-4 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-12">
+      {/* Camp Fees & Tickets — Subway MetroCard inspired */}
+      <section className="relative py-16 px-4 nyc-concrete nyc-grain">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-12 text-[#fccc0a] nyc-stencil">
             Camp Fees & Tickets
           </h2>
           
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle>Event Week Camper</CardTitle>
-                <CardDescription>Arriving for the event</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-black text-black mb-4">$900</div>
-                <ul className="text-sm space-y-2 text-gray-700">
-                  <li>• All camp amenities included</li>
-                  <li>• Daily meal during 6 days of food service</li>
-                  <li>• Can be split into two payments: 5/1 and 6/1</li>
-                </ul>
-              </CardContent>
-            </Card>
+            <div className="bg-[#1a1a1a] border-2 border-white/10 p-6 shadow-[4px_4px_0px_0px_rgba(252,204,10,0.3)] hover:shadow-[6px_6px_0px_0px_rgba(252,204,10,0.3)] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 rounded-full nyc-line-yellow" />
+                <span className="text-xs font-black uppercase tracking-widest text-gray-400">Event Week</span>
+              </div>
+              <h3 className="text-xl font-black text-white mb-1">Event Week Camper</h3>
+              <p className="text-sm text-gray-400 mb-4">Arriving for the event</p>
+              <div className="text-4xl font-black text-[#fccc0a] mb-4">$900</div>
+              <ul className="text-sm space-y-2 text-gray-300">
+                <li>• All camp amenities included</li>
+                <li>• Daily meal during 6 days of food service</li>
+                <li>• Can be split into two payments: 5/1 and 6/1</li>
+              </ul>
+            </div>
 
-            <Card variant="success">
-              <CardHeader>
-                <CardTitle>Builder</CardTitle>
-                <CardDescription>22 spots — come early, build camp</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-black text-black mb-4">$450</div>
-                <ul className="text-sm space-y-2 text-gray-700">
-                  <li>• 50% off camp fee</li>
-                  <li>• Free housing at Fernley Build House</li>
-                  <li>• Camp transports you, your gear & food to playa</li>
-                  <li>• All camp amenities included</li>
-                </ul>
-              </CardContent>
-            </Card>
+            <div className="bg-[#1a1a1a] border-2 border-green-500/30 p-6 shadow-[4px_4px_0px_0px_rgba(0,147,60,0.3)] hover:shadow-[6px_6px_0px_0px_rgba(0,147,60,0.3)] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-all">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-3 h-3 rounded-full nyc-line-green" />
+                <span className="text-xs font-black uppercase tracking-widest text-gray-400">Builder</span>
+              </div>
+              <h3 className="text-xl font-black text-white mb-1">Builder</h3>
+              <p className="text-sm text-gray-400 mb-4">22 spots — come early, build camp</p>
+              <div className="text-4xl font-black text-green-400 mb-4">$450</div>
+              <ul className="text-sm space-y-2 text-gray-300">
+                <li>• 50% off camp fee</li>
+                <li>• Free housing at Fernley Build House</li>
+                <li>• Camp transports you, your gear & food to playa</li>
+                <li>• All camp amenities included</li>
+              </ul>
+            </div>
           </div>
 
           <div className="mt-8 max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
-            <div className="bg-white border-2 border-black p-6 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-              <h3 className="font-black uppercase text-sm mb-3">💰 Payment Schedule</h3>
-              <ul className="text-sm space-y-2 text-gray-700">
-                <li><strong>Due:</strong> May 1, 2026</li>
-                <li><strong>Split option:</strong> Half on 5/1, half on 6/1</li>
+            <div className="bg-[#1a1a1a] border border-white/10 p-6">
+              <h3 className="font-black uppercase text-sm mb-3 text-[#fccc0a]">💰 Payment Schedule</h3>
+              <ul className="text-sm space-y-2 text-gray-300">
+                <li><strong className="text-white">Due:</strong> May 1, 2026</li>
+                <li><strong className="text-white">Split option:</strong> Half on 5/1, half on 6/1</li>
               </ul>
             </div>
-            <div className="bg-white border-2 border-black p-6 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-              <h3 className="font-black uppercase text-sm mb-3">🔄 Refund Policy</h3>
-              <ul className="text-sm space-y-2 text-gray-700">
-                <li><strong>Before 7/1:</strong> Full refund on request</li>
-                <li><strong>After 7/1:</strong> No refunds — camp has pre-paid OSS vendors</li>
+            <div className="bg-[#1a1a1a] border border-white/10 p-6">
+              <h3 className="font-black uppercase text-sm mb-3 text-[#fccc0a]">🔄 Refund Policy</h3>
+              <ul className="text-sm space-y-2 text-gray-300">
+                <li><strong className="text-white">Before 7/1:</strong> Full refund on request</li>
+                <li><strong className="text-white">After 7/1:</strong> No refunds — camp has pre-paid OSS vendors</li>
               </ul>
             </div>
           </div>
 
           <div className="mt-8 max-w-4xl mx-auto">
-            <div className="bg-blue-50 border-2 border-blue-400 p-6 text-center">
-              <h3 className="font-black uppercase text-sm mb-2">🎫 Need a Ticket?</h3>
-              <p className="text-sm text-gray-700">
+            <div className="bg-blue-500/10 border border-blue-400/30 p-6 text-center">
+              <h3 className="font-black uppercase text-sm mb-2 text-blue-400">🎫 Need a Ticket?</h3>
+              <p className="text-sm text-gray-300">
                 If you still need a ticket, NYC Deli can help source you a face-value ticket buying 
                 opportunity. Tickets are not included with the Camp Fee.
               </p>
@@ -324,53 +336,49 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Arrival & Departure Requirements */}
-      <section className="py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-12">
+      {/* Arrival & Departure — NYC street scene background */}
+      <section className="relative py-16 px-4 overflow-hidden nyc-photo-overlay">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/Images/nyc/nyc-street.jpg')" }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-12 text-[#fccc0a] nyc-stencil">
             Arrival & Departure
           </h2>
           
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <Card variant="warning">
-              <CardHeader>
-                <CardTitle>✈️ Required Arrival</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm font-bold">
-                  All campers must arrive in camp by Event Sunday at 12pm.
-                </p>
-                <p className="text-sm text-gray-700">
-                  For camp cohesion and to give everyone time to get acquainted and enjoy the event.
-                </p>
-                <div className="bg-yellow-50 p-3 border border-yellow-300 text-sm">
-                  <strong>Note:</strong> &ldquo;Weekend Warriors&rdquo; who only want to attend from Wed/Thu through Sunday 
-                  cannot meet this requirement.
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-black/70 border-l-4 border-[#fccc0a] p-6 backdrop-blur-sm">
+              <h3 className="text-lg font-black text-[#fccc0a] mb-3">✈️ Required Arrival</h3>
+              <p className="text-sm font-bold text-white">
+                All campers must arrive in camp by Event Sunday at 12pm.
+              </p>
+              <p className="text-sm text-gray-300 mt-3">
+                For camp cohesion and to give everyone time to get acquainted and enjoy the event.
+              </p>
+              <div className="bg-yellow-500/10 p-3 border border-[#fccc0a]/30 text-sm text-gray-200 mt-3">
+                <strong className="text-[#fccc0a]">Note:</strong> &ldquo;Weekend Warriors&rdquo; who only want to attend from Wed/Thu through Sunday 
+                cannot meet this requirement.
+              </div>
+            </div>
 
-            <Card variant="warning">
-              <CardHeader>
-                <CardTitle>🚪 Required Departure</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm font-bold">
-                  All campers must stay through 2pm on Exodus Monday.
-                </p>
-                <p className="text-sm text-gray-700">
-                  To fairly share the work in putting camp back into the containers. Strike is usually 
-                  done by 1:30pm. Then campers are transported in our camp dualie to their 4pm or later 
-                  Burner Express buses.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="bg-black/70 border-l-4 border-[#ff6319] p-6 backdrop-blur-sm">
+              <h3 className="text-lg font-black text-[#ff6319] mb-3">🚪 Required Departure</h3>
+              <p className="text-sm font-bold text-white">
+                All campers must stay through 2pm on Exodus Monday.
+              </p>
+              <p className="text-sm text-gray-300 mt-3">
+                To fairly share the work in putting camp back into the containers. Strike is usually 
+                done by 1:30pm. Then campers are transported in our camp dualie to their 4pm or later 
+                Burner Express buses.
+              </p>
+            </div>
           </div>
 
           <div className="mt-8 max-w-4xl mx-auto">
-            <div className="bg-green-50 border-2 border-green-400 p-6">
-              <h3 className="font-black uppercase text-sm mb-3">✨ Optional: 1-2 Bonus Days on Playa</h3>
-              <p className="text-sm text-gray-700">
+            <div className="bg-black/70 border-l-4 border-green-500 p-6 backdrop-blur-sm">
+              <h3 className="font-black uppercase text-sm mb-3 text-green-400">✨ Optional: 1-2 Bonus Days on Playa</h3>
+              <p className="text-sm text-gray-200">
                 The vast majority of our campers come in on Build Friday or Saturday on the Burner Express 
                 Bus. Arriving early means you skip the 3-12 hour gate line on Event Sunday, get an extra 
                 24-48 hours to see Black Rock City built, meet your fellow campers, and get acclimated 
@@ -381,36 +389,36 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Tent Guidelines */}
-      <section className="py-16 px-4 bg-gray-50">
+      {/* Tent Guidelines — Dark industrial */}
+      <section className="py-16 px-4 bg-[#1a1a1a]">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-2">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
             Tent Guidelines
           </h2>
-          <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+          <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
             Camp builds 10.5&apos; tall shade over every tent. To conserve scarce communal shade, 
             here are the maximum tent footprint dimensions (width x length in feet).
           </p>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto mb-8">
             {tentGuidelines.map((item) => (
-              <div key={item.people} className="text-center bg-white border-2 border-black p-4 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                <div className="text-2xl font-black text-yellow-500 mb-1">{item.dimensions}</div>
-                <div className="text-xs font-bold uppercase tracking-wider">{item.people}</div>
+              <div key={item.people} className="text-center bg-[#2a2a2a] border border-white/10 p-4 hover:border-[#fccc0a]/50 transition-colors">
+                <div className="text-2xl font-black text-[#fccc0a] mb-1 nyc-neon-subtle">{item.dimensions}</div>
+                <div className="text-xs font-black uppercase tracking-[0.15em] text-gray-300">{item.people}</div>
               </div>
             ))}
           </div>
 
           <div className="max-w-3xl mx-auto space-y-4">
-            <div className="bg-green-50 border-2 border-green-400 p-4">
-              <p className="text-sm text-gray-700">
-                <strong>Good news:</strong> Thanks to shade and air conditioning in camp, you do not need 
+            <div className="bg-green-500/10 border border-green-500/30 p-4">
+              <p className="text-sm text-gray-200">
+                <strong className="text-green-400">Good news:</strong> Thanks to shade and air conditioning in camp, you do not need 
                 an expensive RV, Shiftpod or Bell Tent. A standup Coleman tent or used Kodiak tent are great!
               </p>
             </div>
-            <div className="bg-red-50 border-2 border-red-400 p-4">
-              <p className="text-sm text-gray-700">
-                <strong>Please do not buy</strong> a new Shiftpod or Bell Tent. Each takes up space that 
+            <div className="bg-red-500/10 border border-red-500/30 p-4">
+              <p className="text-sm text-gray-200">
+                <strong className="text-red-400">Please do not buy</strong> a new Shiftpod or Bell Tent. Each takes up space that 
                 4 tents could fit in. If you already own one, we&apos;ll work with it. But please buy a 
                 square or rectangular footprint tent if buying new.
               </p>
@@ -419,37 +427,37 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Build Week */}
-      <section className="py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-2">
+      {/* Build Week — Steel/industrial */}
+      <section className="relative py-16 px-4 nyc-concrete nyc-grain">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
             Build Week (Optional)
           </h2>
-          <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
+          <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
             22 of NYC Deli&apos;s 70 campers will build camp. Half-price camp fee, free housing,
             and camp handles your transport logistics.
           </p>
           
           <div className="max-w-3xl mx-auto">
-            <div className="bg-white border-2 border-black p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <h3 className="font-black uppercase text-lg mb-4">Builder Perks</h3>
-              <ul className="space-y-3 text-sm text-gray-700">
+            <div className="bg-[#1a1a1a] border-2 border-[#fccc0a]/30 p-6 shadow-[4px_4px_0px_0px_rgba(252,204,10,0.2)]">
+              <h3 className="font-black uppercase text-lg mb-4 text-[#fccc0a]">Builder Perks</h3>
+              <ul className="space-y-3 text-sm text-gray-300">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <span><strong>$450 camp fee</strong> (half the regular price)</span>
+                  <span className="text-green-400 font-bold">✓</span>
+                  <span><strong className="text-white">$450 camp fee</strong> (half the regular price)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <span><strong>Free housing</strong> at the Fernley Build House prior to the Burn</span>
+                  <span className="text-green-400 font-bold">✓</span>
+                  <span><strong className="text-white">Free housing</strong> at the Fernley Build House prior to the Burn</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <span><strong>Camp transports</strong> builders, their gear, and their food into playa</span>
+                  <span className="text-green-400 font-bold">✓</span>
+                  <span><strong className="text-white">Camp transports</strong> builders, their gear, and their food into playa</span>
                 </li>
               </ul>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="font-bold text-sm uppercase mb-2">Builder Arrival Timeline</h4>
-                <p className="text-sm text-gray-700">
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <h4 className="font-bold text-sm uppercase mb-2 text-[#fccc0a]">Builder Arrival Timeline</h4>
+                <p className="text-sm text-gray-300">
                   Fly into Reno Build Sunday or Monday → Uber to Fernley Build House → Go on-playa 
                   Build Tuesday morning. All builders must be at the Fernley Build House by Build Monday 
                   night with all personal shopping completed.
@@ -460,15 +468,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Volunteer Commitment */}
-      <section className="py-16 px-4 bg-gray-50">
+      {/* Volunteer Commitment — Dark with yellow spray paint accent */}
+      <section className="py-16 px-4 bg-[#1a1a1a]">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl font-black uppercase tracking-wider mb-4">
+            <div className="nyc-stripe w-24 mx-auto mb-4" />
+            <h2 className="text-2xl font-black uppercase tracking-[0.2em] mb-4 text-[#fccc0a] nyc-stencil">
               Volunteer Commitment
             </h2>
-            <p className="text-lg text-gray-700 mb-6">
-              All campers volunteer <strong>three 2.5-hour shifts</strong> during burn week to make
+            <p className="text-lg text-gray-200 mb-6">
+              All campers volunteer <strong className="text-[#fccc0a]">three 2.5-hour shifts</strong> during burn week to make
               our playa gift and camp happen. As Burning Man camps go, this is a very reasonable 
               volunteer requirement.
             </p>
@@ -479,65 +488,67 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Modules Grid */}
-      <section className="py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-2">
+      {/* Modules Grid — Sticker wall / poster vibe */}
+      <section className="relative py-16 px-4 nyc-brick nyc-grain">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
             Camp System Modules
           </h2>
-          <p className="text-center text-gray-600 mb-12">
+          <p className="text-center text-gray-300 mb-12">
             Nine modules to manage your burn — registration, profile, directory, maps, events, kitchen, schedule, and build week.
           </p>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {modules.map((module) => (
+            {modules.map((module, i) => (
               <Link key={module.href} href={module.href} className="group">
-                <Card className="h-full transition-all group-hover:translate-x-[-2px] group-hover:translate-y-[-2px] group-hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <span className="text-4xl">{module.icon}</span>
-                      <span className={`text-xs font-bold uppercase ${module.statusColor}`}>
-                        {module.status}
-                      </span>
-                    </div>
-                    <CardTitle className="mt-4">{module.title}</CardTitle>
-                    <CardDescription>{module.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <span className="text-sm font-bold text-yellow-600 group-hover:text-yellow-700">
-                      Go to {module.title} →
+                <div
+                  className="h-full bg-[#1a1a1a] border border-white/10 p-6 transition-all group-hover:translate-x-[-2px] group-hover:translate-y-[-2px] group-hover:border-[#fccc0a]/50 group-hover:shadow-[4px_4px_0px_0px_rgba(252,204,10,0.3)]"
+                  style={{ transform: `rotate(${i % 2 === 0 ? '-0.5' : '0.5'}deg)` }}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="text-4xl">{module.icon}</span>
+                    <span className={`text-xs font-black uppercase ${module.statusColor}`}>
+                      {module.status}
                     </span>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <h3 className="mt-4 text-lg font-black text-white">{module.title}</h3>
+                  <p className="text-sm text-gray-400 mt-1">{module.description}</p>
+                  <span className="inline-block mt-4 text-sm font-bold text-[#fccc0a] group-hover:text-[#ffd93d]">
+                    Go to {module.title} →
+                  </span>
+                </div>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Important Dates */}
-      <section className="bg-gray-900 text-white py-16 px-4">
+      {/* Important Dates — Subway schedule board */}
+      <section className="bg-[#111] py-16 px-4">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center text-yellow-400 mb-12">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center text-[#fccc0a] mb-12 nyc-neon-subtle">
             Critical Dates
           </h2>
           
           <div className="grid grid-cols-2 md:grid-cols-5 gap-6 max-w-5xl mx-auto">
             {[
-              { date: 'May 1', label: 'Camp Fees Due', desc: 'First payment' },
-              { date: 'Jul 1', label: 'Refund Deadline', desc: 'No refunds after this' },
-              { date: 'Aug 23', label: 'Build Week Starts', desc: 'Early arrivals only' },
-              { date: 'Aug 30', label: 'Burn Starts', desc: 'Gates open' },
-              { date: 'Sep 7', label: 'Exodus Monday', desc: 'Stay through 2pm' },
+              { date: 'May 1', label: 'Camp Fees Due', desc: 'First payment', line: 'nyc-line-yellow' },
+              { date: 'Jul 1', label: 'Refund Deadline', desc: 'No refunds after this', line: 'nyc-line-red' },
+              { date: 'Aug 23', label: 'Build Week Starts', desc: 'Early arrivals only', line: 'nyc-line-green' },
+              { date: 'Aug 30', label: 'Burn Starts', desc: 'Gates open', line: 'nyc-line-orange' },
+              { date: 'Sep 7', label: 'Exodus Monday', desc: 'Stay through 2pm', line: 'nyc-line-purple' },
             ].map((item) => (
               <div key={item.label} className="text-center">
-                <div className="text-3xl font-black text-yellow-400 mb-2">
+                <div className={`w-8 h-8 rounded-full ${item.line} mx-auto mb-3 flex items-center justify-center`}>
+                  <div className="w-4 h-4 rounded-full bg-[#111]" />
+                </div>
+                <div className="text-3xl font-black text-white mb-2">
                   {item.date}
                 </div>
-                <div className="font-bold uppercase tracking-wider text-sm mb-1">
+                <div className="font-black uppercase tracking-[0.15em] text-sm mb-1 text-gray-300">
                   {item.label}
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-gray-500">
                   {item.desc}
                 </div>
               </div>
@@ -547,41 +558,47 @@ export default function HomePage() {
       </section>
 
       {/* What Happens After Registration */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 bg-[#1a1a1a]">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-center mb-8">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-8 text-[#fccc0a] nyc-stencil">
             What Happens After Registration
           </h2>
           <div className="space-y-4">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-yellow-400 border-2 border-black flex items-center justify-center font-black text-lg flex-shrink-0">1</div>
+              <div className="w-10 h-10 bg-[#fccc0a] flex items-center justify-center font-black text-lg text-black flex-shrink-0">1</div>
               <div>
-                <h3 className="font-bold">Registration Reviewed</h3>
-                <p className="text-sm text-gray-600">Each entry is reviewed by Camp Lead Brian.</p>
+                <h3 className="font-bold text-white">Registration Reviewed</h3>
+                <p className="text-sm text-gray-400">Each entry is reviewed by Camp Lead Brian.</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-yellow-400 border-2 border-black flex items-center justify-center font-black text-lg flex-shrink-0">2</div>
+              <div className="w-10 h-10 bg-[#fccc0a] flex items-center justify-center font-black text-lg text-black flex-shrink-0">2</div>
               <div>
-                <h3 className="font-bold">Zoom Interview</h3>
-                <p className="text-sm text-gray-600">You&apos;ll get an email to schedule a short 20-30 min Zoom with Brian to talk about your burn.</p>
+                <h3 className="font-bold text-white">Zoom Interview</h3>
+                <p className="text-sm text-gray-400">You&apos;ll get an email to schedule a short 20-30 min Zoom with Brian to talk about your burn.</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-yellow-400 border-2 border-black flex items-center justify-center font-black text-lg flex-shrink-0">3</div>
+              <div className="w-10 h-10 bg-[#fccc0a] flex items-center justify-center font-black text-lg text-black flex-shrink-0">3</div>
               <div>
-                <h3 className="font-bold">Photo Album</h3>
-                <p className="text-sm text-gray-600">You&apos;ll receive a link to a private Google Photos album with pictures from Burning Man 2025 so you can see what camp looks like and the general vibe.</p>
+                <h3 className="font-bold text-white">Photo Album</h3>
+                <p className="text-sm text-gray-400">You&apos;ll receive a link to a private Google Photos album with pictures from Burning Man 2025 so you can see what camp looks like and the general vibe.</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Call to Action */}
-      <section className="py-16 px-4 bg-yellow-400 border-t-4 border-black font-nunito">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight mb-4">
+      {/* Call to Action — Graffiti / bodega awning feel */}
+      <section className="relative py-16 px-4 overflow-hidden font-nunito">
+        <div className="absolute inset-0 bg-[#fccc0a]" />
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
+        }} />
+        <div className="nyc-awning h-2 absolute top-0 left-0 right-0" />
+        <div className="relative max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl font-extrabold tracking-tight mb-4 text-black">
             Ready to Join?
           </h2>
           <p className="text-lg mb-4 text-black/80 leading-relaxed">
@@ -592,7 +609,7 @@ export default function HomePage() {
           </p>
           <Link
             href="/intake"
-            className="inline-flex items-center px-8 py-4 bg-black text-yellow-400 font-bold tracking-wide text-lg rounded-md hover:bg-gray-900 transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)]"
+            className="inline-flex items-center px-8 py-4 bg-black text-[#fccc0a] font-black tracking-wide text-lg uppercase hover:bg-gray-900 transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]"
           >
             Start Registration →
           </Link>
