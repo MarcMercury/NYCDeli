@@ -1,5 +1,7 @@
 import { EventsCalendar } from '@/components/events-calendar'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Pre-Burn Events | NYC Deli Rats 2026',
   description: 'Camp events calendar from now until the Burn.',

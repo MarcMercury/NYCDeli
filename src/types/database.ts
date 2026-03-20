@@ -657,3 +657,107 @@ export interface CampEventUpdate {
 }
 
 export type CampEvent = CampEventRow
+
+// ==========================================
+// Build Week Planning Types
+// ==========================================
+
+export type BuildStageType = 'planning' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+export type BuildCategory = 'infrastructure' | 'shelter' | 'kitchen' | 'logistics' | 'safety' | 'layout' | 'decoration' | 'personal'
+export type BuildResourceStatus = 'have' | 'need' | 'fix' | 'discard'
+export type BuildQuestionStatus = 'open' | 'resolved' | 'deferred'
+
+export interface BuildStageRow {
+  id: string
+  stage: BuildStageType
+  title: string
+  description: string | null
+  date_label: string | null
+  crew_size: string | null
+  builder_notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BuildGoalRow {
+  id: string
+  stage_id: string
+  category: BuildCategory
+  title: string
+  description: string | null
+  priority: number
+  status: TaskStatus
+  required_resources: string[]
+  responsible_party: string | null
+  estimated_people: number | null
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BuildResourceRow {
+  id: string
+  category: BuildCategory
+  name: string
+  description: string | null
+  quantity: string | null
+  status: BuildResourceStatus
+  priority: string | null
+  stage_needed: BuildStageType | null
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BuildProcedureStep {
+  order: number
+  text: string
+  notes: string | null
+}
+
+export interface BuildProcedureReference {
+  title: string
+  url: string
+}
+
+export interface BuildProcedureRow {
+  id: string
+  category: BuildCategory
+  title: string
+  description: string | null
+  steps: BuildProcedureStep[]
+  reference_links: BuildProcedureReference[]
+  open_questions: string[]
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BuildQuestionRow {
+  id: string
+  category: BuildCategory
+  question: string
+  context: string | null
+  status: BuildQuestionStatus
+  resolution: string | null
+  is_pain_point: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+// Convenience types
+export type BuildStage = BuildStageRow
+export type BuildGoal = BuildGoalRow
+export type BuildResource = BuildResourceRow
+export type BuildProcedure = BuildProcedureRow
+export type BuildQuestion = BuildQuestionRow
+
+// Extended type for stage with its goals
+export interface BuildStageWithGoals extends BuildStageRow {
+  goals: BuildGoalRow[]
+}
