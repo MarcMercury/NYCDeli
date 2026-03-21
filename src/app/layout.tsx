@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Nunito } from "next/font/google";
+import { Inter, Nunito, Permanent_Marker } from "next/font/google";
 import "./globals.css";
 import { Navigation } from "@/components/layout/navigation";
 import { Footer } from "@/components/layout/footer";
@@ -15,6 +15,13 @@ const nunito = Nunito({
   variable: "--font-nunito",
 });
 
+const permanentMarker = Permanent_Marker({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-graffiti",
+});
+
 export const metadata: Metadata = {
   title: "NYC Deli Rats 2026 | Camp Management System",
   description: "A highly organized New Yorker built a military-grade spreadsheet and then yelled at everyone until they used it correctly. Burning Man 2026 camp coordination.",
@@ -27,8 +34,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.className} ${nunito.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-gray-100">
+    <html lang="en" className={`${inter.className} ${nunito.variable} ${permanentMarker.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[#111]">
         <Navigation />
         <main className="flex-1">{children}</main>
         <Footer />
