@@ -518,21 +518,21 @@ body {
 /* ── Graffiti Rat ── */
 .graffiti-rat-wrapper {
   position: relative;
-  width: 56px;
-  height: 80px;
+  width: 80px;
+  height: 114px;
 }
 
 @media (min-width: 768px) {
   .graffiti-rat-wrapper {
-    width: 75px;
-    height: 108px;
+    width: 110px;
+    height: 157px;
   }
 }
 
 @media (min-width: 1024px) {
   .graffiti-rat-wrapper {
-    width: 90px;
-    height: 128px;
+    width: 140px;
+    height: 200px;
   }
 }
 
