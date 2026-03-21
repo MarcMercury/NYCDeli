@@ -541,8 +541,6 @@ body {
   height: 100%;
   object-fit: contain;
   filter: drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.7));
-  /* Remove any white/light background fringe from PNG */
-  mix-blend-mode: lighten;
 }
 
 .graffiti-rat {
