@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #1a1a1a;
+  --background: #111;
   --foreground: #e8e8e8;
-  --nyc-yellow: #f5c518;
-  --nyc-orange: #ff6b35;
+  --nyc-yellow: #fccc0a;
+  --nyc-orange: #ff6319;
   --nyc-neon-green: #39ff14;
-  --nyc-pink: #ff2d7b;
-  --nyc-concrete: #2a2a2a;
-  --nyc-steel: #3d3d3d;
-  --nyc-grime: #1e1e1e;
+  --nyc-pink: #ff1493;
+  --nyc-red: #ee352e;
+  --nyc-blue: #0039a6;
+  --nyc-purple: #b933ad;
+  --nyc-concrete: #1c1c1c;
 }
 
 @theme inline {
@@ -28,103 +29,157 @@ body {
   font-family: var(--font-nunito), sans-serif;
 }
 
-/* ─── Gritty NYC Textures ─── */
+/* ═══════════════════════════════════════════════
+   GRITTY NYC STREET ART — Pure CSS
+   ═══════════════════════════════════════════════ */
 
-/* Noise/grain overlay for grungy sections */
-.nyc-grain::before {
+/* ── Heavy grain / grime overlay ── */
+.nyc-grime {
+  position: relative;
+}
+.nyc-grime::before {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.06;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 1;
 }
 
-/* Brick wall pattern */
-.nyc-brick {
-  background-color: #2a1f1f;
+/* ── Cracked concrete wall ── */
+.nyc-concrete-wall {
+  background:
+    /* Subtle cracks */
+    linear-gradient(17deg, transparent 45%, rgba(0,0,0,0.15) 45.5%, transparent 46%),
+    linear-gradient(143deg, transparent 60%, rgba(0,0,0,0.1) 60.5%, transparent 61%),
+    linear-gradient(200deg, transparent 30%, rgba(0,0,0,0.08) 30.5%, transparent 31%),
+    /* Base concrete texture */
+    radial-gradient(ellipse at 20% 50%, #222 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, #1e1e1e 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 80%, #252525 0%, transparent 45%),
+    linear-gradient(180deg, #1a1a1a 0%, #181818 50%, #1c1c1c 100%);
+}
+
+/* ── Dirty brick wall (realistic) ── */
+.nyc-brick-wall {
+  background-color: #2c1810;
   background-image:
-    linear-gradient(335deg, #3a2222 23px, transparent 23px),
-    linear-gradient(155deg, #3a2222 23px, transparent 23px),
-    linear-gradient(335deg, #3a2222 23px, transparent 23px),
-    linear-gradient(155deg, #3a2222 23px, transparent 23px);
-  background-size: 58px 58px;
-  background-position: 0px 2px, 4px 35px, 29px 31px, 33px 6px;
+    /* Mortar lines - horizontal */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 28px,
+      #1a110a 28px,
+      #1a110a 32px
+    ),
+    /* Mortar lines - vertical (offset every other row) */
+    repeating-linear-gradient(
+      90deg,
+      #1a110a 0px,
+      #1a110a 2px,
+      transparent 2px,
+      transparent 62px
+    );
+  background-size: 64px 32px;
 }
-
-/* Concrete/sidewalk texture */
-.nyc-concrete {
-  background: linear-gradient(135deg, #2a2a2a 0%, #333 25%, #2d2d2d 50%, #363636 75%, #2a2a2a 100%);
-}
-
-/* Subway tile pattern */
-.nyc-subway-tile {
-  background-color: #e8e0d4;
-  background-image:
-    linear-gradient(to right, #c5b9a8 1px, transparent 1px),
-    linear-gradient(to bottom, #c5b9a8 1px, transparent 1px);
-  background-size: 30px 15px;
-}
-
-/* Dark photo overlay for background images */
-.nyc-photo-overlay::after {
+.nyc-brick-wall::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0.5) 40%,
-    rgba(0, 0, 0, 0.7) 100%
-  );
+  background:
+    /* Grime/staining */
+    linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 30%, rgba(0,0,0,0.4) 100%),
+    /* Water damage streaks */
+    linear-gradient(175deg, transparent 20%, rgba(0,0,0,0.15) 20.5%, transparent 22%),
+    linear-gradient(183deg, transparent 55%, rgba(0,0,0,0.12) 55.5%, transparent 57%),
+    linear-gradient(178deg, transparent 75%, rgba(0,0,0,0.18) 75.5%, transparent 77%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Spray paint splatter backgrounds ── */
+.nyc-graffiti-hero {
+  background:
+    /* Big spray paint splashes */
+    radial-gradient(ellipse 300px 200px at 10% 30%, rgba(252,204,10,0.15) 0%, transparent 70%),
+    radial-gradient(ellipse 250px 350px at 85% 60%, rgba(255,20,147,0.1) 0%, transparent 70%),
+    radial-gradient(ellipse 200px 150px at 60% 15%, rgba(57,255,20,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 350px 200px at 30% 80%, rgba(255,99,25,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 180px 250px at 95% 10%, rgba(0,57,166,0.1) 0%, transparent 70%),
+    /* Overspray mist */
+    radial-gradient(circle 600px at 15% 50%, rgba(252,204,10,0.06) 0%, transparent 70%),
+    radial-gradient(circle 400px at 70% 30%, rgba(238,53,46,0.05) 0%, transparent 70%),
+    /* Concrete base */
+    radial-gradient(ellipse at 20% 50%, #1e1e1e 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, #1a1a1a 0%, transparent 40%),
+    linear-gradient(180deg, #141414 0%, #111 100%);
+}
+
+/* ── Spray can drip effect (vertical lines) ── */
+.nyc-drips::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    /* Individual drips at various positions */
+    linear-gradient(180deg, rgba(252,204,10,0.25) 0%, rgba(252,204,10,0.08) 60%, transparent 100%) no-repeat 12% 60% / 2px 80px,
+    linear-gradient(180deg, rgba(255,20,147,0.2) 0%, rgba(255,20,147,0.06) 70%, transparent 100%) no-repeat 28% 45% / 3px 120px,
+    linear-gradient(180deg, rgba(57,255,20,0.18) 0%, rgba(57,255,20,0.05) 65%, transparent 100%) no-repeat 67% 55% / 2px 60px,
+    linear-gradient(180deg, rgba(252,204,10,0.2) 0%, rgba(252,204,10,0.06) 70%, transparent 100%) no-repeat 83% 40% / 2px 100px,
+    linear-gradient(180deg, rgba(255,99,25,0.22) 0%, rgba(255,99,25,0.07) 60%, transparent 100%) no-repeat 45% 50% / 3px 90px,
+    linear-gradient(180deg, rgba(185,51,173,0.15) 0%, rgba(185,51,173,0.04) 70%, transparent 100%) no-repeat 92% 35% / 2px 70px;
+  pointer-events: none;
   z-index: 1;
 }
 
-/* Stencil / spray paint text effect */
-.nyc-stencil {
-  text-shadow:
-    2px 2px 0 rgba(0, 0, 0, 0.8),
-    -1px -1px 0 rgba(0, 0, 0, 0.4);
-  letter-spacing: 0.05em;
+/* ── Tagged / graffiti section with color splashes ── */
+.nyc-tagged {
+  position: relative;
+  background:
+    /* Overlapping spray paint zones - like a heavily tagged wall */
+    radial-gradient(ellipse 200px 120px at 5% 70%, rgba(238,53,46,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 180px 200px at 92% 25%, rgba(57,255,20,0.09) 0%, transparent 70%),
+    radial-gradient(ellipse 250px 150px at 50% 90%, rgba(185,51,173,0.1) 0%, transparent 70%),
+    radial-gradient(ellipse 300px 180px at 75% 50%, rgba(0,57,166,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 220px 160px at 20% 20%, rgba(252,204,10,0.1) 0%, transparent 70%),
+    radial-gradient(ellipse 150px 200px at 40% 60%, rgba(255,99,25,0.08) 0%, transparent 70%);
 }
 
-/* Neon glow effect */
-.nyc-neon {
+/* ── Bodega neon glow ── */
+.nyc-neon-glow {
   text-shadow:
-    0 0 7px var(--nyc-yellow),
-    0 0 10px var(--nyc-yellow),
-    0 0 21px var(--nyc-yellow),
-    0 0 42px var(--nyc-orange),
-    0 0 82px var(--nyc-orange);
+    0 0 7px currentColor,
+    0 0 10px currentColor,
+    0 0 21px currentColor,
+    0 0 42px currentColor;
 }
 
 .nyc-neon-subtle {
   text-shadow:
     0 0 5px var(--nyc-yellow),
-    0 0 10px rgba(245, 197, 24, 0.3);
+    0 0 15px rgba(252, 204, 10, 0.4);
 }
 
-/* Tape/sticker effect on cards */
-.nyc-sticker {
-  transform: rotate(-0.5deg);
-  box-shadow:
-    4px 4px 0 rgba(0, 0, 0, 0.9),
-    -1px -1px 0 rgba(255, 255, 255, 0.05);
+/* ── Stencil spray paint text ── */
+.nyc-stencil {
+  text-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.9),
+    -1px -1px 0 rgba(0, 0, 0, 0.5),
+    1px -1px 0 rgba(0, 0, 0, 0.5),
+    -1px 1px 0 rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.08em;
 }
 
-.nyc-sticker:hover {
-  transform: rotate(0deg) translate(-2px, -2px);
+/* ── Spray paint text — has overspray blur ── */
+.nyc-spray {
+  text-shadow:
+    0 0 8px currentColor,
+    2px 2px 0 rgba(0,0,0,0.8);
+  letter-spacing: 0.1em;
 }
 
-/* Chalk/menu board text */
-.nyc-chalk {
-  color: #e8e0d4;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-/* Street stripe divider */
+/* ── Street stripe / crosswalk ── */
 .nyc-stripe {
   background: repeating-linear-gradient(
     90deg,
@@ -136,40 +191,81 @@ body {
   height: 4px;
 }
 
-/* Manhole cover / utility accent */
-.nyc-manhole {
-  border: 3px solid #444;
-  background: radial-gradient(circle, #333 0%, #222 70%, #1a1a1a 100%);
-}
-
-/* Rusty steel border */
-.nyc-rusty-border {
-  border: 2px solid #8b6914;
-  box-shadow: inset 0 0 8px rgba(139, 105, 20, 0.2);
-}
-
-/* Bodega awning stripes */
-.nyc-awning {
-  background: repeating-linear-gradient(
-    90deg,
-    #cc2200 0px,
-    #cc2200 20px,
-    #ffffff 20px,
-    #ffffff 40px
-  );
-}
-
-/* Deli menu board */
-.nyc-menu-board {
-  background: #1a2e1a;
-  border: 8px solid #5c3a1e;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
-}
-
-/* Subway line colors */
+/* ── Subway line colors ── */
 .nyc-line-yellow { background: #fccc0a; }
 .nyc-line-orange { background: #ff6319; }
 .nyc-line-green { background: #00933c; }
 .nyc-line-blue { background: #0039a6; }
 .nyc-line-red { background: #ee352e; }
 .nyc-line-purple { background: #b933ad; }
+
+/* ── Bodega awning ── */
+.nyc-awning {
+  background: repeating-linear-gradient(
+    90deg,
+    #cc2200 0px,
+    #cc2200 20px,
+    #fff 20px,
+    #fff 40px
+  );
+}
+
+/* ── Deli menu board (dark green chalkboard) ── */
+.nyc-menu-board {
+  background: #0d1f0d;
+  border: 6px solid #3d2b1a;
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, 0.6),
+    inset 0 2px 0 rgba(255,255,255,0.03);
+}
+
+/* ── Chalk text on menu board ── */
+.nyc-chalk {
+  color: #d4cfc0;
+  text-shadow: 0 0 3px rgba(255,255,255,0.1);
+}
+
+/* ── Wheatpaste poster effect for cards ── */
+.nyc-poster {
+  box-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.8),
+    -1px -1px 0 rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+}
+.nyc-poster:hover {
+  transform: translate(-2px, -2px);
+  box-shadow:
+    5px 5px 0 rgba(252, 204, 10, 0.3),
+    -1px -1px 0 rgba(255, 255, 255, 0.05);
+  border-color: rgba(252, 204, 10, 0.3);
+}
+
+/* ── Scuffed / worn underline accent ── */
+.nyc-scuff {
+  background-image: linear-gradient(
+    90deg,
+    var(--nyc-yellow) 0%,
+    var(--nyc-orange) 30%,
+    var(--nyc-pink) 60%,
+    var(--nyc-neon-green) 100%
+  );
+  background-size: 100% 3px;
+  background-repeat: no-repeat;
+  background-position: bottom;
+  padding-bottom: 6px;
+}
+
+/* ── Graffiti color bar (rainbow tag stripe) ── */
+.nyc-tag-stripe {
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--nyc-red) 0%,
+    var(--nyc-orange) 20%,
+    var(--nyc-yellow) 40%,
+    var(--nyc-neon-green) 60%,
+    var(--nyc-blue) 80%,
+    var(--nyc-purple) 100%
+  );
+}

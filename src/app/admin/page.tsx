@@ -8,6 +8,7 @@ import {
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
+import { updateCamperAction, deleteCamperAction, updateTaskStatusAction, updateSettingAction } from '@/app/actions/admin'
 import type { Camper, BuildTask, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate } from '@/types/database'
 
 type Tab = { id: string; label: string }
@@ -73,14 +74,9 @@ export default function AdminPage() {
   )
 
   const updateCamper = async (camperId: string, updates: CamperUpdate) => {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('campers')
-      .update(updates as never)
-      .eq('id', camperId)
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    const result = await updateCamperAction(camperId, updates)
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Update failed' })
     } else {
       setMessage({ type: 'success', text: 'Camper updated successfully' })
       fetchData()
@@ -88,17 +84,9 @@ export default function AdminPage() {
   }
 
   const updateTaskStatus = async (taskId: string, status: 'pending' | 'active' | 'done') => {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('build_tasks')
-      .update({ 
-        status, 
-        completed_at: status === 'done' ? new Date().toISOString() : null 
-      } as never)
-      .eq('id', taskId)
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    const result = await updateTaskStatusAction(taskId, status)
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Update failed' })
     } else {
       setMessage({ type: 'success', text: 'Task updated' })
       fetchData()
@@ -106,14 +94,9 @@ export default function AdminPage() {
   }
 
   const updateSetting = async (key: string, value: string) => {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('system_settings')
-      .update({ value, updated_at: new Date().toISOString() } as never)
-      .eq('key', key)
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    const result = await updateSettingAction(key, value)
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Update failed' })
     } else {
       setMessage({ type: 'success', text: 'Setting updated' })
       fetchData()
@@ -123,14 +106,9 @@ export default function AdminPage() {
   const deleteCamper = async (camperId: string) => {
     if (!confirm('Are you sure? This will delete the camper and all their assignments.')) return
     
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('campers')
-      .delete()
-      .eq('id', camperId)
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    const result = await deleteCamperAction(camperId)
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Delete failed' })
     } else {
       setMessage({ type: 'success', text: 'Camper deleted' })
       setSelectedCamper(null)

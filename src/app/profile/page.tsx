@@ -90,34 +90,50 @@ export default function ProfilePage() {
 
     setPhotos(photosResult.data || [])
 
-    // Fetch schedule data
-    const [rolesRes, shiftsRes, assignmentsRes, allCampersRes] = await Promise.all([
+    // Fetch schedule data — only fetch user's own assignments first, then enrich
+    const [rolesRes, shiftsRes] = await Promise.all([
       supabase.from('kitchen_roles').select('*'),
       supabase.from('kitchen_shifts').select('*').order('date').order('start_time'),
-      supabase.from('schedule_assignments').select('*'),
-      supabase.from('campers').select('*'),
     ])
 
     const roles = (rolesRes.data as KitchenRole[]) || []
     const shiftsData = (shiftsRes.data as KitchenShift[]) || []
-    const assignmentsData = (assignmentsRes.data as ScheduleAssignment[]) || []
-    const allCampers = (allCampersRes.data as Camper[]) || []
 
     const enrichedShifts = shiftsData.map(shift => ({
       ...shift,
       role: roles.find(r => r.id === shift.role_id),
     }))
 
-    const enrichedAssignments = assignmentsData.map(assignment => ({
-      ...assignment,
-      shift: enrichedShifts.find(s => s.id === assignment.shift_id),
-      camper: allCampers.find(c => c.id === assignment.camper_id),
-    }))
-    setAllAssignments(enrichedAssignments)
-
-    // Filter my assignments if we have a linked camper
+    // Only fetch this user's assignments (not all assignments)
     if (camperData) {
-      setMyAssignments(enrichedAssignments.filter(a => a.camper_id === camperData.id))
+      const { data: myAssignmentsData } = await supabase
+        .from('schedule_assignments')
+        .select('*')
+        .eq('camper_id', camperData.id)
+
+      const myEnriched = (myAssignmentsData as ScheduleAssignment[] || []).map(assignment => ({
+        ...assignment,
+        shift: enrichedShifts.find(s => s.id === assignment.shift_id),
+        camper: camperData as unknown as Camper,
+      }))
+      setMyAssignments(myEnriched)
+    }
+
+    // Only fetch all assignments for admin users (lazy load on tab switch)
+    if (profileResult.data?.role === 'admin') {
+      const [assignmentsRes, allCampersRes] = await Promise.all([
+        supabase.from('schedule_assignments').select('*'),
+        supabase.from('campers').select('id, full_name, playa_name, email'),
+      ])
+      const assignmentsData = (assignmentsRes.data as ScheduleAssignment[]) || []
+      const allCampers = (allCampersRes.data as Camper[]) || []
+
+      const enrichedAssignments = assignmentsData.map(assignment => ({
+        ...assignment,
+        shift: enrichedShifts.find(s => s.id === assignment.shift_id),
+        camper: allCampers.find(c => c.id === assignment.camper_id),
+      }))
+      setAllAssignments(enrichedAssignments)
     }
 
     setLoading(false)

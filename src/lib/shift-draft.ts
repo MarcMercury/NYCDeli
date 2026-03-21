@@ -16,6 +16,7 @@ export interface DraftShiftPosition {
   id: string // unique key for draft picking
   category: string
   role: string
+  description?: string
   time?: string
   note?: string
   countsDouble?: boolean
@@ -24,13 +25,14 @@ export interface DraftShiftPosition {
 
 export interface DraftShiftCategory {
   name: string
+  description?: string
   time?: string
   note?: string
   positions: DraftShiftPosition[]
 }
 
 let _posId = 0
-function pos(category: string, role: string, time?: string, opts?: { countsDouble?: boolean; requiresExp?: boolean; note?: string }): DraftShiftPosition {
+function pos(category: string, role: string, time?: string, opts?: { countsDouble?: boolean; requiresExp?: boolean; note?: string; description?: string }): DraftShiftPosition {
   _posId++
   return { id: `pos-${_posId}`, category, role, time, ...opts }
 }
@@ -42,114 +44,124 @@ export function getAllDraftShiftCategories(): DraftShiftCategory[] {
       name: 'Deli Shifts (M–Sat)',
       note: 'Core daily shifts',
       positions: [
-        pos('Deli Shifts', 'Kitchen Lead', undefined, { note: 'as needed' }),
-        pos('Deli Shifts', 'Kitchen Supervisor', '8:30AM–12:30PM', { requiresExp: true, countsDouble: true }),
-        pos('Deli Shifts', 'Camp Manager Day', '10AM–4PM', { countsDouble: true }),
-        pos('Deli Shifts', 'Camp Manager Day Deputy', '10AM–1PM'),
-        pos('Deli Shifts', 'Camp Manager Day Deputy', '1PM–4PM'),
-        pos('Deli Shifts', 'Camp Manager Night', '4PM–10PM', { countsDouble: true }),
-        pos('Deli Shifts', 'Camp Manager Night Deputy', '4PM–7PM'),
-        pos('Deli Shifts', 'Camp Manager Night Deputy', '7PM–10PM'),
+        pos('Deli Shifts', 'Kitchen Lead', undefined, { note: 'as needed', description: 'Oversees all kitchen operations; makes real-time calls on prep, service flow, and staffing' }),
+        pos('Deli Shifts', 'Kitchen Supervisor', '8:30AM–12:30PM', { requiresExp: true, countsDouble: true, description: 'Opens the kitchen, manages morning prep and service; ensures food safety and quality standards' }),
+        pos('Deli Shifts', 'Camp Manager Day', '10AM–4PM', { countsDouble: true, description: 'Runs daytime camp operations including supply runs, camper issues, and infrastructure' }),
+        pos('Deli Shifts', 'Camp Manager Day Deputy', '10AM–1PM', { description: 'Supports the Day Camp Manager with errands, logistics, and camper coordination' }),
+        pos('Deli Shifts', 'Camp Manager Day Deputy', '1PM–4PM', { description: 'Supports the Day Camp Manager with errands, logistics, and camper coordination' }),
+        pos('Deli Shifts', 'Camp Manager Night', '4PM–10PM', { countsDouble: true, description: 'Manages evening camp operations, noise levels, safety, and overnight readiness' }),
+        pos('Deli Shifts', 'Camp Manager Night Deputy', '4PM–7PM', { description: 'Assists Night Camp Manager with evening duties and closing procedures' }),
+        pos('Deli Shifts', 'Camp Manager Night Deputy', '7PM–10PM', { description: 'Assists Night Camp Manager with evening duties and closing procedures' }),
       ],
     },
     {
       name: 'Prep Crew',
       time: '8:30–11:00 AM',
-      positions: Array.from({ length: 5 }, () => pos('Prep Crew', 'Prep Crew', '8:30–11:00 AM')),
+      positions: Array.from({ length: 5 }, () => pos('Prep Crew', 'Prep Crew', '8:30–11:00 AM', { description: 'Chops, slices, portions, and organizes ingredients for the day\u2019s deli service' })),
     },
     {
       name: 'Order Taker',
       time: '9:30–12:00',
-      positions: [pos('Order Taker', 'Order Taker & Counter', '9:30–12:00', { note: 'Basically Entertainer' })],
+      positions: [pos('Order Taker', 'Order Taker & Counter', '9:30–12:00', { note: 'Basically Entertainer', description: 'Takes customer orders at the counter with energy and flair \u2014 part cashier, part entertainer' })],
     },
     {
       name: 'Grill – Service Shift',
       time: '9:30–12:00',
       positions: [
-        pos('Grill', 'Grill Lead', '9:30–12:00', { requiresExp: true }),
-        pos('Grill', 'Grill', '9:30–12:00'),
-        pos('Grill', 'Grill', '9:30–12:00'),
-        pos('Grill', 'Grill', '9:30–12:00'),
+        pos('Grill', 'Grill Lead', '9:30–12:00', { requiresExp: true, description: 'Runs the grill station; calls temps, manages ticket flow, and ensures food is cooked safely' }),
+        pos('Grill', 'Grill', '9:30–12:00', { description: 'Works the flat-top and grill cooking eggs, bacon, and proteins to order' }),
+        pos('Grill', 'Grill', '9:30–12:00', { description: 'Works the flat-top and grill cooking eggs, bacon, and proteins to order' }),
+        pos('Grill', 'Grill', '9:30–12:00', { description: 'Works the flat-top and grill cooking eggs, bacon, and proteins to order' }),
       ],
     },
     {
       name: 'Assembly / Deli Service',
       time: '9:30–12:00',
       positions: [
-        pos('Assembly', 'Assembly (Egg + Egg+Cheese)', '9:30–12:00'),
-        pos('Assembly', 'Assembly (Schmearer)', '9:30–12:00'),
-        pos('Assembly', 'Assembly (Bacon)', '9:30–12:00'),
-        pos('Assembly', 'Assembly (Coffee + Milk)', '9:30–12:00'),
-        pos('Assembly', 'Assembly (Sandwich Counter)', '9:30–12:00'),
+        pos('Assembly', 'Assembly (Egg + Egg+Cheese)', '9:30–12:00', { description: 'Assembles egg and egg-and-cheese sandwiches fresh off the grill' }),
+        pos('Assembly', 'Assembly (Schmearer)', '9:30–12:00', { description: 'Spreads cream cheese, butter, and condiments on bagels and rolls' }),
+        pos('Assembly', 'Assembly (Bacon)', '9:30–12:00', { description: 'Handles bacon prep, portioning, and adding bacon to sandwich orders' }),
+        pos('Assembly', 'Assembly (Coffee + Milk)', '9:30–12:00', { description: 'Brews and serves coffee and milk; keeps the beverage station stocked and clean' }),
+        pos('Assembly', 'Assembly (Sandwich Counter)', '9:30–12:00', { description: 'Final sandwich assembly \u2014 wraps, bags, and hands completed orders to runners' }),
       ],
     },
     {
       name: 'Runner',
       time: '9:30–12:00',
       positions: [
-        pos('Runner', 'Runner (Assist)', '9:30–12:00'),
-        pos('Runner', 'Runner (Assist)', '9:30–12:00'),
+        pos('Runner', 'Runner (Assist)', '9:30–12:00', { description: 'Delivers finished orders from the counter to customers and assists where needed' }),
+        pos('Runner', 'Runner (Assist)', '9:30–12:00', { description: 'Delivers finished orders from the counter to customers and assists where needed' }),
       ],
     },
     {
       name: 'Security',
       time: '10:00–12:30',
-      positions: [pos('Security', 'Security', '10:00–12:30')],
+      positions: [pos('Security', 'Security', '10:00–12:30', { description: 'Manages crowd flow, enforces line order, and keeps the deli perimeter safe and fun' })],
     },
     {
       name: 'Clean-up Crew',
       time: '12:00–2:30',
-      positions: Array.from({ length: 5 }, () => pos('Clean-up Crew', 'Clean-up & Kitchen Reset', '12:00–2:30')),
+      positions: Array.from({ length: 5 }, () => pos('Clean-up Crew', 'Clean-up & Kitchen Reset', '12:00–2:30', { description: 'Deep cleans all stations, washes dishes, sanitizes surfaces, and resets the kitchen for the next day' })),
     },
     {
       name: 'Entertainers',
       time: '10:00–12:30',
       positions: [
-        pos('Entertainers', 'Entertainer / Bike Manager', '10:00–12:30'),
-        pos('Entertainers', 'Entertainer / Bike Manager', '10:00–12:30'),
-        pos('Entertainers', 'Entertainer / Line Manager', '10:00–12:30'),
-        pos('Entertainers', 'Entertainer / Line Manager', '10:00–12:30'),
+        pos('Entertainers', 'Entertainer / Bike Manager', '10:00–12:30', { description: 'Manages the bike valet area and entertains the crowd while they wait' }),
+        pos('Entertainers', 'Entertainer / Bike Manager', '10:00–12:30', { description: 'Manages the bike valet area and entertains the crowd while they wait' }),
+        pos('Entertainers', 'Entertainer / Line Manager', '10:00–12:30', { description: 'Keeps the line moving and entertained with games, banter, or conversation' }),
+        pos('Entertainers', 'Entertainer / Line Manager', '10:00–12:30', { description: 'Keeps the line moving and entertained with games, banter, or conversation' }),
       ],
     },
     {
       name: 'Music & DJs',
       time: '9:30–12:30',
-      positions: [pos('Music & DJs', 'DJ', '9:30–12:30')],
+      positions: [pos('Music & DJs', 'DJ', '9:30–12:30', { description: 'Provides the soundtrack for deli service \u2014 sets the vibe and keeps energy high' })],
     },
     {
       name: 'Deep Playa Food Service (Fri 8/29)',
       note: 'Soup for 1,000',
       positions: [
-        pos('Deep Playa', 'Kitchen Lead', '3PM–6:30PM'),
-        pos('Deep Playa', 'Grill Lead', '3PM–6:30PM', { requiresExp: true }),
-        pos('Deep Playa', 'Volunteer Supervisor', '3PM–6:30PM'),
-        pos('Deep Playa', 'Volunteer Supervisor', '3PM–6:30PM'),
-        pos('Deep Playa', 'Volunteer Supervisor', '3PM–6:30PM'),
-        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM'),
-        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM'),
-        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM'),
-        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM'),
+        pos('Deep Playa', 'Kitchen Lead', '3PM–6:30PM', { description: 'Leads kitchen operations for the deep playa soup service' }),
+        pos('Deep Playa', 'Grill Lead', '3PM–6:30PM', { requiresExp: true, description: 'Runs the cooking station for the deep playa event' }),
+        pos('Deep Playa', 'Volunteer Supervisor', '3PM–6:30PM', { description: 'Supervises 15\u201320 external volunteers from Camp Milk & Honey' }),
+        pos('Deep Playa', 'Volunteer Supervisor', '3PM–6:30PM', { description: 'Supervises 15\u201320 external volunteers from Camp Milk & Honey' }),
+        pos('Deep Playa', 'Volunteer Supervisor', '3PM–6:30PM', { description: 'Supervises 15\u201320 external volunteers from Camp Milk & Honey' }),
+        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM', { description: 'Transports prepared food to deep playa and serves 1,000+ attendees' }),
+        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM', { description: 'Transports prepared food to deep playa and serves 1,000+ attendees' }),
+        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM', { description: 'Transports prepared food to deep playa and serves 1,000+ attendees' }),
+        pos('Deep Playa', 'Transport & Serving', '6:30PM–9PM', { description: 'Transports prepared food to deep playa and serves 1,000+ attendees' }),
       ],
     },
     {
       name: 'Strike (Sun 8/31)',
       note: 'Teardown shifts',
       positions: [
-        pos('Strike', 'Striker – Deco + Chill Tent', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Deco + Chill Tent', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Deco + Chill Tent', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Deco + Chill Tent', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Service Kitchen', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Service Kitchen', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Service Kitchen', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Plumbing/Shower', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Plumbing/Shower', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Plumbing/Shower', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Plumbing/Shower', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Power', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Power', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Power', '8:30AM–11AM'),
-        pos('Strike', 'Striker – Power', '8:30AM–11AM'),
+        pos('Strike', 'Striker \u2013 Deco + Chill Tent', '8:30AM–11AM', { description: 'Tears down decorations and disassembles the public chill tent' }),
+        pos('Strike', 'Striker \u2013 Deco + Chill Tent', '8:30AM–11AM', { description: 'Tears down decorations and disassembles the public chill tent' }),
+        pos('Strike', 'Striker \u2013 Deco + Chill Tent', '8:30AM–11AM', { description: 'Tears down decorations and disassembles the public chill tent' }),
+        pos('Strike', 'Striker \u2013 Deco + Chill Tent', '8:30AM–11AM', { description: 'Tears down decorations and disassembles the public chill tent' }),
+        pos('Strike', 'Striker \u2013 Service Kitchen', '8:30AM–11AM', { description: 'Breaks down the service kitchen \u2014 packs equipment, cleans, and loads out' }),
+        pos('Strike', 'Striker \u2013 Service Kitchen', '8:30AM–11AM', { description: 'Breaks down the service kitchen \u2014 packs equipment, cleans, and loads out' }),
+        pos('Strike', 'Striker \u2013 Service Kitchen', '8:30AM–11AM', { description: 'Breaks down the service kitchen \u2014 packs equipment, cleans, and loads out' }),
+        pos('Strike', 'Striker \u2013 Plumbing/Shower', '8:30AM–11AM', { description: 'Disconnects plumbing, drains lines, and disassembles the shower container' }),
+        pos('Strike', 'Striker \u2013 Plumbing/Shower', '8:30AM–11AM', { description: 'Disconnects plumbing, drains lines, and disassembles the shower container' }),
+        pos('Strike', 'Striker \u2013 Plumbing/Shower', '8:30AM–11AM', { description: 'Disconnects plumbing, drains lines, and disassembles the shower container' }),
+        pos('Strike', 'Striker \u2013 Plumbing/Shower', '8:30AM–11AM', { description: 'Disconnects plumbing, drains lines, and disassembles the shower container' }),
+        pos('Strike', 'Striker \u2013 Power', '8:30AM–11AM', { description: 'Disconnects electrical systems, coils cabling, and packs generators' }),
+        pos('Strike', 'Striker \u2013 Power', '8:30AM–11AM', { description: 'Disconnects electrical systems, coils cabling, and packs generators' }),
+        pos('Strike', 'Striker \u2013 Power', '8:30AM–11AM', { description: 'Disconnects electrical systems, coils cabling, and packs generators' }),
+        pos('Strike', 'Striker \u2013 Power', '8:30AM–11AM', { description: 'Disconnects electrical systems, coils cabling, and packs generators' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
+        pos('Strike', 'Striker \u2013 Lighting/Shade/Bikes', '8:30AM–11AM', { description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks' }),
       ],
     },
   ]

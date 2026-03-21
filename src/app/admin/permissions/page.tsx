@@ -6,6 +6,7 @@ import {
   Card, CardContent,
   Badge, Alert, Button, Input
 } from '@/components/ui'
+import { updateUserRoleAction } from '@/app/actions/admin'
 import type { UserProfileRow, UserRole } from '@/types/database'
 
 export default function PermissionsPage() {
@@ -36,14 +37,9 @@ export default function PermissionsPage() {
   }, [fetchProfiles])
 
   const updateRole = async (profileId: string, newRole: UserRole) => {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ role: newRole } as never)
-      .eq('id', profileId)
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    const result = await updateUserRoleAction(profileId, newRole)
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Update failed' })
     } else {
       setMessage({ type: 'success', text: 'Role updated successfully' })
       fetchProfiles()
