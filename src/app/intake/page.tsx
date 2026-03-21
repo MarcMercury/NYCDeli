@@ -124,15 +124,43 @@ export default function IntakePage() {
     try {
       const supabase = createClient()
       
-      // Step 1: Create auth account
+      // Step 1: Create auth account (or sign in if already registered)
       const { error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
       })
 
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        // If user already registered (from a previous failed attempt), try signing in
+        if (signUpError.message.includes('already registered') || signUpError.status === 422) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: data.email,
+            password: data.password,
+          })
+          if (signInError) {
+            throw new Error(
+              'An account with this email already exists. Please sign in on the login page, or use a different email.'
+            )
+          }
+        } else {
+          throw signUpError
+        }
+      }
 
-      // Step 2: Insert camper record (strip password fields)
+      // Step 2: Check if camper record already exists (from a previous partial submission)
+      const { data: existingCamper } = await supabase
+        .from('campers')
+        .select('id')
+        .eq('email', data.email)
+        .maybeSingle() as unknown as { data: { id: string } | null }
+
+      if (existingCamper) {
+        // Camper already registered — go straight to success
+        router.push('/intake/success')
+        return
+      }
+
+      // Step 3: Insert camper record (strip password fields)
       const { password: _pw, confirmPassword: _cpw, ...camperFields } = data
       const camperData = {
         ...camperFields,
