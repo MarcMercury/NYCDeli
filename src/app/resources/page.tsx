@@ -580,8 +580,7 @@ export default function ResourcesPage() {
             Resources
           </h1>
           <p className="text-lg text-black/70 max-w-2xl">
-            Everything you need to know about Burning Man and NYC Deli — searchable guides,
-            packing lists, camp info, external links, and more.
+            One page can&apos;t possibly tell you everything you need to know about Burning Man and NYC Deli, so talk to people, engage, ask, question, be resourceful on your own. Do NOT rely on this page alone — it&apos;s just some shit that others thought was helpful at some point.
           </p>
         </div>
       </section>

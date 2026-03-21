@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-  Badge, Alert, Button, Input, Select,
+  Badge, Alert, Button, Input,
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -30,10 +30,12 @@ import {
   getAllDraftPositions,
 } from '@/lib/shift-draft'
 
-type ViewMode = 'list' | 'setup' | 'live'
+type ViewMode = 'list' | 'wizard' | 'setup' | 'live'
+type WizardStep = 1 | 2 | 3
 
 export default function AdminShiftDraftPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1)
   const [draft, setDraft] = useState<ShiftDraftRow | null>(null)
   const [draftOrder, setDraftOrderState] = useState<ShiftDraftOrderWithCamper[]>([])
   const [picks, setPicks] = useState<ShiftDraftPickRow[]>([])
@@ -48,7 +50,7 @@ export default function AdminShiftDraftPage() {
 
   // Order building
   const [searchTerm, setSearchTerm] = useState('')
-  const [orderList, setOrderList] = useState<string[]>([]) // camper IDs in order
+  const [orderList, setOrderList] = useState<string[]>([])
   const dragItem = useRef<number | null>(null)
   const dragOverItem = useRef<number | null>(null)
 
@@ -60,27 +62,29 @@ export default function AdminShiftDraftPage() {
     try {
       const supabase = createClient()
 
-      // Load all campers
       const { data: camperData } = await supabase
         .from('campers')
         .select('*')
         .order('full_name')
       setCampers(camperData || [])
 
-      // Load active draft
       const activeDraft = await fetchActiveDraft()
       if (activeDraft) {
         setDraft(activeDraft)
+        setDraftName(activeDraft.name)
+        setTotalRounds(activeDraft.total_rounds)
+        setPickTimeLimit(activeDraft.pick_time_limit_seconds)
         const order = await fetchDraftOrder(activeDraft.id)
         setDraftOrderState(order)
         setOrderList(order.map(o => o.camper_id))
         const draftPicks = await fetchDraftPicks(activeDraft.id)
         setPicks(draftPicks)
 
-        if (activeDraft.status === 'active' || activeDraft.status === 'paused') {
+        if (activeDraft.status === 'active' || activeDraft.status === 'paused' || activeDraft.status === 'completed') {
           setViewMode('live')
         } else {
           setViewMode('setup')
+          setWizardStep(2)
         }
       }
     } catch {
@@ -179,7 +183,8 @@ export default function AdminShiftDraftPage() {
       const newDraft = await createDraft(draftName, totalRounds, pickTimeLimit, user.id)
       setDraft(newDraft)
       setViewMode('setup')
-      showMessage('success', 'Draft created!')
+      setWizardStep(2)
+      showMessage('success', 'Draft created! Now set up the draft order.')
     } catch (err) {
       showMessage('error', `Failed to create draft: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
@@ -203,7 +208,7 @@ export default function AdminShiftDraftPage() {
       showMessage('error', 'Add campers to the draft order first')
       return
     }
-    if (!confirm('Start the draft? Campers will be notified. Make sure the order is set.')) return
+    if (!confirm('Start the draft? Campers will pick from the Kitchen page. Make sure the order is set.')) return
     try {
       await handleSaveOrder()
       await startDraft(draft.id)
@@ -253,6 +258,7 @@ export default function AdminShiftDraftPage() {
       setPicks([])
       setOrderList([])
       setViewMode('list')
+      setWizardStep(1)
       showMessage('success', 'Draft deleted')
     } catch (err) {
       showMessage('error', `Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -301,6 +307,20 @@ export default function AdminShiftDraftPage() {
     setOrderList(shuffled)
   }
 
+  const moveUp = (index: number) => {
+    if (index === 0) return
+    const reordered = [...orderList];
+    [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]]
+    setOrderList(reordered)
+  }
+
+  const moveDown = (index: number) => {
+    if (index >= orderList.length - 1) return
+    const reordered = [...orderList];
+    [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]]
+    setOrderList(reordered)
+  }
+
   const handleDragStart = (index: number) => {
     dragItem.current = index
   }
@@ -321,7 +341,7 @@ export default function AdminShiftDraftPage() {
 
   const getCamperById = (id: string) => campers.find(c => c.id === id)
 
-  // ---------- Helpers for live view ----------
+  // ---------- Helpers ----------
 
   const currentPick = draft?.status === 'active'
     ? picks.find(p =>
@@ -374,7 +394,10 @@ export default function AdminShiftDraftPage() {
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-wider">
               🎯 Shift Draft
             </h1>
-            <p className="text-gray-600">Set up and run the live shift selection draft</p>
+            <p className="text-gray-600">
+              Set up and run the live shift selection draft.
+              Campers pick shifts from the <strong>Kitchen</strong> page.
+            </p>
           </div>
           {draft && (
             <Badge variant={
@@ -394,242 +417,504 @@ export default function AdminShiftDraftPage() {
           </Alert>
         )}
 
-        {/* No draft exists - create one */}
-        {!draft && viewMode === 'list' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Draft</CardTitle>
-              <CardDescription>Set up a new shift selection draft for all campers</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold uppercase tracking-wider mb-1">Draft Name</label>
-                <Input
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  placeholder="Shift Draft 2026"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold uppercase tracking-wider mb-1">Total Rounds</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={totalRounds}
-                    onChange={(e) => setTotalRounds(Number(e.target.value))}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Number of times through the draft order</p>
+        {/* ===== No draft: Wizard Flow ===== */}
+        {(!draft && (viewMode === 'list' || viewMode === 'wizard')) && (
+          <div className="space-y-6">
+            {/* Wizard Steps Indicator */}
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[
+                { step: 1 as WizardStep, label: 'Configure' },
+                { step: 2 as WizardStep, label: 'Set Draft Order' },
+                { step: 3 as WizardStep, label: 'Review & Launch' },
+              ].map(({ step, label }) => (
+                <div key={step} className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center font-black text-lg border-4 transition-colors",
+                    wizardStep === step
+                      ? "bg-yellow-400 border-black text-black"
+                      : wizardStep > step
+                        ? "bg-green-500 border-green-600 text-white"
+                        : "bg-gray-200 border-gray-300 text-gray-400"
+                  )}>
+                    {wizardStep > step ? '✓' : step}
+                  </div>
+                  <span className={cn(
+                    "text-sm font-bold uppercase tracking-wider hidden sm:block",
+                    wizardStep === step ? "text-black" : "text-gray-400"
+                  )}>
+                    {label}
+                  </span>
+                  {step < 3 && <div className="w-12 h-1 bg-gray-300 mx-2 hidden sm:block" />}
                 </div>
-                <div>
-                  <label className="block text-sm font-bold uppercase tracking-wider mb-1">Pick Time Limit (sec)</label>
-                  <Input
-                    type="number"
-                    min={30}
-                    max={600}
-                    value={pickTimeLimit}
-                    onChange={(e) => setPickTimeLimit(Number(e.target.value))}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Default: 120 sec (2 min)</p>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={handleCreateDraft}>Create Draft</Button>
-            </CardFooter>
-          </Card>
+              ))}
+            </div>
+
+            {/* Step 1: Configure */}
+            {wizardStep === 1 && (
+              <Card className="max-w-2xl mx-auto border-4 border-black">
+                <CardHeader className="bg-yellow-50 border-b-2 border-black">
+                  <CardTitle className="text-xl">Step 1: Configure Draft</CardTitle>
+                  <CardDescription>Name your draft and set the rules</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-6">
+                  <div>
+                    <label className="block text-sm font-bold uppercase tracking-wider mb-2">Draft Name</label>
+                    <Input
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                      placeholder="e.g. Shift Draft 2026"
+                      className="text-lg"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold uppercase tracking-wider mb-2">Total Rounds</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={totalRounds}
+                        onChange={(e) => setTotalRounds(Number(e.target.value))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Each camper picks this many shifts (one per round)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold uppercase tracking-wider mb-2">Pick Time Limit</label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={30}
+                          max={600}
+                          value={pickTimeLimit}
+                          onChange={(e) => setPickTimeLimit(Number(e.target.value))}
+                        />
+                        <span className="text-sm text-gray-500 whitespace-nowrap">seconds</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {pickTimeLimit >= 60 ? `${Math.floor(pickTimeLimit / 60)}m ${pickTimeLimit % 60}s` : `${pickTimeLimit}s`} per pick. Auto-skip if time runs out.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 border-2 border-gray-200 p-4 rounded">
+                    <h4 className="font-bold text-sm uppercase tracking-wider mb-2">Draft Rules</h4>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Each camper picks <strong>{totalRounds}</strong> shift{totalRounds !== 1 ? 's' : ''} total</li>
+                      <li>• Each pick must be made within <strong>{pickTimeLimit}s</strong> or the turn is auto-skipped</li>
+                      <li>• Draft order reverses on even rounds (snake draft)</li>
+                      <li>• Campers pick from the <strong>Kitchen</strong> page in real-time</li>
+                      <li>• Shifts marked &quot;2×&quot; count as two shift credits</li>
+                      <li>• Shifts marked &quot;EXP&quot; require kitchen experience</li>
+                    </ul>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                  <Button onClick={handleCreateDraft} className="px-8">
+                    Create Draft & Continue →
+                  </Button>
+                </CardFooter>
+              </Card>
+            )}
+
+            {wizardStep === 2 && !draft && (
+              <Card className="max-w-2xl mx-auto text-center">
+                <CardContent className="py-12">
+                  <p className="text-gray-600 mb-4">Create a draft first to set the order.</p>
+                  <Button onClick={() => setWizardStep(1)}>← Back to Step 1</Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
-        {/* Setup mode */}
-        {draft && draft.status === 'setup' && viewMode === 'setup' && (
+        {/* ===== Draft in setup: Wizard Steps 2 & 3 ===== */}
+        {draft && draft.status === 'setup' && (viewMode === 'wizard' || viewMode === 'setup') && (
           <div className="space-y-6">
-            {/* Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Draft Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Wizard Steps Indicator */}
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[
+                { step: 1 as WizardStep, label: 'Configure' },
+                { step: 2 as WizardStep, label: 'Set Draft Order' },
+                { step: 3 as WizardStep, label: 'Review & Launch' },
+              ].map(({ step, label }) => (
+                <button
+                  key={step}
+                  onClick={() => setWizardStep(step)}
+                  className="flex items-center gap-2"
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center font-black text-lg border-4 transition-colors cursor-pointer",
+                    wizardStep === step
+                      ? "bg-yellow-400 border-black text-black"
+                      : wizardStep > step
+                        ? "bg-green-500 border-green-600 text-white"
+                        : "bg-gray-200 border-gray-300 text-gray-400"
+                  )}>
+                    {wizardStep > step ? '✓' : step}
+                  </div>
+                  <span className={cn(
+                    "text-sm font-bold uppercase tracking-wider hidden sm:block",
+                    wizardStep === step ? "text-black" : "text-gray-400"
+                  )}>
+                    {label}
+                  </span>
+                  {step < 3 && <div className="w-12 h-1 bg-gray-300 mx-2 hidden sm:block" />}
+                </button>
+              ))}
+            </div>
+
+            {/* Step 1: Edit Settings */}
+            {wizardStep === 1 && (
+              <Card className="max-w-2xl mx-auto border-4 border-black">
+                <CardHeader className="bg-yellow-50 border-b-2 border-black">
+                  <CardTitle className="text-xl">Step 1: Draft Settings</CardTitle>
+                  <CardDescription>Adjust settings for &ldquo;{draft.name}&rdquo;</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-6">
                   <div>
-                    <label className="block text-sm font-bold uppercase tracking-wider mb-1">Name</label>
+                    <label className="block text-sm font-bold uppercase tracking-wider mb-2">Draft Name</label>
                     <Input
                       value={draftName}
                       onChange={(e) => setDraftName(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold uppercase tracking-wider mb-1">Rounds</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={totalRounds}
-                      onChange={(e) => setTotalRounds(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold uppercase tracking-wider mb-1">Time Limit (sec)</label>
-                    <Input
-                      type="number"
-                      min={30}
-                      max={600}
-                      value={pickTimeLimit}
-                      onChange={(e) => setPickTimeLimit(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex gap-2">
-                <Button onClick={handleUpdateSettings} variant="secondary">Save Settings</Button>
-                <Button onClick={handleDeleteDraft} variant="danger">Delete Draft</Button>
-              </CardFooter>
-            </Card>
-
-            {/* Draft Order */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Available Campers */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Available Campers ({filteredCampers.length})</CardTitle>
-                  <Input
-                    placeholder="Search campers..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="mt-2"
-                  />
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="max-h-[500px] overflow-y-auto">
-                    {filteredCampers.map(c => (
-                      <button
-                        key={c.id}
-                        onClick={() => addToOrder(c.id)}
-                        className="w-full text-left px-4 py-2 border-b border-gray-100 hover:bg-yellow-50 flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-bold">{c.full_name}</span>
-                          {c.playa_name && (
-                            <span className="text-gray-500 ml-2">&quot;{c.playa_name}&quot;</span>
-                          )}
-                        </div>
-                        <span className="text-green-600 font-bold">+ Add</span>
-                      </button>
-                    ))}
-                    {filteredCampers.length === 0 && (
-                      <p className="p-4 text-gray-500 text-center">
-                        {campers.length === orderList.length ? 'All campers added' : 'No matches'}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button onClick={addAllCampers} variant="secondary" className="w-full">
-                    Add All Campers
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              {/* Draft Order */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Draft Order ({orderList.length})</CardTitle>
-                  <CardDescription>Drag to reorder, or use shuffle</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="max-h-[500px] overflow-y-auto">
-                    {orderList.map((camperId, idx) => {
-                      const camper = getCamperById(camperId)
-                      return (
-                        <div
-                          key={camperId}
-                          draggable
-                          onDragStart={() => handleDragStart(idx)}
-                          onDragEnter={() => handleDragEnter(idx)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={(e) => e.preventDefault()}
-                          className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 hover:bg-gray-50 cursor-grab active:cursor-grabbing"
-                        >
-                          <span className="text-gray-400 font-mono w-8 text-right">{idx + 1}.</span>
-                          <span className="font-bold flex-1">
-                            {camper?.full_name || 'Unknown'}
-                            {camper?.playa_name && (
-                              <span className="text-gray-500 font-normal ml-2">&quot;{camper.playa_name}&quot;</span>
-                            )}
-                          </span>
-                          <button
-                            onClick={() => removeFromOrder(camperId)}
-                            className="text-red-500 hover:text-red-700 font-bold text-sm"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      )
-                    })}
-                    {orderList.length === 0 && (
-                      <p className="p-4 text-gray-500 text-center">
-                        Add campers from the left panel
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="flex gap-2">
-                  <Button onClick={shuffleOrder} variant="secondary">🎲 Shuffle</Button>
-                  <Button onClick={handleSaveOrder} variant="secondary">💾 Save Order</Button>
-                  <Button onClick={() => setOrderList([])} variant="danger">Clear</Button>
-                </CardFooter>
-              </Card>
-            </div>
-
-            {/* Shift Grid Preview */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Shift Positions ({getAllDraftPositions().length} total)</CardTitle>
-                <CardDescription>These shifts will be available during the draft</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map(cat => (
-                    <div key={cat.name} className="border-2 border-black p-3">
-                      <h4 className="font-bold uppercase text-sm mb-1">{cat.name}</h4>
-                      {cat.time && <p className="text-xs text-gray-500 mb-2">{cat.time}</p>}
-                      <div className="space-y-1">
-                        {cat.positions.map(pos => (
-                          <div key={pos.id} className="text-xs flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-                            <span>{pos.role}</span>
-                            {pos.time && <span className="text-gray-400">({pos.time})</span>}
-                            {pos.requiresExp && <Badge variant="warning" className="text-[10px] py-0 px-1">EXP</Badge>}
-                            {pos.countsDouble && <Badge variant="info" className="text-[10px] py-0 px-1">2×</Badge>}
-                          </div>
-                        ))}
-                      </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold uppercase tracking-wider mb-2">Total Rounds</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={totalRounds}
+                        onChange={(e) => setTotalRounds(Number(e.target.value))}
+                      />
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    <div>
+                      <label className="block text-sm font-bold uppercase tracking-wider mb-2">Pick Time Limit (sec)</label>
+                      <Input
+                        type="number"
+                        min={30}
+                        max={600}
+                        value={pickTimeLimit}
+                        onChange={(e) => setPickTimeLimit(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button onClick={handleDeleteDraft} variant="danger">Delete Draft</Button>
+                  <div className="flex gap-2">
+                    <Button onClick={handleUpdateSettings} variant="secondary">Save Settings</Button>
+                    <Button onClick={() => setWizardStep(2)}>Next: Set Order →</Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            )}
 
-            {/* Start Draft */}
-            <Card className="border-yellow-500 border-4">
-              <CardContent className="py-8 text-center">
-                <h3 className="text-2xl font-black uppercase mb-2">Ready to Start?</h3>
-                <p className="text-gray-600 mb-4">
-                  {orderList.length} campers in the draft order · {totalRounds} rounds · {pickTimeLimit}s per pick
-                </p>
-                <Button
-                  onClick={handleStartDraft}
-                  className="text-lg px-8 py-3"
-                  disabled={orderList.length === 0}
-                >
-                  🚀 Start Draft
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Step 2: Set Draft Order */}
+            {wizardStep === 2 && (
+              <div className="space-y-6">
+                <div className="text-center mb-4">
+                  <h2 className="text-2xl font-black uppercase tracking-wider">Step 2: Set Draft Order</h2>
+                  <p className="text-gray-600">Add campers and arrange the order they&apos;ll pick shifts</p>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button onClick={addAllCampers} variant="secondary">
+                    👥 Add All {campers.length} Campers
+                  </Button>
+                  <Button onClick={shuffleOrder} variant="secondary" disabled={orderList.length === 0}>
+                    🎲 Randomize Order
+                  </Button>
+                  <Button onClick={() => setOrderList([])} variant="danger" disabled={orderList.length === 0}>
+                    Clear All
+                  </Button>
+                </div>
+
+                <div className="grid lg:grid-cols-2 gap-6">
+                  {/* Available Campers Pool */}
+                  <Card className="border-2 border-black">
+                    <CardHeader className="bg-gray-50 border-b-2 border-black">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">Available Campers</CardTitle>
+                        <Badge variant="default">{filteredCampers.length} remaining</Badge>
+                      </div>
+                      <Input
+                        placeholder="Search by name, playa name, or email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="mt-2"
+                      />
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        {filteredCampers.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => addToOrder(c.id)}
+                            className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-green-50 flex items-center justify-between transition-colors group"
+                          >
+                            <div>
+                              <span className="font-bold">{c.full_name}</span>
+                              {c.playa_name && (
+                                <span className="text-gray-500 ml-2">&quot;{c.playa_name}&quot;</span>
+                              )}
+                              <p className="text-xs text-gray-400">{c.email}</p>
+                            </div>
+                            <span className="text-green-600 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                              + Add →
+                            </span>
+                          </button>
+                        ))}
+                        {filteredCampers.length === 0 && (
+                          <div className="p-8 text-center">
+                            {campers.length === orderList.length ? (
+                              <div>
+                                <div className="text-3xl mb-2">✅</div>
+                                <p className="text-gray-500 font-bold">All campers added!</p>
+                              </div>
+                            ) : (
+                              <p className="text-gray-500">No matches for &ldquo;{searchTerm}&rdquo;</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Draft Order */}
+                  <Card className="border-4 border-yellow-400">
+                    <CardHeader className="bg-yellow-50 border-b-2 border-yellow-400">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">Draft Order</CardTitle>
+                        <Badge variant="warning">{orderList.length} campers</Badge>
+                      </div>
+                      <CardDescription>Drag to reorder or use arrow buttons. #1 picks first.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        {orderList.map((camperId, idx) => {
+                          const camper = getCamperById(camperId)
+                          return (
+                            <div
+                              key={camperId}
+                              draggable
+                              onDragStart={() => handleDragStart(idx)}
+                              onDragEnter={() => handleDragEnter(idx)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={(e) => e.preventDefault()}
+                              className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 hover:bg-yellow-50 cursor-grab active:cursor-grabbing transition-colors"
+                            >
+                              <span className={cn(
+                                "text-sm font-mono w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0",
+                                idx < 3 ? "bg-yellow-400 text-black" : "bg-gray-100 text-gray-500"
+                              )}>
+                                {idx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <span className="font-bold">
+                                  {camper?.full_name || 'Unknown'}
+                                </span>
+                                {camper?.playa_name && (
+                                  <span className="text-gray-500 font-normal ml-2 text-sm">&quot;{camper.playa_name}&quot;</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => moveUp(idx)}
+                                  disabled={idx === 0}
+                                  className="p-1 text-gray-400 hover:text-black disabled:opacity-30"
+                                  title="Move up"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  onClick={() => moveDown(idx)}
+                                  disabled={idx >= orderList.length - 1}
+                                  className="p-1 text-gray-400 hover:text-black disabled:opacity-30"
+                                  title="Move down"
+                                >
+                                  ▼
+                                </button>
+                                <button
+                                  onClick={() => removeFromOrder(camperId)}
+                                  className="p-1 text-red-400 hover:text-red-600 font-bold"
+                                  title="Remove"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {orderList.length === 0 && (
+                          <div className="p-8 text-center">
+                            <div className="text-3xl mb-2">👈</div>
+                            <p className="text-gray-500">Add campers from the left panel</p>
+                            <p className="text-xs text-gray-400 mt-1">Or click &ldquo;Add All&rdquo; then shuffle</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex gap-2 border-t-2 border-yellow-300">
+                      <Button onClick={shuffleOrder} variant="secondary" disabled={orderList.length < 2}>
+                        🎲 Shuffle
+                      </Button>
+                      <Button onClick={handleSaveOrder} variant="secondary" disabled={orderList.length === 0}>
+                        💾 Save Order
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </div>
+
+                {/* Navigation */}
+                <div className="flex justify-between">
+                  <Button onClick={() => setWizardStep(1)} variant="secondary">
+                    ← Back: Settings
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (orderList.length === 0) {
+                        showMessage('error', 'Add at least one camper to the draft order')
+                        return
+                      }
+                      handleSaveOrder()
+                      setWizardStep(3)
+                    }}
+                  >
+                    Next: Review & Launch →
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Review & Launch */}
+            {wizardStep === 3 && (
+              <div className="space-y-6">
+                <div className="text-center mb-4">
+                  <h2 className="text-2xl font-black uppercase tracking-wider">Step 3: Review & Launch</h2>
+                  <p className="text-gray-600">Double-check everything before going live</p>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <Card className="text-center border-2 border-black">
+                    <CardContent className="py-6">
+                      <p className="text-sm uppercase tracking-wider text-gray-500">Draft Name</p>
+                      <p className="text-xl font-black">{draftName}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="text-center border-2 border-black">
+                    <CardContent className="py-6">
+                      <p className="text-sm uppercase tracking-wider text-gray-500">Campers</p>
+                      <p className="text-4xl font-black">{orderList.length}</p>
+                      <p className="text-xs text-gray-400">{totalRounds} round{totalRounds !== 1 ? 's' : ''} × {orderList.length} = {totalRounds * orderList.length} total picks</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="text-center border-2 border-black">
+                    <CardContent className="py-6">
+                      <p className="text-sm uppercase tracking-wider text-gray-500">Time Per Pick</p>
+                      <p className="text-4xl font-black">{pickTimeLimit >= 60 ? `${Math.floor(pickTimeLimit / 60)}m` : `${pickTimeLimit}s`}</p>
+                      <p className="text-xs text-gray-400">{pickTimeLimit} seconds</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Draft Order Preview */}
+                <Card className="border-2 border-black">
+                  <CardHeader>
+                    <CardTitle>Draft Order Preview</CardTitle>
+                    <CardDescription>First 3 picks are highlighted. Order reverses in even rounds (snake draft).</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                      {orderList.map((camperId, idx) => {
+                        const camper = getCamperById(camperId)
+                        return (
+                          <div
+                            key={camperId}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded border-2 text-sm",
+                              idx < 3 ? "border-yellow-400 bg-yellow-50" : "border-gray-200"
+                            )}
+                          >
+                            <span className={cn(
+                              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                              idx < 3 ? "bg-yellow-400 text-black" : "bg-gray-100 text-gray-500"
+                            )}>
+                              {idx + 1}
+                            </span>
+                            <span className="truncate font-medium">
+                              {camper?.playa_name || camper?.full_name || 'Unknown'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Available Shifts Preview */}
+                <Card className="border-2 border-black">
+                  <CardHeader>
+                    <CardTitle>Available Shift Positions ({getAllDraftPositions().length} total)</CardTitle>
+                    <CardDescription>These shifts will be available for picking during the draft</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {categories.map(cat => (
+                        <div key={cat.name} className="border-2 border-black p-3">
+                          <h4 className="font-bold uppercase text-sm mb-1">{cat.name}</h4>
+                          {cat.time && <p className="text-xs text-gray-500 mb-2">{cat.time}</p>}
+                          <div className="space-y-1">
+                            {cat.positions.map(pos => (
+                              <div key={pos.id} className="text-xs flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+                                <span>{pos.role}</span>
+                                {pos.time && <span className="text-gray-400">({pos.time})</span>}
+                                {pos.requiresExp && <Badge variant="warning" className="text-[10px] py-0 px-1">EXP</Badge>}
+                                {pos.countsDouble && <Badge variant="info" className="text-[10px] py-0 px-1">2×</Badge>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Launch */}
+                <Card className="border-4 border-green-500">
+                  <CardContent className="py-10 text-center space-y-4">
+                    <div className="text-5xl">🚀</div>
+                    <h3 className="text-2xl font-black uppercase">Ready to Go Live?</h3>
+                    <p className="text-gray-600 max-w-md mx-auto">
+                      Once started, campers will see the live draft on the <strong>Kitchen page</strong> under the
+                      &ldquo;Sign-Up Sheet & Draft&rdquo; tab. The first camper in the order will be on the clock.
+                    </p>
+                    <div className="flex justify-center gap-3 pt-4">
+                      <Button onClick={() => setWizardStep(2)} variant="secondary">
+                        ← Edit Order
+                      </Button>
+                      <Button
+                        onClick={handleStartDraft}
+                        className="text-lg px-10 py-3 bg-green-600 hover:bg-green-700"
+                        disabled={orderList.length === 0}
+                      >
+                        🚀 Start Draft Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Live Draft View */}
+        {/* ===== Live Draft View ===== */}
         {draft && (draft.status === 'active' || draft.status === 'paused' || draft.status === 'completed') && viewMode === 'live' && (
           <div className="space-y-6">
             {/* Live Status Bar */}
@@ -652,7 +937,6 @@ export default function AdminShiftDraftPage() {
                     <Badge variant="default" className="text-xl px-6 py-2">DRAFT COMPLETE</Badge>
                   ) : (
                     <div className="flex items-center gap-4">
-                      {/* Timer */}
                       {draft.status === 'active' && timeLeft !== null && (
                         <div className={cn(
                           "text-4xl font-mono font-black",
@@ -663,7 +947,6 @@ export default function AdminShiftDraftPage() {
                         </div>
                       )}
 
-                      {/* Controls */}
                       <div className="flex gap-2">
                         <Button onClick={handleTogglePause} variant="secondary">
                           {draft.status === 'paused' ? '▶️ Resume' : '⏸️ Pause'}
@@ -678,10 +961,9 @@ export default function AdminShiftDraftPage() {
                   )}
                 </div>
 
-                {/* Current Picker */}
                 {currentCamper && draft.status === 'active' && (
                   <div className="mt-4 p-4 bg-yellow-100 border-2 border-yellow-500 text-center">
-                    <p className="text-sm uppercase tracking-wider text-yellow-700 font-bold">Now Picking</p>
+                    <p className="text-sm uppercase tracking-wider text-yellow-700 font-bold">Now Picking (on Kitchen page)</p>
                     <p className="text-2xl font-black">
                       {currentCamper.playa_name || currentCamper.full_name}
                     </p>
@@ -693,7 +975,6 @@ export default function AdminShiftDraftPage() {
 
             {/* Draft Board + Pick History */}
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Shift Grid */}
               <div className="lg:col-span-2">
                 <Card>
                   <CardHeader>
@@ -744,9 +1025,7 @@ export default function AdminShiftDraftPage() {
                 </Card>
               </div>
 
-              {/* Draft Order + Pick Log */}
               <div className="space-y-6">
-                {/* Order List */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Draft Order</CardTitle>
@@ -783,7 +1062,6 @@ export default function AdminShiftDraftPage() {
                   </CardContent>
                 </Card>
 
-                {/* Recent Picks */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Recent Picks</CardTitle>
