@@ -264,58 +264,49 @@ function CountdownDisplay({ values, placeholder }: {
 
   return (
     <section className="countdown-brick-wall relative overflow-hidden border-b-4 border-black">
-      {/* Brick wall background with overlay */}
-      <div className="absolute inset-0">
-        <Image
-          src="/Images/nyc/brick-wall.jpg"
-          alt=""
-          fill
-          className="object-cover"
-          priority
-        />
-        {/* Dark overlay for contrast */}
-        <div className="absolute inset-0 bg-black/40" />
-        {/* Grime overlay */}
+      {/* Black background with spray paint texture */}
+      <div className="absolute inset-0 bg-black">
+        {/* Subtle concrete/asphalt texture via CSS noise */}
         <div className="absolute inset-0 nyc-grime" />
+        {/* Spray paint ambient glow patches */}
+        <div className="absolute inset-0" style={{
+          background: [
+            'radial-gradient(ellipse 400px 250px at 8% 40%, rgba(185,51,173,0.08) 0%, transparent 70%)',
+            'radial-gradient(ellipse 300px 200px at 90% 60%, rgba(185,51,173,0.06) 0%, transparent 70%)',
+            'radial-gradient(ellipse 250px 180px at 50% 15%, rgba(252,204,10,0.04) 0%, transparent 70%)',
+            'radial-gradient(ellipse 350px 200px at 70% 80%, rgba(57,255,20,0.03) 0%, transparent 70%)',
+            'radial-gradient(ellipse 200px 300px at 20% 85%, rgba(255,99,25,0.04) 0%, transparent 70%)',
+          ].join(', ')
+        }} />
       </div>
 
-      <div className="relative z-10 py-10 md:py-14 px-4">
-        <div className="max-w-5xl mx-auto">
-          {/* Graffiti title */}
-          <h2 className="graffiti-title text-center mb-8 md:mb-10">
-            <span className="graffiti-text-main">
-              💣 THIS PAGE WILL SELF-DESTRUCT IN:
-            </span>
-          </h2>
+      <div className="relative z-10 py-4 md:py-5 px-4">
+        <div className="max-w-6xl mx-auto">
+          {/* Single-line: title + countdown + rat */}
+          <div className="flex items-center justify-center gap-3 md:gap-6 flex-wrap md:flex-nowrap">
+            {/* Graffiti title */}
+            <h2 className="graffiti-title shrink-0">
+              <span className="graffiti-text-compact">
+                💣 SELF-DESTRUCT IN:
+              </span>
+            </h2>
 
-          {/* Countdown numbers + rat container */}
-          <div className="flex items-end justify-center gap-2 sm:gap-3 md:gap-5">
-            {/* The countdown numbers */}
-            <div className="flex items-end gap-2 sm:gap-3 md:gap-5">
+            {/* Countdown numbers */}
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
               {items.map(({ value, label }, i) => (
                 <div key={label} className="flex flex-col items-center">
-                  <div className="graffiti-number-block">
-                    <span className="graffiti-number">
+                  <div className="graffiti-number-block-compact">
+                    <span className="graffiti-number-compact">
                       {typeof value === 'number' ? String(value).padStart(2, '0') : value}
                     </span>
-                    {/* Paint drip effects under each number */}
-                    <div className="graffiti-drips">
-                      <div className="drip drip-1" />
-                      <div className="drip drip-2" />
-                      {i % 2 === 0 && <div className="drip drip-3" />}
-                    </div>
                   </div>
-                  <span className="graffiti-label">{label}</span>
-                  {/* Colon separator */}
-                  {i < items.length - 1 && (
-                    <span className="graffiti-colon" aria-hidden="true" />
-                  )}
+                  <span className="graffiti-label-compact">{label}</span>
                 </div>
               ))}
             </div>
 
-            {/* Rat standing next to seconds */}
-            <div className="hidden sm:block relative -mb-2 ml-1 md:ml-3">
+            {/* Rat next to countdown */}
+            <div className="hidden sm:block relative shrink-0">
               <SprayPaintRat />
             </div>
           </div>
@@ -325,6 +316,9 @@ function CountdownDisplay({ values, placeholder }: {
             <div className="splatter splatter-1" />
             <div className="splatter splatter-2" />
             <div className="splatter splatter-3" />
+            <div className="splatter splatter-4" />
+            <div className="splatter splatter-5" />
+            <div className="splatter splatter-6" />
           </div>
         </div>
       </div>
@@ -350,19 +344,12 @@ export function CountdownTimer() {
   if (timeLeft.expired) {
     return (
       <section className="countdown-brick-wall relative overflow-hidden border-b-4 border-black">
-        <div className="absolute inset-0">
-          <Image
-            src="/Images/nyc/brick-wall.jpg"
-            alt=""
-            fill
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 bg-black">
+          <div className="absolute inset-0 nyc-grime" />
         </div>
-        <div className="relative z-10 py-14 px-4">
+        <div className="relative z-10 py-4 md:py-5 px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h2 className="graffiti-text-main text-4xl md:text-6xl animate-pulse">
+            <h2 className="graffiti-text-main text-2xl md:text-4xl animate-pulse">
               💥 BOOM. SEE YOU ON THE PLAYA. 💥
             </h2>
           </div>

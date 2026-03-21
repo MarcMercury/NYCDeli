@@ -316,7 +316,24 @@ body {
   -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
 }
 
-/* ── Graffiti numbers ── */
+/* ── Compact inline title for countdown bar ── */
+.graffiti-text-compact {
+  font-family: var(--font-graffiti), 'Impact', 'Arial Black', sans-serif;
+  font-size: clamp(0.85rem, 2.5vw, 1.4rem);
+  color: #fccc0a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.9),
+    -1px -1px 0 rgba(0, 0, 0, 0.5),
+    0 0 15px rgba(252, 204, 10, 0.3),
+    0 0 30px rgba(252, 204, 10, 0.1);
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Graffiti numbers (legacy full-size) ── */
 .graffiti-number-block {
   position: relative;
   min-width: 60px;
@@ -334,14 +351,14 @@ body {
 .graffiti-number {
   font-family: var(--font-graffiti), 'Impact', 'Arial Black', sans-serif;
   font-size: clamp(2.5rem, 8vw, 5rem);
-  color: #ee352e;
+  color: #b933ad;
   text-shadow:
     4px 4px 0 rgba(0, 0, 0, 0.85),
     -2px -2px 0 rgba(0, 0, 0, 0.4),
     2px -2px 0 rgba(0, 0, 0, 0.4),
     -2px 2px 0 rgba(0, 0, 0, 0.4),
-    0 0 30px rgba(238, 53, 46, 0.35),
-    0 0 60px rgba(238, 53, 46, 0.15);
+    0 0 30px rgba(185, 51, 173, 0.4),
+    0 0 60px rgba(185, 51, 173, 0.18);
   line-height: 1;
   display: block;
   paint-order: stroke fill;
@@ -359,6 +376,46 @@ body {
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
 }
 
+/* ── Compact countdown numbers (inline bar) ── */
+.graffiti-number-block-compact {
+  position: relative;
+  min-width: 38px;
+  text-align: center;
+  padding: 2px 2px 4px;
+}
+
+@media (min-width: 768px) {
+  .graffiti-number-block-compact {
+    min-width: 52px;
+    padding: 2px 4px 6px;
+  }
+}
+
+.graffiti-number-compact {
+  font-family: var(--font-graffiti), 'Impact', 'Arial Black', sans-serif;
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  color: #b933ad;
+  text-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.85),
+    -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(185, 51, 173, 0.4),
+    0 0 40px rgba(185, 51, 173, 0.18);
+  line-height: 1;
+  display: block;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.3);
+}
+
+.graffiti-label-compact {
+  font-family: var(--font-graffiti), 'Impact', 'Arial Black', sans-serif;
+  font-size: clamp(0.45rem, 1.2vw, 0.65rem);
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-top: 2px;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.8);
+}
+
 /* ── Paint drips under numbers ── */
 .graffiti-drips {
   position: absolute;
@@ -373,17 +430,17 @@ body {
 .drip {
   width: 3px;
   border-radius: 0 0 3px 3px;
-  background: linear-gradient(180deg, #ee352e 0%, rgba(238, 53, 46, 0.3) 80%, transparent 100%);
+  background: linear-gradient(180deg, #b933ad 0%, rgba(185, 51, 173, 0.3) 80%, transparent 100%);
 }
 
-.drip-1 { height: 18px; opacity: 0.7; }
-.drip-2 { height: 28px; opacity: 0.5; margin-top: 4px; }
-.drip-3 { height: 14px; opacity: 0.6; margin-top: 8px; }
+.drip-1 { height: 10px; opacity: 0.7; }
+.drip-2 { height: 16px; opacity: 0.5; margin-top: 2px; }
+.drip-3 { height: 8px; opacity: 0.6; margin-top: 4px; }
 
 @media (min-width: 768px) {
-  .drip-1 { height: 28px; }
-  .drip-2 { height: 42px; }
-  .drip-3 { height: 20px; }
+  .drip-1 { height: 14px; }
+  .drip-2 { height: 22px; }
+  .drip-3 { height: 10px; }
 }
 
 /* ── Spray paint splatters ── */
@@ -402,48 +459,80 @@ body {
 }
 
 .splatter-1 {
-  width: 120px;
-  height: 120px;
-  background: radial-gradient(circle, #ee352e 0%, transparent 70%);
-  top: 10%;
-  left: 5%;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(ellipse 60% 80%, rgba(185, 51, 173, 0.25) 0%, rgba(185, 51, 173, 0.08) 40%, transparent 70%);
+  top: 5%;
+  left: 3%;
 }
 
 .splatter-2 {
-  width: 80px;
-  height: 80px;
-  background: radial-gradient(circle, #fccc0a 0%, transparent 70%);
-  bottom: 15%;
-  right: 8%;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(252, 204, 10, 0.18) 0%, transparent 70%);
+  bottom: 10%;
+  right: 6%;
 }
 
 .splatter-3 {
-  width: 60px;
-  height: 60px;
-  background: radial-gradient(circle, #39ff14 0%, transparent 70%);
-  top: 60%;
-  left: 70%;
-  opacity: 0.1;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle, rgba(185, 51, 173, 0.15) 0%, transparent 65%);
+  top: 55%;
+  left: 65%;
+}
+
+.splatter-4 {
+  width: 200px;
+  height: 140px;
+  background: radial-gradient(ellipse, rgba(57, 255, 20, 0.08) 0%, transparent 60%);
+  top: 20%;
+  right: 15%;
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.15;
+}
+
+.splatter-5 {
+  width: 100px;
+  height: 160px;
+  background: radial-gradient(ellipse 70% 100%, rgba(255, 99, 25, 0.12) 0%, transparent 65%);
+  bottom: 20%;
+  left: 25%;
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.15;
+}
+
+.splatter-6 {
+  width: 70px;
+  height: 70px;
+  background: radial-gradient(circle, rgba(185, 51, 173, 0.2) 0%, rgba(185, 51, 173, 0.05) 50%, transparent 70%);
+  top: 75%;
+  right: 30%;
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.15;
 }
 
 /* ── Graffiti Rat ── */
 .graffiti-rat-wrapper {
   position: relative;
-  width: 90px;
-  height: 140px;
+  width: 50px;
+  height: 80px;
 }
 
 @media (min-width: 768px) {
   .graffiti-rat-wrapper {
-    width: 120px;
-    height: 190px;
+    width: 65px;
+    height: 100px;
   }
 }
 
 @media (min-width: 1024px) {
   .graffiti-rat-wrapper {
-    width: 140px;
-    height: 220px;
+    width: 75px;
+    height: 115px;
   }
 }
 
@@ -457,25 +546,25 @@ body {
 .spray-mist {
   position: absolute;
   top: 30%;
-  left: -30px;
-  width: 50px;
-  height: 50px;
+  left: -18px;
+  width: 30px;
+  height: 30px;
   pointer-events: none;
   z-index: 2;
 }
 
 @media (min-width: 768px) {
   .spray-mist {
-    left: -40px;
-    width: 60px;
-    height: 60px;
+    left: -25px;
+    width: 40px;
+    height: 40px;
   }
 }
 
 .mist-particle {
   position: absolute;
   border-radius: 50%;
-  background: #ee352e;
+  background: #b933ad;
   animation: mist-float 2s ease-in-out infinite;
 }
 
