@@ -104,7 +104,7 @@ const tentGuidelines = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[#111]">
+    <div className="min-h-screen nyc-home-dark">
       {/* Countdown Timer */}
       <CountdownTimer />
 

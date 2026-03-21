@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.className} ${nunito.variable} ${permanentMarker.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#111]">
+      <body className="min-h-full flex flex-col">
         <Navigation />
         <main className="flex-1">{children}</main>
         <Footer />
