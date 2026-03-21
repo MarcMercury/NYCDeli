@@ -425,7 +425,7 @@ function CountdownDisplay({ values, placeholder }: {
             {/* Graffiti title */}
             <h2 className="graffiti-title shrink-0">
               <span className="graffiti-text-compact">
-                💣 SELF-DESTRUCT IN:
+                💣 This page will self destruct in:
               </span>
             </h2>
 
