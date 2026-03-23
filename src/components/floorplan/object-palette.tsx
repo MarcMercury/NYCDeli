@@ -10,10 +10,9 @@ interface ObjectPaletteProps {
 }
 
 export function ObjectPalette({ onDragStart }: ObjectPaletteProps) {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>('structures')
-  const [searchQuery, setSearchQuery] = useState('')
-
   const categories = Object.keys(CATEGORY_LABELS) as Array<ObjectTemplate['category']>
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(categories))
+  const [searchQuery, setSearchQuery] = useState('')
 
   const filteredTemplates = searchQuery
     ? OBJECT_TEMPLATES.filter(
@@ -59,14 +58,21 @@ export function ObjectPalette({ onDragStart }: ObjectPaletteProps) {
         {categories.map(cat => {
           const items = groupedTemplates[cat] || []
           if (items.length === 0) return null
-          const isExpanded = expandedCategory === cat || !!searchQuery
+          const isExpanded = expandedCategories.has(cat) || !!searchQuery
           return (
             <div key={cat}>
               <button
-                onClick={() => setExpandedCategory(isExpanded && !searchQuery ? null : cat)}
+                onClick={() => {
+                  setExpandedCategories(prev => {
+                    const next = new Set(prev)
+                    if (next.has(cat) && !searchQuery) next.delete(cat)
+                    else next.add(cat)
+                    return next
+                  })
+                }}
                 className="w-full text-left text-xs font-black uppercase tracking-wider py-1.5 px-2 bg-gray-100 border-2 border-black hover:bg-gray-200 transition-colors flex items-center justify-between"
               >
-                <span>{CATEGORY_LABELS[cat]}</span>
+                <span>{CATEGORY_LABELS[cat]} <span className="text-[10px] font-normal text-gray-500">({items.length})</span></span>
                 <span className="text-[10px]">{isExpanded ? '▼' : '▶'}</span>
               </button>
               {isExpanded && (

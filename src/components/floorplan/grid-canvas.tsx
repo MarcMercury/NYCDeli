@@ -179,14 +179,16 @@ export function GridCanvas({
     e.preventDefault()
     setDragOverPos(null)
     try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'))
+      const raw = e.dataTransfer.getData('application/json')
+      if (!raw) return
+      const data = JSON.parse(raw)
       if (data.type === 'new-object') {
         const x = snapToGrid(toFeetX(e.clientX))
         const y = snapToGrid(toFeetY(e.clientY))
         onDropNew(data.objectType, x, y)
       }
-    } catch {
-      // Invalid drag data
+    } catch (err) {
+      console.error('[GridCanvas] Drop failed:', err)
     }
   }
 
