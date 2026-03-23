@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
 const signUpSchema = z.object({
@@ -79,15 +80,18 @@ export async function signIn(_prevState: AuthState, formData: FormData): Promise
       .single() as { data: { role: string } | null }
 
     if (profile?.role === 'pending') {
+      revalidatePath('/', 'layout')
       redirect('/pending')
     }
   }
 
+  revalidatePath('/', 'layout')
   redirect('/')
 }
 
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
   redirect('/login')
 }

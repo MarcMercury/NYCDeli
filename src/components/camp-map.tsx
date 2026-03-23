@@ -541,26 +541,6 @@ export function CampMap() {
           )}
         >
           <div className="min-w-[340px] p-4 space-y-4">
-          {/* Layer Controls */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">🗂️ Layers</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5">
-              {Object.entries(layers).map(([key, value]) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={e => setLayers(prev => ({ ...prev, [key]: e.target.checked }))}
-                    className="w-3.5 h-3.5"
-                  />
-                  <span className="font-bold capitalize">{key}</span>
-                </label>
-              ))}
-            </CardContent>
-          </Card>
-
           {/* Identify / Reserve Mode */}
           {mode === 'reserve' && !isIdentified && (
             <Card className="border-emerald-500 border-2">
@@ -741,56 +721,6 @@ export function CampMap() {
               </CardContent>
             </Card>
           )}
-
-          {/* Map Legend */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">📍 Legend</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs space-y-1.5">
-              {mode === 'reserve' && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 ring-4 ring-emerald-400 border-blue-400 bg-blue-200" />
-                    <span>Available — click to reserve</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 ring-4 ring-yellow-400 border-blue-400 bg-blue-200" />
-                    <span>Your spot</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 ring-4 ring-red-400 border-blue-400 bg-blue-200" />
-                    <span>Taken by another camper</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 ring-4 ring-orange-400 border-blue-400 bg-blue-200 opacity-60" />
-                    <span>Doesn&apos;t fit your tent</span>
-                  </div>
-                  <hr className="my-2" />
-                </>
-              )}
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-300 border-2 border-blue-500" />
-                <span>Tents / Shelters</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-yellow-300 border-2 border-yellow-500" />
-                <span>Kitchen Areas</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-300 border-2 border-green-500" />
-                <span>Common Areas</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-gray-300 border-2 border-gray-500" />
-                <span>Utilities</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-purple-300 border-2 border-purple-500" />
-                <span>Entertainment</span>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Tips */}
           <Card>

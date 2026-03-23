@@ -47,7 +47,6 @@ type Tab = { id: string; label: string }
 const tabs: Tab[] = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'inventory', label: 'Inventory' },
-  { id: 'resources', label: 'Resources' },
   { id: 'issues', label: 'Issues' },
   { id: 'info', label: 'Info' },
 ]
@@ -424,258 +423,270 @@ export default function BuildWeekPage() {
 
         {/* ═══════════  INVENTORY  ═══════════ */}
         <TabPanel tabId="inventory" activeTab={activeTab}>
-          <div className="mb-4 flex items-center gap-2">
-            <select
-              value={inventoryCategoryFilter}
-              onChange={e => setInventoryCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
-            >
-              <option value="all">All ({inventory.length})</option>
-              {inventoryCategories.map(cat => (
-                <option key={cat} value={cat}>
-                  {INVENTORY_CATEGORY_ICONS[cat] || '📦'} {cat.charAt(0).toUpperCase() + cat.slice(1)} ({inventory.filter(i => i.category === cat).length})
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-gray-400 ml-2">
-              {verifiedCount}/{inventory.length} verified
-            </span>
-            <button
-              onClick={() => { setShowAddInventory(true); setEditingInventory(null) }}
-              className="ml-auto px-3 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800 transition-colors"
-            >
-              + Add
-            </button>
+          {/* ── Summary strip ── */}
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+            <span>{verifiedCount}/{inventory.length} verified</span>
+            {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
+            <span>{resources.filter(r => r.status === 'have').length} have</span>
+            {resources.filter(r => r.status === 'fix').length > 0 && (
+              <span className="text-amber-600">{resources.filter(r => r.status === 'fix').length} fix</span>
+            )}
           </div>
 
-          {/* Progress bar for verified items */}
+          {/* ── Progress bar for verified items ── */}
           {inventory.length > 0 && (
-            <div className="mb-4">
+            <div className="mb-5">
               <ProgressBar value={Math.round((verifiedCount / inventory.length) * 100)} />
             </div>
           )}
 
-          {/* Add / Edit Form */}
-          {(showAddInventory || editingInventory) && (
-            <InventoryForm
-              item={editingInventory}
-              saving={savingInventory}
-              onSave={editingInventory ? handleEditInventory : handleAddInventory}
-              onCancel={() => { setShowAddInventory(false); setEditingInventory(null) }}
-            />
-          )}
+          {/* ━━━ MATERIALS & SUPPLIES ━━━ */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-black uppercase tracking-widest">Materials &amp; Supplies</h3>
+              <select
+                value={resourceStatusFilter}
+                onChange={e => setResourceStatusFilter(e.target.value)}
+                className="ml-auto px-2 py-1 text-xs border-2 border-black bg-white font-bold focus:outline-none"
+              >
+                <option value="all">All ({resources.length})</option>
+                <option value="need">Need ({resources.filter(r => r.status === 'need').length})</option>
+                <option value="have">Have ({resources.filter(r => r.status === 'have').length})</option>
+                <option value="fix">Fix ({resources.filter(r => r.status === 'fix').length})</option>
+                <option value="discard">Discard ({resources.filter(r => r.status === 'discard').length})</option>
+              </select>
+              <button
+                onClick={() => { setShowAddResource(true); setEditingResource(null) }}
+                className="px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
+              >
+                + Add
+              </button>
+            </div>
 
-          {filteredInventory.length === 0 ? (
-            <p className="text-gray-400 text-sm">No inventory items yet. Add items to start your checklist.</p>
-          ) : (
-            <>
-              {/* Group by category */}
-              {(() => {
-                const grouped = filteredInventory.reduce<Record<string, BuildInventory[]>>((acc, item) => {
-                  if (!acc[item.category]) acc[item.category] = []
-                  acc[item.category].push(item)
-                  return acc
-                }, {})
+            {/* Add / Edit Resource Form */}
+            {(showAddResource || editingResource) && (
+              <ResourceForm
+                resource={editingResource}
+                saving={savingResource}
+                onSave={editingResource ? handleEditResource : handleAddResource}
+                onCancel={() => { setShowAddResource(false); setEditingResource(null) }}
+              />
+            )}
 
-                return Object.entries(grouped).map(([category, items]) => {
-                  const catVerified = items.filter(i => i.verified).length
-                  return (
-                    <div key={category} className="mb-4">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span>{INVENTORY_CATEGORY_ICONS[category] || '📦'}</span>
-                        <span className="text-xs font-bold uppercase tracking-wider">
-                          {category}
-                        </span>
-                        <span className="text-[10px] text-gray-400">
-                          {catVerified}/{items.length}
-                        </span>
-                      </div>
-                      <div className="border-2 border-black bg-white divide-y divide-gray-100">
-                        {items.map(item => (
-                          <div
-                            key={item.id}
-                            className={cn(
-                              'px-4 py-2.5 flex items-center gap-3',
-                              item.verified && 'bg-green-50/40'
-                            )}
-                          >
-                            {/* Verify checkbox */}
-                            <button
-                              onClick={() => handleInventoryVerify(item)}
-                              disabled={updatingInventory[item.id]}
-                              className={cn(
-                                'text-lg flex-shrink-0 hover:scale-110 transition-transform focus:outline-none',
-                                updatingInventory[item.id] && 'opacity-40 animate-pulse'
-                              )}
-                              title={item.verified ? 'Unverify' : 'Mark verified'}
-                            >
-                              {item.verified ? '✅' : '⬜'}
-                            </button>
-
-                            {/* Item info */}
-                            <div className="flex-1 min-w-0">
-                              <span className={cn(
-                                'text-sm',
-                                item.verified && 'line-through text-gray-400'
-                              )}>
-                                {item.name}
-                              </span>
-                              {item.description && (
-                                <p className="text-[11px] text-gray-400 truncate">{item.description}</p>
-                              )}
-                              {item.notes && (
-                                <p className="text-[11px] text-amber-600">{item.notes}</p>
-                              )}
-                            </div>
-
-                            {/* Quantity */}
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <input
-                                type="number"
-                                min={0}
-                                value={item.quantity_actual}
-                                onChange={e => handleInventoryQuantity(item.id, Math.max(0, parseInt(e.target.value) || 0))}
-                                disabled={updatingInventory[item.id]}
-                                className={cn(
-                                  'w-12 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
-                                  item.quantity_actual >= item.quantity_expected
-                                    ? 'border-green-400 bg-green-50 text-green-700'
-                                    : 'border-red-300 bg-red-50 text-red-700'
-                                )}
-                              />
-                              <span className="text-xs text-gray-400">/{item.quantity_expected}</span>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => { setEditingInventory(item); setShowAddInventory(false) }}
-                                className="p-1 text-gray-400 hover:text-gray-700 text-xs"
-                                title="Edit"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => handleDeleteInventory(item.id)}
-                                disabled={updatingInventory[item.id]}
-                                className={cn(
-                                  'p-1 text-gray-400 hover:text-red-600 text-xs',
-                                  updatingInventory[item.id] && 'opacity-50'
-                                )}
-                                title="Delete"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+            {filteredResources.length === 0 ? (
+              <p className="text-gray-400 text-sm">No materials match this filter.</p>
+            ) : (
+              <div className="border-2 border-black bg-white divide-y divide-gray-100">
+                {filteredResources.map(resource => (
+                  <div
+                    key={resource.id}
+                    className={cn(
+                      'px-4 py-2.5 flex items-center gap-3',
+                      resource.status === 'discard' && 'opacity-40'
+                    )}
+                  >
+                    <span>{CATEGORY_ICONS[resource.category] || '📦'}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={cn(
+                        'text-sm',
+                        resource.status === 'discard' && 'line-through'
+                      )}>
+                        {resource.name}
+                      </span>
+                      {resource.quantity && (
+                        <span className="text-xs text-gray-400 ml-1">×{resource.quantity}</span>
+                      )}
+                      {resource.priority === 'critical' && (
+                        <span className="ml-1.5 text-[10px] font-bold text-red-600">CRITICAL</span>
+                      )}
                     </div>
-                  )
-                })
-              })()}
-            </>
-          )}
-        </TabPanel>
-
-        {/* ═══════════  RESOURCES  ═══════════ */}
-        <TabPanel tabId="resources" activeTab={activeTab}>
-          <div className="mb-4 flex items-center gap-2">
-            <select
-              value={resourceStatusFilter}
-              onChange={e => setResourceStatusFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
-            >
-              <option value="all">All ({resources.length})</option>
-              <option value="need">Need ({resources.filter(r => r.status === 'need').length})</option>
-              <option value="have">Have ({resources.filter(r => r.status === 'have').length})</option>
-              <option value="fix">Fix ({resources.filter(r => r.status === 'fix').length})</option>
-              <option value="discard">Discard ({resources.filter(r => r.status === 'discard').length})</option>
-            </select>
-            <button
-              onClick={() => { setShowAddResource(true); setEditingResource(null) }}
-              className="ml-auto px-3 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800 transition-colors"
-            >
-              + Add
-            </button>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={resource.status}
+                        onChange={e => handleResourceStatusChange(resource.id, e.target.value as BuildResourceStatus)}
+                        disabled={updatingResources[resource.id]}
+                        className={cn(
+                          'text-xs font-bold uppercase px-2 py-1 border-2 rounded focus:outline-none',
+                          RESOURCE_STATUS_COLORS[resource.status],
+                          updatingResources[resource.id] && 'opacity-50'
+                        )}
+                      >
+                        <option value="have">Have</option>
+                        <option value="need">Need</option>
+                        <option value="fix">Fix</option>
+                        <option value="discard">Discard</option>
+                      </select>
+                      <button
+                        onClick={() => { setEditingResource(resource); setShowAddResource(false) }}
+                        className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+                        title="Edit"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteResource(resource.id)}
+                        disabled={updatingResources[resource.id]}
+                        className={cn(
+                          'p-1 text-gray-400 hover:text-red-600 text-xs',
+                          updatingResources[resource.id] && 'opacity-50'
+                        )}
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Add / Edit Form */}
-          {(showAddResource || editingResource) && (
-            <ResourceForm
-              resource={editingResource}
-              saving={savingResource}
-              onSave={editingResource ? handleEditResource : handleAddResource}
-              onCancel={() => { setShowAddResource(false); setEditingResource(null) }}
-            />
-          )}
-
-          {filteredResources.length === 0 ? (
-            <p className="text-gray-400 text-sm">No resources match this filter.</p>
-          ) : (
-            <div className="border-2 border-black bg-white divide-y divide-gray-100">
-              {filteredResources.map(resource => (
-                <div
-                  key={resource.id}
-                  className={cn(
-                    'px-4 py-2.5 flex items-center gap-3',
-                    resource.status === 'discard' && 'opacity-40'
-                  )}
-                >
-                  <span>{CATEGORY_ICONS[resource.category] || '📦'}</span>
-                  <div className="flex-1 min-w-0">
-                    <span className={cn(
-                      'text-sm',
-                      resource.status === 'discard' && 'line-through'
-                    )}>
-                      {resource.name}
-                    </span>
-                    {resource.quantity && (
-                      <span className="text-xs text-gray-400 ml-1">×{resource.quantity}</span>
-                    )}
-                    {resource.priority === 'critical' && (
-                      <span className="ml-1.5 text-[10px] font-bold text-red-600">CRITICAL</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={resource.status}
-                      onChange={e => handleResourceStatusChange(resource.id, e.target.value as BuildResourceStatus)}
-                      disabled={updatingResources[resource.id]}
-                      className={cn(
-                        'text-xs font-bold uppercase px-2 py-1 border-2 rounded focus:outline-none',
-                        RESOURCE_STATUS_COLORS[resource.status],
-                        updatingResources[resource.id] && 'opacity-50'
-                      )}
-                    >
-                      <option value="have">Have</option>
-                      <option value="need">Need</option>
-                      <option value="fix">Fix</option>
-                      <option value="discard">Discard</option>
-                    </select>
-                    <button
-                      onClick={() => { setEditingResource(resource); setShowAddResource(false) }}
-                      className="p-1 text-gray-400 hover:text-gray-700 text-xs"
-                      title="Edit"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => handleDeleteResource(resource.id)}
-                      disabled={updatingResources[resource.id]}
-                      className={cn(
-                        'p-1 text-gray-400 hover:text-red-600 text-xs',
-                        updatingResources[resource.id] && 'opacity-50'
-                      )}
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-              ))}
+          {/* ━━━ INVENTORY CHECKLIST ━━━ */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-xs font-black uppercase tracking-widest">Inventory Checklist</h3>
+              <select
+                value={inventoryCategoryFilter}
+                onChange={e => setInventoryCategoryFilter(e.target.value)}
+                className="ml-auto px-2 py-1 text-xs border-2 border-black bg-white font-bold focus:outline-none"
+              >
+                <option value="all">All ({inventory.length})</option>
+                {inventoryCategories.map(cat => (
+                  <option key={cat} value={cat}>
+                    {INVENTORY_CATEGORY_ICONS[cat] || '📦'} {cat.charAt(0).toUpperCase() + cat.slice(1)} ({inventory.filter(i => i.category === cat).length})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => { setShowAddInventory(true); setEditingInventory(null) }}
+                className="px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
+              >
+                + Add
+              </button>
             </div>
-          )}
+
+            {/* Add / Edit Inventory Form */}
+            {(showAddInventory || editingInventory) && (
+              <InventoryForm
+                item={editingInventory}
+                saving={savingInventory}
+                onSave={editingInventory ? handleEditInventory : handleAddInventory}
+                onCancel={() => { setShowAddInventory(false); setEditingInventory(null) }}
+              />
+            )}
+
+            {filteredInventory.length === 0 ? (
+              <p className="text-gray-400 text-sm">No inventory items yet. Add items to start your checklist.</p>
+            ) : (
+              <>
+                {/* Group by category */}
+                {(() => {
+                  const grouped = filteredInventory.reduce<Record<string, BuildInventory[]>>((acc, item) => {
+                    if (!acc[item.category]) acc[item.category] = []
+                    acc[item.category].push(item)
+                    return acc
+                  }, {})
+
+                  return Object.entries(grouped).map(([category, items]) => {
+                    const catVerified = items.filter(i => i.verified).length
+                    return (
+                      <div key={category} className="mb-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span>{INVENTORY_CATEGORY_ICONS[category] || '📦'}</span>
+                          <span className="text-xs font-bold uppercase tracking-wider">
+                            {category}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {catVerified}/{items.length}
+                          </span>
+                        </div>
+                        <div className="border-2 border-black bg-white divide-y divide-gray-100">
+                          {items.map(item => (
+                            <div
+                              key={item.id}
+                              className={cn(
+                                'px-4 py-2.5 flex items-center gap-3',
+                                item.verified && 'bg-green-50/40'
+                              )}
+                            >
+                              {/* Verify checkbox */}
+                              <button
+                                onClick={() => handleInventoryVerify(item)}
+                                disabled={updatingInventory[item.id]}
+                                className={cn(
+                                  'text-lg flex-shrink-0 hover:scale-110 transition-transform focus:outline-none',
+                                  updatingInventory[item.id] && 'opacity-40 animate-pulse'
+                                )}
+                                title={item.verified ? 'Unverify' : 'Mark verified'}
+                              >
+                                {item.verified ? '✅' : '⬜'}
+                              </button>
+
+                              {/* Item info */}
+                              <div className="flex-1 min-w-0">
+                                <span className={cn(
+                                  'text-sm',
+                                  item.verified && 'line-through text-gray-400'
+                                )}>
+                                  {item.name}
+                                </span>
+                                {item.description && (
+                                  <p className="text-[11px] text-gray-400 truncate">{item.description}</p>
+                                )}
+                                {item.notes && (
+                                  <p className="text-[11px] text-amber-600">{item.notes}</p>
+                                )}
+                              </div>
+
+                              {/* Quantity */}
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={item.quantity_actual}
+                                  onChange={e => handleInventoryQuantity(item.id, Math.max(0, parseInt(e.target.value) || 0))}
+                                  disabled={updatingInventory[item.id]}
+                                  className={cn(
+                                    'w-12 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
+                                    item.quantity_actual >= item.quantity_expected
+                                      ? 'border-green-400 bg-green-50 text-green-700'
+                                      : 'border-red-300 bg-red-50 text-red-700'
+                                  )}
+                                />
+                                <span className="text-xs text-gray-400">/{item.quantity_expected}</span>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => { setEditingInventory(item); setShowAddInventory(false) }}
+                                  className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+                                  title="Edit"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteInventory(item.id)}
+                                  disabled={updatingInventory[item.id]}
+                                  className={cn(
+                                    'p-1 text-gray-400 hover:text-red-600 text-xs',
+                                    updatingInventory[item.id] && 'opacity-50'
+                                  )}
+                                  title="Delete"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </>
+            )}
+          </div>
         </TabPanel>
 
         {/* ═══════════  ISSUES  ═══════════ */}

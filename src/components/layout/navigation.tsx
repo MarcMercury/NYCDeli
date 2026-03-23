@@ -34,16 +34,15 @@ export function Navigation() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
+    const supabase = createClient()
+
+    const syncNav = async (userId: string | undefined) => {
+      if (userId) {
         setIsLoggedIn(true)
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single() as unknown as { data: { role: UserRole } | null }
         setUserRole(profile?.role || null)
       } else {
@@ -52,13 +51,17 @@ export function Navigation() {
       }
     }
 
-    checkAuth()
-
-    // Listen for auth changes
-    const supabase = createClient()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkAuth()
+    // Use getSession() for instant read from cookies (no network call)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      syncNav(session?.user?.id)
     })
+
+    // Listen for auth changes (fires on login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        syncNav(session?.user?.id)
+      }
+    )
 
     return () => subscription.unsubscribe()
   }, [])
