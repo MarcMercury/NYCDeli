@@ -285,6 +285,9 @@ export default function KitchenPage() {
   const [editingCell, setEditingCell] = useState<{ catIdx: number; posIdx: number; field: 'role' | 'time' | 'description' } | null>(null)
   const [editValue, setEditValue] = useState('')
   const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  // Display categories (with admin overrides applied)
+  const [displayDeliCategories, setDisplayDeliCategories] = useState<ShiftCategory[]>(deliShiftCategories)
+  const [displaySpecialCategories, setDisplaySpecialCategories] = useState<ShiftCategory[]>(specialShiftCategories)
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
@@ -339,6 +342,35 @@ export default function KitchenPage() {
           .eq('id', user.id)
           .single() as unknown as { data: { role: string } | null }
         setIsAdmin(profile?.role === 'admin')
+      }
+
+      // Load shift position overrides
+      const { data: overrideSetting } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'shift_position_overrides')
+        .single() as unknown as { data: { value: string } | null }
+
+      if (overrideSetting) {
+        try {
+          const overrides = JSON.parse(overrideSetting.value) as Record<string, { role?: string; time?: string; description?: string }>
+          const applyOverrides = (cats: ShiftCategory[], prefix: string): ShiftCategory[] =>
+            cats.map((cat, catIdx) => ({
+              ...cat,
+              positions: cat.positions.map((pos, posIdx) => {
+                const ov = overrides[`${prefix}-${catIdx}-${posIdx}`]
+                if (!ov) return pos
+                return {
+                  ...pos,
+                  ...(ov.role && { role: ov.role }),
+                  ...(ov.time && { time: ov.time }),
+                  ...(ov.description && { description: ov.description }),
+                }
+              }),
+            }))
+          setDisplayDeliCategories(applyOverrides(deliShiftCategories, 'deli'))
+          setDisplaySpecialCategories(applyOverrides(specialShiftCategories, 'special'))
+        } catch { /* ignore malformed */ }
       }
 
       const { data: camperData } = await supabase
@@ -474,6 +506,18 @@ export default function KitchenPage() {
 
   const getCamperById = (id: string) => allCampers.find(c => c.id === id)
 
+  // Optimistic update helper for admin position edits
+  const updateDisplayPosition = (catIdx: number, posIdx: number, field: 'role' | 'time' | 'description', value: string) => {
+    setDisplayDeliCategories(prev => prev.map((cat, ci) =>
+      ci === catIdx ? {
+        ...cat,
+        positions: cat.positions.map((p, pi) =>
+          pi === posIdx ? { ...p, [field]: value } : p
+        ),
+      } : cat
+    ))
+  }
+
   /** Get the camper name who picked a specific position key */
   const getPickedCamperForSlot = (category: string, role: string, time?: string) => {
     const posKey = `${category}|${role}|${time ?? ''}`
@@ -598,7 +642,7 @@ export default function KitchenPage() {
               </h2>
               <p className="text-sm text-gray-600 mb-4">Daily service shifts to keep the deli running</p>
               <div className="space-y-6">
-                {deliShiftCategories.map((category, catIdx) => (
+                {displayDeliCategories.map((category, catIdx) => (
                   <Card key={catIdx}>
                     <CardHeader className="pb-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -634,6 +678,7 @@ export default function KitchenPage() {
                                     <button className="text-xs text-green-600 font-bold" onClick={async () => {
                                       const { updateShiftPositionAction } = await import('@/app/actions/admin')
                                       await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { role: editValue, category: category.name })
+                                      updateDisplayPosition(catIdx, posIdx, 'role', editValue)
                                       setAdminMessage({ type: 'success', text: `Updated role` })
                                       setEditingCell(null)
                                     }}>✓</button>
@@ -665,6 +710,7 @@ export default function KitchenPage() {
                                     <button className="text-xs text-green-600 font-bold" onClick={async () => {
                                       const { updateShiftPositionAction } = await import('@/app/actions/admin')
                                       await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { time: editValue, category: category.name })
+                                      updateDisplayPosition(catIdx, posIdx, 'time', editValue)
                                       setAdminMessage({ type: 'success', text: `Updated time` })
                                       setEditingCell(null)
                                     }}>✓</button>
@@ -695,6 +741,7 @@ export default function KitchenPage() {
                                 <button className="text-xs text-green-600 font-bold mt-1" onClick={async () => {
                                   const { updateShiftPositionAction } = await import('@/app/actions/admin')
                                   await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { description: editValue, category: category.name })
+                                  updateDisplayPosition(catIdx, posIdx, 'description', editValue)
                                   setAdminMessage({ type: 'success', text: `Updated description` })
                                   setEditingCell(null)
                                 }}>✓</button>
@@ -726,7 +773,7 @@ export default function KitchenPage() {
               </h2>
               <p className="text-sm text-gray-600 mb-4">One-off event support shifts</p>
               <div className="space-y-6">
-                {specialShiftCategories.map((category, catIdx) => (
+                {displaySpecialCategories.map((category, catIdx) => (
                   <Card key={catIdx} variant="warning">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg">{category.name}</CardTitle>
@@ -1062,7 +1109,7 @@ export default function KitchenPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {deliShiftCategories.map((category, catIdx) => {
+                          {displayDeliCategories.map((category, catIdx) => {
                             const uniquePositions = getUniquePositions([category])
                             return (
                               <React.Fragment key={`cat-${catIdx}`}>
@@ -1074,7 +1121,7 @@ export default function KitchenPage() {
                                 </tr>
                                 {uniquePositions.map((pos, posIdx) => {
                                   const slots = countSlots([category], pos.role, pos.time)
-                                  const gridCellKey = `grid-${catIdx}-${posIdx}`
+                                  const gridCellKey = `deli-${catIdx}-${posIdx}`
                                   return (
                                     <tr key={`${catIdx}-${posIdx}`} className={cn("hover:bg-gray-50", adminEditing && "hover:bg-yellow-50")}>
                                       <td className="border-2 border-black px-3 py-2">
@@ -1084,6 +1131,7 @@ export default function KitchenPage() {
                                             <button className="text-xs text-green-600 font-bold" onClick={async () => {
                                               const { updateShiftPositionAction } = await import('@/app/actions/admin')
                                               await updateShiftPositionAction(gridCellKey, { role: editValue, category: category.name })
+                                              updateDisplayPosition(catIdx, posIdx, 'role', editValue)
                                               setAdminMessage({ type: 'success', text: `Updated role` })
                                               setEditingCell(null)
                                             }}>✓</button>
@@ -1108,6 +1156,7 @@ export default function KitchenPage() {
                                             <button className="text-xs text-green-600 font-bold" onClick={async () => {
                                               const { updateShiftPositionAction } = await import('@/app/actions/admin')
                                               await updateShiftPositionAction(gridCellKey, { time: editValue, category: category.name })
+                                              updateDisplayPosition(catIdx, posIdx, 'time', editValue)
                                               setAdminMessage({ type: 'success', text: `Updated time` })
                                               setEditingCell(null)
                                             }}>✓</button>
@@ -1150,7 +1199,7 @@ export default function KitchenPage() {
                 🍜 Special Event Shifts
               </h2>
               <p className="text-sm text-gray-600 mb-4">One-off events — sign up for a specific role</p>
-              {specialShiftCategories.map((category, catIdx) => {
+              {displaySpecialCategories.map((category, catIdx) => {
                 const uniquePositions = getUniquePositions([category])
                 return (
                   <div key={catIdx} className="overflow-x-auto mb-6">

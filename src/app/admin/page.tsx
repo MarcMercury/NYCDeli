@@ -43,7 +43,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // Kitchen shift editor state
   const [shiftCategories, setShiftCategories] = useState<DraftShiftCategory[]>([])
-  const [editingPosition, setEditingPosition] = useState<DraftShiftPosition | null>(null)
+  const [editingPosition, setEditingPosition] = useState<{ pos: DraftShiftPosition; catIdx: number; posIdx: number } | null>(null)
   const [editForm, setEditForm] = useState<{ role: string; time: string; description: string }>({ role: '', time: '', description: '' })
 
   const fetchData = useCallback(async () => {
@@ -98,10 +98,32 @@ export default function AdminPage() {
     setCampers(campersData)
     setUsers([...usersWithCampers, ...orphanUsers])
     setTasks(tasksRes.data || [])
-    setSettings(settingsRes.data || [])
+    const allSettings = (settingsRes.data || []) as SystemSetting[]
+    setSettings(allSettings)
     setShifts(shiftsRes.data || [])
     setAssignments(assignmentsRes.data || [])
-    setShiftCategories(getAllDraftShiftCategories())
+
+    // Load shift categories with any admin overrides applied
+    const baseCategories = getAllDraftShiftCategories()
+    const overrideSetting = allSettings.find(s => s.key === 'shift_position_overrides')
+    if (overrideSetting) {
+      try {
+        const overrides = JSON.parse(overrideSetting.value) as Record<string, { role?: string; time?: string; description?: string }>
+        for (const cat of baseCategories) {
+          for (let posIdx = 0; posIdx < cat.positions.length; posIdx++) {
+            const catIdx = baseCategories.indexOf(cat)
+            const key = `deli-${catIdx}-${posIdx}`
+            const ov = overrides[key]
+            if (ov) {
+              if (ov.role) cat.positions[posIdx].role = ov.role
+              if (ov.time) cat.positions[posIdx].time = ov.time
+              if (ov.description) cat.positions[posIdx].description = ov.description
+            }
+          }
+        }
+      } catch { /* ignore malformed overrides */ }
+    }
+    setShiftCategories(baseCategories)
     setFetchErrors(errors)
     setLastRefreshed(new Date())
     setLoading(false)
@@ -779,7 +801,7 @@ export default function AdminPage() {
                 <Card className="max-w-md w-full border-4 border-yellow-500">
                   <CardHeader>
                     <CardTitle>Edit Shift Position</CardTitle>
-                    <CardDescription>Category: {editingPosition.category}</CardDescription>
+                    <CardDescription>Category: {editingPosition.pos.category}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -818,15 +840,16 @@ export default function AdminPage() {
                       className="flex-1"
                       onClick={async () => {
                         const { updateShiftPositionAction } = await import('@/app/actions/admin')
-                        const result = await updateShiftPositionAction(editingPosition.id, {
+                        const result = await updateShiftPositionAction(`deli-${editingPosition.catIdx}-${editingPosition.posIdx}`, {
                           role: editForm.role,
                           time: editForm.time,
                           description: editForm.description,
-                          category: editingPosition.category,
+                          category: editingPosition.pos.category,
                         })
                         if (result.success) {
                           setMessage({ type: 'success', text: `Updated position: ${editForm.role}` })
                           setEditingPosition(null)
+                          fetchData()
                         } else {
                           setMessage({ type: 'error', text: result.error || 'Update failed' })
                         }
@@ -882,7 +905,7 @@ export default function AdminPage() {
                               <button
                                 className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
                                 onClick={() => {
-                                  setEditingPosition(pos)
+                                  setEditingPosition({ pos, catIdx, posIdx })
                                   setEditForm({
                                     role: pos.role,
                                     time: pos.time || '',
