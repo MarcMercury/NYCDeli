@@ -520,6 +520,12 @@ export interface Database {
         Update: Partial<Omit<BuildQuestionRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: []
       }
+      build_inventory: {
+        Row: BuildInventoryRow
+        Insert: Omit<BuildInventoryRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildInventoryRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
       shift_drafts: {
         Row: ShiftDraftRow
         Insert: ShiftDraftInsert
@@ -957,12 +963,31 @@ export interface BuildQuestionRow {
   updated_at: string
 }
 
+export type InventoryCategory = 'structures' | 'electrical' | 'kitchen' | 'water' | 'shade' | 'lighting' | 'tools' | 'safety' | 'signage' | 'decor' | 'personal' | 'misc'
+
+export interface BuildInventoryRow {
+  id: string
+  category: InventoryCategory
+  name: string
+  description: string | null
+  quantity_expected: number
+  quantity_actual: number
+  verified: boolean
+  verified_by: string | null
+  verified_at: string | null
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
 // Convenience types
 export type BuildStage = BuildStageRow
 export type BuildGoal = BuildGoalRow
 export type BuildResource = BuildResourceRow
 export type BuildProcedure = BuildProcedureRow
 export type BuildQuestion = BuildQuestionRow
+export type BuildInventory = BuildInventoryRow
 
 // Extended type for stage with its goals
 export interface BuildStageWithGoals extends BuildStageRow {

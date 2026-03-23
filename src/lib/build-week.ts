@@ -6,6 +6,7 @@ import type {
   BuildProcedure,
   BuildQuestion,
   BuildStageWithGoals,
+  BuildInventory,
   Camper,
 } from '@/types/database'
 
@@ -165,6 +166,71 @@ export async function deleteBuildResource(resourceId: string) {
   if (error) throw error
 }
 
+// ── Inventory CRUD ──
+
+export async function fetchBuildInventory(): Promise<BuildInventory[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_inventory')
+    .select('*')
+    .order('category')
+    .order('sort_order')
+  if (error) throw error
+  return (data as BuildInventory[]) || []
+}
+
+export async function createInventoryItem(item: {
+  name: string
+  category: string
+  description?: string
+  quantity_expected: number
+  notes?: string
+}): Promise<BuildInventory> {
+  const supabase = createClient()
+  const { data: existing } = await supabase
+    .from('build_inventory')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order + 1 : 0
+
+  const { data, error } = await supabase
+    .from('build_inventory')
+    .insert({ ...item, sort_order: nextOrder } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildInventory
+}
+
+export async function updateInventoryItem(itemId: string, updates: {
+  name?: string
+  category?: string
+  description?: string | null
+  quantity_expected?: number
+  quantity_actual?: number
+  verified?: boolean
+  verified_by?: string | null
+  verified_at?: string | null
+  notes?: string | null
+}) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_inventory')
+    .update(updates as never)
+    .eq('id', itemId)
+  if (error) throw error
+}
+
+export async function deleteInventoryItem(itemId: string) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_inventory')
+    .delete()
+    .eq('id', itemId)
+  if (error) throw error
+}
+
 export const STAGE_ICONS: Record<string, string> = {
   planning: '📋',
   monday: '📍',
@@ -201,4 +267,19 @@ export const RESOURCE_STATUS_COLORS: Record<string, string> = {
   need: 'bg-red-100 text-red-800 border-red-400',
   fix: 'bg-yellow-100 text-yellow-800 border-yellow-400',
   discard: 'bg-gray-100 text-gray-500 border-gray-400 line-through',
+}
+
+export const INVENTORY_CATEGORY_ICONS: Record<string, string> = {
+  structures: '🏗️',
+  electrical: '⚡',
+  kitchen: '🍳',
+  water: '💧',
+  shade: '⛱️',
+  lighting: '💡',
+  tools: '🔧',
+  safety: '🛡️',
+  signage: '🪧',
+  decor: '🎨',
+  personal: '🧑',
+  misc: '📦',
 }

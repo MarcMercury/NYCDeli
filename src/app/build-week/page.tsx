@@ -12,15 +12,20 @@ import {
   fetchBuildProcedures,
   fetchBuildQuestions,
   fetchBuildWeekBuilders,
+  fetchBuildInventory,
   updateGoalStatus,
   updateQuestionStatus,
   updateResourceStatus,
   createBuildResource,
   updateBuildResource,
   deleteBuildResource,
+  createInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
   STAGE_ICONS,
   CATEGORY_ICONS,
   RESOURCE_STATUS_COLORS,
+  INVENTORY_CATEGORY_ICONS,
 } from '@/lib/build-week'
 import type {
   BuildStageWithGoals,
@@ -28,10 +33,12 @@ import type {
   BuildProcedure,
   BuildQuestion,
   BuildGoal,
+  BuildInventory,
   TaskStatus,
   BuildResourceStatus,
   BuildQuestionStatus,
   BuildCategory,
+  InventoryCategory,
   Camper,
 } from '@/types/database'
 
@@ -39,6 +46,7 @@ type Tab = { id: string; label: string }
 
 const tabs: Tab[] = [
   { id: 'tasks', label: 'Tasks' },
+  { id: 'inventory', label: 'Inventory' },
   { id: 'resources', label: 'Resources' },
   { id: 'issues', label: 'Issues' },
   { id: 'info', label: 'Info' },
@@ -64,22 +72,30 @@ export default function BuildWeekPage() {
   const [showAddResource, setShowAddResource] = useState(false)
   const [editingResource, setEditingResource] = useState<BuildResource | null>(null)
   const [savingResource, setSavingResource] = useState(false)
+  const [inventory, setInventory] = useState<BuildInventory[]>([])
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<string>('all')
+  const [showAddInventory, setShowAddInventory] = useState(false)
+  const [editingInventory, setEditingInventory] = useState<BuildInventory | null>(null)
+  const [savingInventory, setSavingInventory] = useState(false)
+  const [updatingInventory, setUpdatingInventory] = useState<Record<string, boolean>>({})
 
   const fetchData = useCallback(async () => {
     try {
-      const [stagesData, resourcesData, proceduresData, questionsData, buildersData] =
+      const [stagesData, resourcesData, proceduresData, questionsData, buildersData, inventoryData] =
         await Promise.all([
           fetchBuildStagesWithGoals(),
           fetchBuildResources(),
           fetchBuildProcedures(),
           fetchBuildQuestions(),
           fetchBuildWeekBuilders(),
+          fetchBuildInventory(),
         ])
       setStages(stagesData)
       setResources(resourcesData)
       setProcedures(proceduresData)
       setQuestions(questionsData)
       setBuilders(buildersData)
+      setInventory(inventoryData)
       // Auto-expand the first stage with incomplete goals
       const firstIncomplete = stagesData.find(s => s.goals.some(g => g.status !== 'done'))
       if (firstIncomplete) {
@@ -197,6 +213,83 @@ export default function BuildWeekPage() {
     }
   }
 
+  const handleInventoryVerify = async (item: BuildInventory) => {
+    const nowVerified = !item.verified
+    setUpdatingInventory(prev => ({ ...prev, [item.id]: true }))
+    try {
+      await updateInventoryItem(item.id, {
+        verified: nowVerified,
+        verified_at: nowVerified ? new Date().toISOString() : null,
+      })
+      setInventory(prev =>
+        prev.map(i =>
+          i.id === item.id
+            ? { ...i, verified: nowVerified, verified_at: nowVerified ? new Date().toISOString() : null }
+            : i
+        )
+      )
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingInventory(prev => ({ ...prev, [item.id]: false }))
+    }
+  }
+
+  const handleInventoryQuantity = async (itemId: string, quantity_actual: number) => {
+    setUpdatingInventory(prev => ({ ...prev, [itemId]: true }))
+    try {
+      await updateInventoryItem(itemId, { quantity_actual })
+      setInventory(prev =>
+        prev.map(i => (i.id === itemId ? { ...i, quantity_actual } : i))
+      )
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingInventory(prev => ({ ...prev, [itemId]: false }))
+    }
+  }
+
+  const handleAddInventory = async (data: InventoryFormData) => {
+    setSavingInventory(true)
+    try {
+      const newItem = await createInventoryItem(data)
+      setInventory(prev => [...prev, newItem])
+      setShowAddInventory(false)
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingInventory(false)
+    }
+  }
+
+  const handleEditInventory = async (data: InventoryFormData) => {
+    if (!editingInventory) return
+    setSavingInventory(true)
+    try {
+      await updateInventoryItem(editingInventory.id, data)
+      setInventory(prev =>
+        prev.map(i => (i.id === editingInventory.id ? { ...i, ...data } as BuildInventory : i))
+      )
+      setEditingInventory(null)
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingInventory(false)
+    }
+  }
+
+  const handleDeleteInventory = async (itemId: string) => {
+    setUpdatingInventory(prev => ({ ...prev, [itemId]: true }))
+    try {
+      await deleteInventoryItem(itemId)
+      setInventory(prev => prev.filter(i => i.id !== itemId))
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingInventory(prev => ({ ...prev, [itemId]: false }))
+    }
+  }
+
   const getStageProgress = (goals: BuildGoal[]) => {
     if (goals.length === 0) return 0
     return Math.round((goals.filter(g => g.status === 'done').length / goals.length) * 100)
@@ -209,6 +302,14 @@ export default function BuildWeekPage() {
 
   const filteredQuestions =
     questionFilter === 'all' ? questions : questions.filter(q => q.status === questionFilter)
+
+  const filteredInventory =
+    inventoryCategoryFilter === 'all'
+      ? inventory
+      : inventory.filter(i => i.category === inventoryCategoryFilter)
+
+  const inventoryCategories = Array.from(new Set(inventory.map(i => i.category))).sort()
+  const verifiedCount = inventory.filter(i => i.verified).length
 
   // Overall stats
   const totalGoals = stages.reduce((sum, s) => sum + s.goals.length, 0)
@@ -244,6 +345,7 @@ export default function BuildWeekPage() {
             <div className="flex gap-3 text-xs text-gray-400">
               {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
               {openIssueCount > 0 && <span className="text-yellow-600">{openIssueCount} open issues</span>}
+              {inventory.length > 0 && <span>{verifiedCount}/{inventory.length} verified</span>}
               <span>{builders.length} builders</span>
             </div>
           </div>
@@ -318,6 +420,162 @@ export default function BuildWeekPage() {
               )
             })}
           </div>
+        </TabPanel>
+
+        {/* ═══════════  INVENTORY  ═══════════ */}
+        <TabPanel tabId="inventory" activeTab={activeTab}>
+          <div className="mb-4 flex items-center gap-2">
+            <select
+              value={inventoryCategoryFilter}
+              onChange={e => setInventoryCategoryFilter(e.target.value)}
+              className="px-3 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
+            >
+              <option value="all">All ({inventory.length})</option>
+              {inventoryCategories.map(cat => (
+                <option key={cat} value={cat}>
+                  {INVENTORY_CATEGORY_ICONS[cat] || '📦'} {cat.charAt(0).toUpperCase() + cat.slice(1)} ({inventory.filter(i => i.category === cat).length})
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-400 ml-2">
+              {verifiedCount}/{inventory.length} verified
+            </span>
+            <button
+              onClick={() => { setShowAddInventory(true); setEditingInventory(null) }}
+              className="ml-auto px-3 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800 transition-colors"
+            >
+              + Add
+            </button>
+          </div>
+
+          {/* Progress bar for verified items */}
+          {inventory.length > 0 && (
+            <div className="mb-4">
+              <ProgressBar value={Math.round((verifiedCount / inventory.length) * 100)} />
+            </div>
+          )}
+
+          {/* Add / Edit Form */}
+          {(showAddInventory || editingInventory) && (
+            <InventoryForm
+              item={editingInventory}
+              saving={savingInventory}
+              onSave={editingInventory ? handleEditInventory : handleAddInventory}
+              onCancel={() => { setShowAddInventory(false); setEditingInventory(null) }}
+            />
+          )}
+
+          {filteredInventory.length === 0 ? (
+            <p className="text-gray-400 text-sm">No inventory items yet. Add items to start your checklist.</p>
+          ) : (
+            <>
+              {/* Group by category */}
+              {(() => {
+                const grouped = filteredInventory.reduce<Record<string, BuildInventory[]>>((acc, item) => {
+                  if (!acc[item.category]) acc[item.category] = []
+                  acc[item.category].push(item)
+                  return acc
+                }, {})
+
+                return Object.entries(grouped).map(([category, items]) => {
+                  const catVerified = items.filter(i => i.verified).length
+                  return (
+                    <div key={category} className="mb-4">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span>{INVENTORY_CATEGORY_ICONS[category] || '📦'}</span>
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          {category}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {catVerified}/{items.length}
+                        </span>
+                      </div>
+                      <div className="border-2 border-black bg-white divide-y divide-gray-100">
+                        {items.map(item => (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              'px-4 py-2.5 flex items-center gap-3',
+                              item.verified && 'bg-green-50/40'
+                            )}
+                          >
+                            {/* Verify checkbox */}
+                            <button
+                              onClick={() => handleInventoryVerify(item)}
+                              disabled={updatingInventory[item.id]}
+                              className={cn(
+                                'text-lg flex-shrink-0 hover:scale-110 transition-transform focus:outline-none',
+                                updatingInventory[item.id] && 'opacity-40 animate-pulse'
+                              )}
+                              title={item.verified ? 'Unverify' : 'Mark verified'}
+                            >
+                              {item.verified ? '✅' : '⬜'}
+                            </button>
+
+                            {/* Item info */}
+                            <div className="flex-1 min-w-0">
+                              <span className={cn(
+                                'text-sm',
+                                item.verified && 'line-through text-gray-400'
+                              )}>
+                                {item.name}
+                              </span>
+                              {item.description && (
+                                <p className="text-[11px] text-gray-400 truncate">{item.description}</p>
+                              )}
+                              {item.notes && (
+                                <p className="text-[11px] text-amber-600">{item.notes}</p>
+                              )}
+                            </div>
+
+                            {/* Quantity */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <input
+                                type="number"
+                                min={0}
+                                value={item.quantity_actual}
+                                onChange={e => handleInventoryQuantity(item.id, Math.max(0, parseInt(e.target.value) || 0))}
+                                disabled={updatingInventory[item.id]}
+                                className={cn(
+                                  'w-12 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
+                                  item.quantity_actual >= item.quantity_expected
+                                    ? 'border-green-400 bg-green-50 text-green-700'
+                                    : 'border-red-300 bg-red-50 text-red-700'
+                                )}
+                              />
+                              <span className="text-xs text-gray-400">/{item.quantity_expected}</span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => { setEditingInventory(item); setShowAddInventory(false) }}
+                                className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+                                title="Edit"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDeleteInventory(item.id)}
+                                disabled={updatingInventory[item.id]}
+                                className={cn(
+                                  'p-1 text-gray-400 hover:text-red-600 text-xs',
+                                  updatingInventory[item.id] && 'opacity-50'
+                                )}
+                                title="Delete"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </>
+          )}
         </TabPanel>
 
         {/* ═══════════  RESOURCES  ═══════════ */}
@@ -918,6 +1176,136 @@ function ResourceForm({ resource, saving, onSave, onCancel }: {
           )}
         >
           {saving ? 'Saving…' : resource ? 'Save Changes' : 'Add Resource'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-1.5 text-sm font-bold bg-gray-200 hover:bg-gray-300"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/* ── Inventory Form types & component ── */
+
+type InventoryFormData = {
+  name: string
+  category: string
+  description?: string
+  quantity_expected: number
+  notes?: string
+}
+
+const INVENTORY_CATEGORIES: { value: InventoryCategory; label: string }[] = [
+  { value: 'structures', label: 'Structures' },
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'kitchen', label: 'Kitchen' },
+  { value: 'water', label: 'Water' },
+  { value: 'shade', label: 'Shade' },
+  { value: 'lighting', label: 'Lighting' },
+  { value: 'tools', label: 'Tools' },
+  { value: 'safety', label: 'Safety' },
+  { value: 'signage', label: 'Signage' },
+  { value: 'decor', label: 'Decor' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'misc', label: 'Misc' },
+]
+
+function InventoryForm({ item, saving, onSave, onCancel }: {
+  item: BuildInventory | null
+  saving: boolean
+  onSave: (data: InventoryFormData) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(item?.name || '')
+  const [category, setCategory] = useState<string>(item?.category || 'misc')
+  const [description, setDescription] = useState(item?.description || '')
+  const [quantityExpected, setQuantityExpected] = useState(item?.quantity_expected ?? 1)
+  const [notes, setNotes] = useState(item?.notes || '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    onSave({
+      name: name.trim(),
+      category,
+      description: description.trim() || undefined,
+      quantity_expected: Math.max(1, quantityExpected),
+      notes: notes.trim() || undefined,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border-2 border-black bg-white p-4 mb-4 space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        {item ? 'Edit Item' : 'Add Inventory Item'}
+      </p>
+
+      {/* Row 1: Name + Category */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Item name *"
+          required
+          className="flex-1 px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
+        >
+          {INVENTORY_CATEGORIES.map(c => (
+            <option key={c.value} value={c.value}>{INVENTORY_CATEGORY_ICONS[c.value]} {c.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Row 2: Quantity expected */}
+      <div className="flex gap-2 items-center">
+        <label className="text-xs font-bold text-gray-500">Qty needed:</label>
+        <input
+          type="number"
+          min={1}
+          value={quantityExpected}
+          onChange={e => setQuantityExpected(Math.max(1, parseInt(e.target.value) || 1))}
+          className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none text-center"
+        />
+      </div>
+
+      {/* Row 3: Description */}
+      <input
+        type="text"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+        placeholder="Description (optional)"
+        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+      />
+
+      {/* Row 4: Notes */}
+      <input
+        type="text"
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        placeholder="Notes (optional)"
+        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+      />
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={saving || !name.trim()}
+          className={cn(
+            'px-4 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800',
+            (saving || !name.trim()) && 'opacity-50 cursor-not-allowed'
+          )}
+        >
+          {saving ? 'Saving…' : item ? 'Save Changes' : 'Add Item'}
         </button>
         <button
           type="button"
