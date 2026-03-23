@@ -263,7 +263,7 @@ export function CampMap() {
     if (!obj.properties?.reservable) return ''
     const spot = findSpotForObject(obj)
     if (!spot) return ''
-    if (spot.reservation?.camper_id === camper?.id) return 'ring-4 ring-yellow-400'
+    if (spot.reservation && camper && spot.reservation.camper_id === camper.id) return 'ring-4 ring-yellow-400'
     if (spot.reservation) return 'ring-4 ring-red-400'
     return 'ring-4 ring-emerald-400'
   }
@@ -272,7 +272,7 @@ export function CampMap() {
   const visibleObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
 
   // My reservation
-  const myReservation = spots.find(s => s.reservation?.camper_id === camper?.id)
+  const myReservation = camper ? spots.find(s => s.reservation?.camper_id === camper.id) : undefined
 
   if (loading) {
     return (
@@ -491,7 +491,7 @@ export function CampMap() {
                         {isReservable && (() => {
                           const spot = findSpotForObject(obj)
                           if (!spot) return null
-                          if (spot.reservation?.camper_id === camper?.id) {
+                          if (spot.reservation && camper && spot.reservation.camper_id === camper.id) {
                             return <span className="text-[7px] bg-yellow-500 text-black px-1 rounded-sm mt-0.5 font-bold">YOUR SPOT</span>
                           }
                           if (spot.reservation) {
@@ -613,7 +613,7 @@ export function CampMap() {
                     )}
 
                     {/* Your spot — release option */}
-                    {selectedObject.spot.reservation?.camper_id === camper?.id && (
+                    {selectedObject.spot.reservation && camper && selectedObject.spot.reservation.camper_id === camper.id && (
                       <div className="space-y-2">
                         <div className="p-2 bg-yellow-50 border-2 border-yellow-400 text-center">
                           <p className="font-black">🏕️ This is YOUR spot!</p>
