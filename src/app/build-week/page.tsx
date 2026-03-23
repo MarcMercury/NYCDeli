@@ -15,6 +15,9 @@ import {
   updateGoalStatus,
   updateQuestionStatus,
   updateResourceStatus,
+  createBuildResource,
+  updateBuildResource,
+  deleteBuildResource,
   STAGE_ICONS,
   CATEGORY_ICONS,
   RESOURCE_STATUS_COLORS,
@@ -28,6 +31,7 @@ import type {
   TaskStatus,
   BuildResourceStatus,
   BuildQuestionStatus,
+  BuildCategory,
   Camper,
 } from '@/types/database'
 
@@ -57,6 +61,9 @@ export default function BuildWeekPage() {
   const [showResolutionInput, setShowResolutionInput] = useState<Record<string, boolean>>({})
   const [questionFilter, setQuestionFilter] = useState<'all' | 'open' | 'resolved' | 'deferred'>('all')
   const [expandedRef, setExpandedRef] = useState<Record<string, boolean>>({ schedule: true })
+  const [showAddResource, setShowAddResource] = useState(false)
+  const [editingResource, setEditingResource] = useState<BuildResource | null>(null)
+  const [savingResource, setSavingResource] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -146,6 +153,47 @@ export default function BuildWeekPage() {
       // Silently fail
     } finally {
       setUpdatingQuestions(prev => ({ ...prev, [questionId]: false }))
+    }
+  }
+
+  const handleAddResource = async (data: ResourceFormData) => {
+    setSavingResource(true)
+    try {
+      const newResource = await createBuildResource(data)
+      setResources(prev => [...prev, newResource])
+      setShowAddResource(false)
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingResource(false)
+    }
+  }
+
+  const handleEditResource = async (data: ResourceFormData) => {
+    if (!editingResource) return
+    setSavingResource(true)
+    try {
+      await updateBuildResource(editingResource.id, data)
+      setResources(prev =>
+        prev.map(r => (r.id === editingResource.id ? { ...r, ...data } as BuildResource : r))
+      )
+      setEditingResource(null)
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingResource(false)
+    }
+  }
+
+  const handleDeleteResource = async (resourceId: string) => {
+    setUpdatingResources(prev => ({ ...prev, [resourceId]: true }))
+    try {
+      await deleteBuildResource(resourceId)
+      setResources(prev => prev.filter(r => r.id !== resourceId))
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingResources(prev => ({ ...prev, [resourceId]: false }))
     }
   }
 
@@ -274,7 +322,7 @@ export default function BuildWeekPage() {
 
         {/* ═══════════  RESOURCES  ═══════════ */}
         <TabPanel tabId="resources" activeTab={activeTab}>
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <select
               value={resourceStatusFilter}
               onChange={e => setResourceStatusFilter(e.target.value)}
@@ -286,7 +334,23 @@ export default function BuildWeekPage() {
               <option value="fix">Fix ({resources.filter(r => r.status === 'fix').length})</option>
               <option value="discard">Discard ({resources.filter(r => r.status === 'discard').length})</option>
             </select>
+            <button
+              onClick={() => { setShowAddResource(true); setEditingResource(null) }}
+              className="ml-auto px-3 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800 transition-colors"
+            >
+              + Add
+            </button>
           </div>
+
+          {/* Add / Edit Form */}
+          {(showAddResource || editingResource) && (
+            <ResourceForm
+              resource={editingResource}
+              saving={savingResource}
+              onSave={editingResource ? handleEditResource : handleAddResource}
+              onCancel={() => { setShowAddResource(false); setEditingResource(null) }}
+            />
+          )}
 
           {filteredResources.length === 0 ? (
             <p className="text-gray-400 text-sm">No resources match this filter.</p>
@@ -315,21 +379,41 @@ export default function BuildWeekPage() {
                       <span className="ml-1.5 text-[10px] font-bold text-red-600">CRITICAL</span>
                     )}
                   </div>
-                  <select
-                    value={resource.status}
-                    onChange={e => handleResourceStatusChange(resource.id, e.target.value as BuildResourceStatus)}
-                    disabled={updatingResources[resource.id]}
-                    className={cn(
-                      'text-xs font-bold uppercase px-2 py-1 border-2 rounded focus:outline-none',
-                      RESOURCE_STATUS_COLORS[resource.status],
-                      updatingResources[resource.id] && 'opacity-50'
-                    )}
-                  >
-                    <option value="have">Have</option>
-                    <option value="need">Need</option>
-                    <option value="fix">Fix</option>
-                    <option value="discard">Discard</option>
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={resource.status}
+                      onChange={e => handleResourceStatusChange(resource.id, e.target.value as BuildResourceStatus)}
+                      disabled={updatingResources[resource.id]}
+                      className={cn(
+                        'text-xs font-bold uppercase px-2 py-1 border-2 rounded focus:outline-none',
+                        RESOURCE_STATUS_COLORS[resource.status],
+                        updatingResources[resource.id] && 'opacity-50'
+                      )}
+                    >
+                      <option value="have">Have</option>
+                      <option value="need">Need</option>
+                      <option value="fix">Fix</option>
+                      <option value="discard">Discard</option>
+                    </select>
+                    <button
+                      onClick={() => { setEditingResource(resource); setShowAddResource(false) }}
+                      className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteResource(resource.id)}
+                      disabled={updatingResources[resource.id]}
+                      className={cn(
+                        'p-1 text-gray-400 hover:text-red-600 text-xs',
+                        updatingResources[resource.id] && 'opacity-50'
+                      )}
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -694,5 +778,155 @@ function RefSection({ title, icon, isOpen, onToggle, children }: {
       </button>
       {isOpen && <div className="px-4 pb-3">{children}</div>}
     </div>
+  )
+}
+
+/* ── Resource Form types & component ── */
+
+type ResourceFormData = {
+  name: string
+  category: string
+  description?: string
+  quantity?: string
+  status: string
+  priority?: string
+  stage_needed?: string | null
+  notes?: string
+}
+
+const CATEGORIES: { value: BuildCategory; label: string }[] = [
+  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'shelter', label: 'Shelter' },
+  { value: 'kitchen', label: 'Kitchen' },
+  { value: 'logistics', label: 'Logistics' },
+  { value: 'safety', label: 'Safety' },
+  { value: 'layout', label: 'Layout' },
+  { value: 'decoration', label: 'Decoration' },
+  { value: 'personal', label: 'Personal' },
+]
+
+function ResourceForm({ resource, saving, onSave, onCancel }: {
+  resource: BuildResource | null
+  saving: boolean
+  onSave: (data: ResourceFormData) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(resource?.name || '')
+  const [category, setCategory] = useState<string>(resource?.category || 'logistics')
+  const [description, setDescription] = useState(resource?.description || '')
+  const [quantity, setQuantity] = useState(resource?.quantity || '')
+  const [status, setStatus] = useState<string>(resource?.status || 'need')
+  const [priority, setPriority] = useState(resource?.priority || '')
+  const [notes, setNotes] = useState(resource?.notes || '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    onSave({
+      name: name.trim(),
+      category,
+      description: description.trim() || undefined,
+      quantity: quantity.trim() || undefined,
+      status,
+      priority: priority || undefined,
+      notes: notes.trim() || undefined,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border-2 border-black bg-white p-4 mb-4 space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        {resource ? 'Edit Resource' : 'Add Resource'}
+      </p>
+
+      {/* Row 1: Name + Category */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Resource name *"
+          required
+          className="flex-1 px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
+        >
+          {CATEGORIES.map(c => (
+            <option key={c.value} value={c.value}>{CATEGORY_ICONS[c.value]} {c.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Row 2: Quantity + Status + Priority */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={quantity}
+          onChange={e => setQuantity(e.target.value)}
+          placeholder="Qty"
+          className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <select
+          value={status}
+          onChange={e => setStatus(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
+        >
+          <option value="need">Need</option>
+          <option value="have">Have</option>
+          <option value="fix">Fix</option>
+          <option value="discard">Discard</option>
+        </select>
+        <select
+          value={priority}
+          onChange={e => setPriority(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black bg-white focus:outline-none"
+        >
+          <option value="">Normal</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+
+      {/* Row 3: Description */}
+      <input
+        type="text"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+        placeholder="Description (optional)"
+        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+      />
+
+      {/* Row 4: Notes */}
+      <input
+        type="text"
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        placeholder="Notes (optional)"
+        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+      />
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={saving || !name.trim()}
+          className={cn(
+            'px-4 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800',
+            (saving || !name.trim()) && 'opacity-50 cursor-not-allowed'
+          )}
+        >
+          {saving ? 'Saving…' : resource ? 'Save Changes' : 'Add Resource'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-1.5 text-sm font-bold bg-gray-200 hover:bg-gray-300"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   )
 }

@@ -110,6 +110,61 @@ export async function updateResourceStatus(resourceId: string, status: 'have' | 
   if (error) throw error
 }
 
+export async function createBuildResource(resource: {
+  name: string
+  category: string
+  description?: string
+  quantity?: string
+  status: string
+  priority?: string
+  stage_needed?: string | null
+  notes?: string
+}): Promise<BuildResource> {
+  const supabase = createClient()
+  // Get the max sort_order to put new item at the end
+  const { data: existing } = await supabase
+    .from('build_resources')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order + 1 : 0
+
+  const { data, error } = await supabase
+    .from('build_resources')
+    .insert({ ...resource, sort_order: nextOrder } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildResource
+}
+
+export async function updateBuildResource(resourceId: string, updates: {
+  name?: string
+  category?: string
+  description?: string | null
+  quantity?: string | null
+  status?: string
+  priority?: string | null
+  stage_needed?: string | null
+  notes?: string | null
+}) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_resources')
+    .update(updates as never)
+    .eq('id', resourceId)
+  if (error) throw error
+}
+
+export async function deleteBuildResource(resourceId: string) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_resources')
+    .delete()
+    .eq('id', resourceId)
+  if (error) throw error
+}
+
 export const STAGE_ICONS: Record<string, string> = {
   planning: '📋',
   monday: '📍',
