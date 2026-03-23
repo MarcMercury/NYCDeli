@@ -187,6 +187,7 @@ export interface UserProfileRow {
   denied_at: string | null
   denied_reason: string | null
   bio: string | null
+  last_sign_in_at: string | null
 }
 
 export interface UserProfileInsert {
@@ -205,6 +206,7 @@ export interface UserProfileUpdate {
   denied_at?: string | null
   denied_reason?: string | null
   bio?: string | null
+  last_sign_in_at?: string | null
 }
 
 export interface CamperPhotoRow {
@@ -713,7 +715,23 @@ export type FloorplanObjectType =
   | 'table'
   | 'shower_container'
   | 'sink_hose'
+  | 'fire_lane'
+  | 'road'
+  | 'path_of_travel'
+  | 'fuel_storage'
+  | 'propane_storage'
+  | 'flame_effect'
+  | 'fire_extinguisher'
+  | 'vehicle'
+  | 'rv'
+  | 'pc_container'
+  | 'trash_receptacle'
+  | 'sign'
+  | 'distance_marker'
+  | 'neighbor_zone'
   | 'custom'
+
+export type FrontageSide = 'north' | 'south' | 'east' | 'west'
 
 export interface FloorplanObjectProperties {
   reservable?: boolean
@@ -723,6 +741,20 @@ export interface FloorplanObjectProperties {
   sub_type?: string
   description?: string
   icon?: string
+  // BRC compliance properties
+  fuel_type?: 'liquid' | 'propane'
+  pc_number?: string
+  door_direction?: 'north' | 'south' | 'east' | 'west'
+  road_name?: string
+  needs_pumpout?: boolean
+  has_generator?: boolean
+  ext_type?: 'ABC' | '40B' | 'kitchen'
+  sign_text?: string
+  neighbor_name?: string
+  distance_ft?: number
+  from_label?: string
+  to_label?: string
+  safety_radius_ft?: number
 }
 
 export interface FloorplanConfigRow {
@@ -736,6 +768,13 @@ export interface FloorplanConfigRow {
   border_label_south: string | null
   border_label_east: string | null
   border_label_west: string | null
+  frontage_sides: FrontageSide[]
+  camp_name: string | null
+  contact_name: string | null
+  playa_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
+  layout_version: number
   created_at: string
   updated_at: string
 }
@@ -750,6 +789,13 @@ export interface FloorplanConfigInsert {
   border_label_south?: string | null
   border_label_east?: string | null
   border_label_west?: string | null
+  frontage_sides?: FrontageSide[]
+  camp_name?: string | null
+  contact_name?: string | null
+  playa_name?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  layout_version?: number
 }
 
 export interface FloorplanConfigUpdate {
@@ -762,6 +808,13 @@ export interface FloorplanConfigUpdate {
   border_label_south?: string | null
   border_label_east?: string | null
   border_label_west?: string | null
+  frontage_sides?: FrontageSide[]
+  camp_name?: string | null
+  contact_name?: string | null
+  playa_name?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  layout_version?: number
 }
 
 export interface FloorplanObjectRow {

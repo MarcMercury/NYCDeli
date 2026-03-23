@@ -92,6 +92,7 @@ export default function AdminPage() {
       denied_at: null,
       denied_reason: null,
       bio: null,
+      last_sign_in_at: null,
       camper: c,
     }))
 
@@ -431,6 +432,7 @@ export default function AdminPage() {
                           <th className="text-left p-3 font-bold uppercase tracking-wider">Name / Email</th>
                           <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Role</th>
                           <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Status</th>
+                          <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Last Login</th>
                           <th className="text-left p-3 font-bold uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -468,6 +470,9 @@ export default function AdminPage() {
                                 <Badge variant="warning">No Camper Profile</Badge>
                               )}
                             </td>
+                            <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
+                              {user.last_sign_in_at ? formatDate(user.last_sign_in_at) : '—'}
+                            </td>
                             <td className="p-3">
                               <Button 
                                 size="sm" 
@@ -485,7 +490,7 @@ export default function AdminPage() {
                         ))}
                         {filteredUsers.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="p-8 text-center text-gray-500">
+                            <td colSpan={5} className="p-8 text-center text-gray-500">
                               No users matching your filters.
                             </td>
                           </tr>

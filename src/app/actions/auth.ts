@@ -72,6 +72,14 @@ export async function signIn(_prevState: AuthState, formData: FormData): Promise
 
   // Check user role to redirect appropriately
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Record last sign-in timestamp
+  if (user) {
+    await supabase
+      .from('user_profiles')
+      .update({ last_sign_in_at: new Date().toISOString() })
+      .eq('id', user.id)
+  }
   if (user) {
     const { data: profile } = await supabase
       .from('user_profiles')

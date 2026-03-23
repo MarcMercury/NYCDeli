@@ -7,8 +7,15 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { error, data } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Record last sign-in timestamp
+      if (data.user) {
+        await supabase
+          .from('user_profiles')
+          .update({ last_sign_in_at: new Date().toISOString() })
+          .eq('id', data.user.id)
+      }
       return NextResponse.redirect(`${origin}/pending`)
     }
   }
