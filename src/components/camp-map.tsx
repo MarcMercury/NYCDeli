@@ -398,13 +398,37 @@ export function CampMap() {
                 backgroundSize: `${config.grid_size_ft * scale}px ${config.grid_size_ft * scale}px`,
               }}
             >
-              {/* Compass */}
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs font-black uppercase tracking-wider bg-black text-yellow-400 px-4 py-1 z-10">
-                ↑ Street Side (N)
-              </div>
-              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-black uppercase tracking-wider bg-gray-400 text-white px-4 py-1 z-10">
-                ↓ Open Playa (S)
-              </div>
+              {/* Border labels */}
+              {config.border_label_north && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs font-black uppercase tracking-wider bg-black text-yellow-400 px-4 py-1 z-10 whitespace-nowrap">
+                  ↑ {config.border_label_north}
+                </div>
+              )}
+              {config.border_label_south && (
+                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-black uppercase tracking-wider bg-gray-400 text-white px-4 py-1 z-10 whitespace-nowrap">
+                  ↓ {config.border_label_south}
+                </div>
+              )}
+              {config.border_label_west && (
+                <div className="absolute -left-6 top-1/2 -translate-y-1/2 z-10">
+                  <span
+                    className="text-xs font-black uppercase tracking-wider bg-black text-white px-3 py-1 whitespace-nowrap"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    {config.border_label_west}
+                  </span>
+                </div>
+              )}
+              {config.border_label_east && (
+                <div className="absolute -right-6 top-1/2 -translate-y-1/2 z-10">
+                  <span
+                    className="text-xs font-black uppercase tracking-wider bg-black text-white px-3 py-1 whitespace-nowrap"
+                    style={{ writingMode: 'vertical-rl' }}
+                  >
+                    {config.border_label_east}
+                  </span>
+                </div>
+              )}
 
               {/* Scale indicator */}
               <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
@@ -454,9 +478,9 @@ export function CampMap() {
                   >
                     {/* Labels */}
                     {showLabels && obj.width_ft * scale > 20 && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-0.5">
-                        <span className="text-[10px]">{template?.icon || '📦'}</span>
-                        <span className="text-[9px] font-black uppercase tracking-wider text-center leading-tight text-black/80 truncate max-w-full px-0.5">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px">
+                        <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
+                        <span className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px">
                           {obj.label || template?.label || obj.object_type}
                         </span>
                         {/* Reservation status indicators for tents */}
