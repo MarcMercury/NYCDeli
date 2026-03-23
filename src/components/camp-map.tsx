@@ -262,7 +262,7 @@ export function CampMap() {
   function getSpotOverlayClass(obj: FloorplanObjectRow): string {
     if (!obj.properties?.reservable) return ''
     const spot = findSpotForObject(obj)
-    if (!spot) return ''
+    if (!spot) return 'ring-4 ring-emerald-400'
     if (spot.reservation && camper && spot.reservation.camper_id === camper.id) return 'ring-4 ring-yellow-400'
     if (spot.reservation) return 'ring-4 ring-red-400'
     return 'ring-4 ring-emerald-400'
@@ -490,7 +490,7 @@ export function CampMap() {
                         {/* Reservation status indicators for tents */}
                         {isReservable && (() => {
                           const spot = findSpotForObject(obj)
-                          if (!spot) return null
+                          if (!spot) return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
                           if (spot.reservation && camper && spot.reservation.camper_id === camper.id) {
                             return <span className="text-[7px] bg-yellow-500 text-black px-1 rounded-sm mt-0.5 font-bold">YOUR SPOT</span>
                           }
@@ -581,6 +581,15 @@ export function CampMap() {
                 >
                   📖 More Details
                 </a>
+
+                {/* Reservable tent with no synced spot */}
+                {selectedObject.object.properties?.reservable && !selectedObject.spot && (
+                  <div className="mt-3 pt-3 border-t">
+                    <Alert variant="warning">
+                      This tent is reservable but hasn&apos;t been synced to the camp spots list yet. An admin needs to click &quot;Sync Spots&quot; in the Layout Builder.
+                    </Alert>
+                  </div>
+                )}
 
                 {/* Spot details if this is a reservable tent */}
                 {selectedObject.spot && (

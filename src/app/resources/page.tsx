@@ -1001,6 +1001,372 @@ The dust and dehydration can wreak havoc — come prepared:
 • Wet wipes (make sure they're biodegradable)
 • Spray bottle for misting yourself and others (great playa gift)`,
   },
+  /* ---- Expanded Packing: Stitch's Veteran Knowledge ---- */
+  {
+    title: 'Cooling, Warming & Comfort Accessories',
+    category: 'packing',
+    tags: ['cooling', 'warming', 'parasol', 'mister', 'hand warmers', 'comfort', 'heat', 'cold'],
+    content: `Desert temps swing from 100°F+ during the day to the 40s at night. Gear up for both.
+
+**Cooling**
+• Spray bottle / mister — mist yourself and others (add a little lemon juice or vinegar to help with the alkalinity). Makes a great playa gift.
+• Gel eye mask or gel neckerchief you can chill in your cooler — this can really help when overheated
+• Chinese parasol or umbrella — rain or shine, your personal shade follows you
+• Portable evaporative cooler — for your tent (see Shopping Links)
+
+**Warming**
+• Rechargeable hand warmers (or chemical ones as backup)
+• Warm gloves or mittens — nights are cold
+• Fleece or fur hat for nighttime
+• Long underwear / thermal base layers
+• Down or synthetic-down jacket, vest, or similar — it can get really cold at night
+• Polypro or wool socks for cold nights`,
+  },
+  {
+    title: 'Shelter Options — Know Your Home',
+    category: 'packing',
+    tags: ['tent', 'shift pod', 'hexayurt', 'rv', 'shelter', 'housing', 'home', 'shade'],
+    content: `You have options. Pick what works for your comfort level and budget. NYC Deli provides 10.5' shade over your tent spot and a ground tarp — but you bring the structure.
+
+**Option 1: Tent**
+The classic. Get one with minimal mesh — ideally one that closes completely. You'll want enough room for costumes (they take space). Seal seams with tape to keep dust out.
+
+**Option 2: Shift Pod**
+Very popular modern option. Reflective, insulated, and relatively quick to set up. [shiftpod.com](https://shiftpod.com/shiftpod/)
+
+**Option 3: Hexayurt**
+DIY insulated shelter built from rigid insulation panels. Cooler than tents, cheaper than RVs. Plans available at [Hexayurt Playa Guide](http://www.appropedia.org/Hexayurt_playa)
+
+**Option 4: Vehicle (RV, Van, Car)**
+Rental companies have Burning Man limitations & the ones that allow it book up very early in the spring. Plan ahead. Cover all windows with foil-faced bubble wrap or tarps — dramatically cuts generator use for AC.
+
+**Option 5: Shipping Box (advanced)**
+Giant wooden crates (e.g. 5'×8'×4') you can pack gear into, then assemble and decorate and live in.
+
+**All Shelters:**
+• Stake everything down securely — playa winds can reach 70+ mph
+• Separate shade structure over your tent makes a huge difference
+• More enclosed = less dust inside (but hotter during the day without cooling)`,
+  },
+  {
+    title: 'Home Setup & Organization',
+    category: 'packing',
+    tags: ['bedding', 'air mattress', 'organization', 'carpet', 'pillow', 'sleeping', 'mirror', 'wardrobe'],
+    content: `Your playa home is your sanctuary. An organized space = better sleep = better burn.
+
+**Bed Setup**
+• Air mattress + pump OR futon mattress (if you have space)
+• Insulation blanket (wool) between you and the air mattress — air inside gets very cold at night and very warm during the day
+• Double-case your pillows — keeps playa dust out
+• Sleeping bag rated to 30°F
+• Tarp/plastic cover to put over your bed — playa WILL get in no matter how dust-proof your home is
+
+**Organization**
+• Clear plastic hanging wardrobe — hang/fold clean clothing inside
+• Clear plastic shoe organizer for over the door — great for goggles, lip balm, lighters, saline, etc.
+• Collapsible clothing rack (~$50 ones collapse flat and fast)
+• Small 3-4 drawer plastic organizer — great bedside storage
+• Carpet/floor mat — keeps dust down and makes home nicer. Roll up and wait to shake out till you're home. Tape off edges to prevent unraveling.
+
+**Vibes**
+• Full-length mirror — great to see your whole outfit (secure it to avoid breakage)
+• Small personal mirror for makeup
+• Tapestries, decorations — make your home feel like your own little Shangri-La
+• Small white board for outside your tent — leave notes, post your schedule
+• Clip lights or LED string lights inside`,
+  },
+  {
+    title: 'Night Safety & Lighting Guide',
+    category: 'packing',
+    tags: ['night', 'lighting', 'led', 'el wire', 'headlamp', 'visibility', 'safety', 'guylines'],
+    content: `Playa at night is DARK. If you can't be seen, you can get hit by bikes or art cars. This is not optional — it's survival.
+
+**Personal Lighting (MUST)**
+• Headlamp + extra batteries
+• LED lights or EL wire to decorate yourself — be VISIBLE FROM ALL DIRECTIONS
+• Flashlight or camp night light
+• Consider energy-efficient, reusable LED or EL wire over single-use glow sticks
+
+**Camp Lighting (MUST)**
+• Lighting for anchors & guylines — people WILL trip over them otherwise. Solar-powered twinkle lights work great. Put these up as soon as structures go up.
+• LED solar lawn lights — fit over rebar nicely
+
+**Where to buy:** Cool Neon, Al Lasher's Electronics Berkeley, glimmergear.com for LED wristbands
+
+**Pro tips:**
+• EL wire is brighter when batteries are fresh — bring spares
+• Night dust storms happen — don't rely solely on seeing others, make sure THEY can see YOU
+• Solar-charge your lights during the day`,
+  },
+  {
+    title: 'Tools & Hardware Checklist',
+    category: 'packing',
+    tags: ['tools', 'rebar', 'tape', 'hammer', 'hardware', 'sledge', 'zip ties', 'setup', 'build'],
+    content: `You're building a temporary home in a desert. Come prepared like you mean it.
+
+**Staking & Anchoring (MUST)**
+• Rebar — 2' straight pieces for tent, guylines, and structures. Everything must be secured!
+• 5 lb. sledge hammer for pounding rebar
+• Rebar end covers — tennis balls (cut across the logo so you find them next year), plastic end caps, or solar lights
+• Rebar puller — hook with eye, large vise grips, or dedicated stake puller
+• Alternative: 3/8"×14" lag bolts you screw in/out with an impact driver
+• Extra rope/clothesline/parachute cord (150' parachute line rated to 300 lbs)
+• Guy line covers — foam pipe insulation or cut pool noodles
+
+**Essential Tools**
+• Pliers (needle nose, regular, & vise grips)
+• Screwdrivers (flat & Phillips)
+• Swiss Army knife / multitool
+• Scissors & safety pins
+• Tape — duct, electrical, & masking (masking for defacing logos)
+• Zip ties (long and short) — can be used in all kinds of ways
+• Work gloves — heavy duty
+• Gorilla Glue 2 oz — saved many a broken boot sole on playa
+• Butane lighters
+• Wire clippers
+
+**Batteries & Power**
+• Extra batteries for EVERYTHING (lots of AA and D)
+• Consider rechargeable batteries with solar charger
+• 12V car inverter / cigarette lighter power converter
+• Camera charger
+• Heavy duty extension cords (if camp has power)
+• Power strips
+
+**Nice-to-Have**
+• Bungee cords / tie-downs (extra)
+• Battery cordless drill + extra batteries & charger (keep batteries out of heat!)
+• Small broom to sweep dust out of tent
+• Sewing kit for repairs
+• Compressed air for camera equipment
+• Cheap watch for time-telling
+• Tool box or bucket — nice to have it all in one place
+• Magnet sweeper/rake — picks up metal debris, great for MOOP sweep
+
+**Safety (MUST)**
+• Fire extinguisher ×2 — one for cooking area, one for sleeping area
+• Car emergency kit — jumper cables, tow cable, flares, reflective triangle, tire inflator`,
+  },
+  {
+    title: 'Personal Food & Drink Planning',
+    category: 'packing',
+    tags: ['food', 'drinks', 'meals', 'snacks', 'cooking', 'cooler', 'hydration', 'coffee', 'alcohol'],
+    content: `Camp provides breakfast Mon–Sat. For everything else, plan your own food. The trick is picking stuff that survives desert heat and limited cooler space.
+
+**Cooler Strategy**
+• 1-2 coolers depending on length of stay (make sure it has a spigot to drain water)
+• Blocks to raise cooler off the ground — heat transfers from the playa, raising it helps ice last
+• Extra blanket wrapped around cooler for insulation
+• Container for perishables inside cooler (large Tupperware or small trash can) — acts like a cool box keeping veggies cool but not drowning. They last way longer.
+• Debbie Meyer Green Bags for fruits & vegetables — they actually work
+• Pro tip: Freeze 24 personal water bottles in a separate cooler with dry ice (OFF THE GROUND and WRAPPED IN A BLANKET). Transfer melted ones to the dry-ice cooler, frozen ones into your food cooler. Works 5-6 days without buying ice.
+
+**Hydration (MUST)**
+• Emergen-C / electrolyte packets — you WILL need these
+• Coconut water — great for staying hydrated
+• Pedialyte — great for hangovers and staying well hydrated
+• Coffee/Tea — instant options (Chi in a box, Starbucks VIA, etc.)
+• Energy shots (5-hour energy, GU gels)
+• Gatorade powder mix
+• Water: ~2-2.5 gallons per person per day (includes bathing)
+
+**Meal Ideas**
+• Pre-made meals (pasta, empanadas) — good for first day when you're still setting up
+• Bacon & eggs, bread (keep in Tupperware in cooler — lasts all week)
+• PB&J, granola, yogurt
+• Chili, instant rice, lentils, heat-and-serve packets (Tasty Bites)
+• Vacuum-sealed restaurant meals — partially freeze, vacuum seal, fully freeze. On playa: boil in pot for 5-10 minutes.
+• Quinoa (pre-make at home)
+
+**Snacks (MUST)**
+• Hard boiled eggs (pre-boil & peel at home — perfect protein)
+• Organic baby food pouches (Ella's Kitchen brand) — moist, easy to get down when you think you can't eat but know you need to
+• Pickles — help balance your body in the high-alkaline environment
+• Nuts, protein bars, fruit roll-ups
+• Chips and salsa, hummus — the salt tastes amazing out there
+• Jerky (beef, turkey, tofu)
+• Clif Shot blocks — calories + electrolytes + caffeine when you can't eat
+
+**Drinks**
+• Canned beer (cans = less trash than bottles, and there's recycling camp)
+• Booze in plastic handles — great gift to bring to party places
+• Box wine/saki — box = less trash
+• Flask + flask funnel
+• Thermos — hot tea or chocolate for cold nights on playa
+
+**Kitchen Essentials (if camp doesn't have)**
+• Cooler, cookware, cutting board, knife
+• Trash bags (contractor grade) — Pack it in, Pack it out!
+• Mesh bags / cheap colander with lid to dry wet trash (keeps trash from smelling)
+• Biodegradable soap, sponge, towel
+• Zip lock bags (1 gal and 1 qt) — for food and dust protection
+• Olive oil — does wonders cleaning playa dust off objects`,
+  },
+  {
+    title: 'Car & Travel Prep',
+    category: 'packing',
+    tags: ['car', 'driving', 'travel', 'rental', 'air filter', 'speed limit', 'gate road'],
+    content: `Most Burning Man accidents happen from people driving to and from without enough sleep. Get rest before the long drive.
+
+**On the Road**
+• Once you get off HWY 80, KEEP TO THE SPEED LIMIT. Cops are ready to take your money if you give them any reason.
+• Once on Gate Road, keep to 10 mph — people get pulled over constantly before reaching camp.
+• Road map / offline directions — don't count on cell service.
+
+**Protect Your Car**
+• Set AC to RECIRCULATE at the entrance gate sign. This prevents the intake from consuming playa dust. Skip this and the first time you turn on the AC at home it'll blast playa dust everywhere.
+• Cover ALL interior car surfaces with blankets, towels, or sheets. This will cut post-playa cleaning time by more than half.
+• New air filter — take a spare to replace the dust-clogged one as soon as you leave playa. Adds miles to your engine and MPG.
+• Lock your car and close windows when not in it. Theft happens on playa just like everywhere else.
+• Cardboard for car windows — enough to black them out for privacy/sleeping.
+
+**Rental Cars**
+• Clean your rental car THOROUGHLY — budget for a deep-clean car wash
+• Some rental companies charge hundreds for excessive dust
+• Companies that allow BM trips book up early spring — plan ahead
+
+**Before Departure (service your vehicle)**
+• Fill up all tanks
+• Check tires, fluids, belts
+• The older your vehicle, the more important this is
+• Keep car key in ONE place and tell others where it is`,
+  },
+  {
+    title: 'Post-Playa Recovery & Cleanup',
+    category: 'packing',
+    tags: ['post playa', 're-entry', 'cleaning', 'depression', 'recovery', 'decompression', 'trash'],
+    content: `Coming home is harder than you think. Plan for it.
+
+**Decompression**
+• Allow at least 2 days before taking on any responsibilities — you need time to ground yourself
+• Connect with campmates who understand the experience
+• Expect extremely vivid dreams and a lot of needed sleep
+• "Wait three weeks before you make any life-changing decisions" — Arctic Monkey's Post-Playa Decompression Guide
+• Post-Playa Depression (PPD) is real. Burning Man shakes up something deep in you, no matter how strong you are. Reach out to burner friends who get it.
+
+**Cleaning**
+• Spray club soda & wipe to remove alkaline dust from car/RV interior and exterior. Use a clean cotton cloth and change sides often — no streaking.
+• Add a splash of white vinegar to laundry (with regular detergent) to break down alkaline playa dust
+• Leather: clean with vinegar/water solution, then rub down with mink oil
+• Clean the hell out of your bike — pull apart, clean moving bits, grease them up, reassemble (or take to a bike shop)
+• Clean shoes ASAP — playa dust destroys leather and rubber over time
+
+**Trash Disposal**
+• Dispose of your trash properly. A lot of dumping (intentional and unintentional) happens everywhere on and off playa.
+• Use drop-off centers for trash & recycling along routes from Black Rock City (open 24 hours following the event) — separate recycling from garbage
+• Make sure to leave room in your vehicle for outbound trash. Pack it in, Pack it out.
+• Try to grab an extra bag or two of someone who left it behind — it happens more than it should.
+
+**Integration**
+• Think about what changed in you and what you want to bring into daily life
+• The lessons of Burning Man can be applied to the default world — that's the real gift`,
+  },
+  {
+    title: 'Lessons Learned from Veteran Burners',
+    category: 'burning-man-101',
+    tags: ['lessons', 'best practices', 'advice', 'veteran', 'wisdom', 'safety', 'tips', 'moop'],
+    content: `Hard-won wisdom from burners who've done this many times. Read it before you go — thank us later.
+
+**The Big Ones**
+• DON'T BRING ANYTHING YOU'RE NOT WILLING TO LOSE — including relationships and your life. Theft happens. Stuff gets misplaced. People change. If you can't afford to lose it, leave it home.
+• Come with an open mind and open heart. Let go of any agenda or expectations — you will be right where you need to be.
+• BE GENTLE WITH YOURSELF AND OTHERS, especially at the end. Fuses run short. People say and do things from a stressed place. Don't take it personally.
+• You don't always get the burn you want — you get the burn you need.
+
+**Practical Wisdom**
+• Take everything out of packaging BEFORE you leave — less garbage to carry home. Label with Sharpie if needed.
+• Make sure to leave room in your vehicle for outbound trash.
+• Lock your car. Close the windows. Even in camp.
+• Put contact info labels on your camera, CamelBak, bike, phone, and anything you love. People WANT to return things but don't know how.
+• Print out passes, ticket confirmations, etc. Don't count on cell service or WiFi.
+• Keep car key in one safe place. Tell others traveling with you where it is.
+
+**Playa Culture**
+• Ask before taking someone's picture — not just people who are nude, but anyone you're focusing on.
+• Be awesome to Porta Potty cleaning crews — only body stuff in the portos, and maybe gift them a cold drink. One year a worker got injured by something sharp going through the vacuum tube.
+• If you have lost someone or carry baggage, bring something that represents it and place it in the Temple to burn on Sunday night. Ask friends who aren't attending if they want you to bring something on their behalf.
+• At sunset, take a moment and howl as it disappears behind the mountains.
+• Whatever you've been scared to try — give it a shot (as long as it doesn't harm anyone else).
+
+**Emotional Prep**
+• The environment will tax you emotionally and physically to the point of fight or flight. It's an excellent opportunity to look at how you deal with stress.
+• Most burners have some kind of emotional release in the first couple of days. It's part of the transition — embrace it.
+• Let others know if you're having a hard time. Ask for what you need.
+• Whatever is natural for you, that's the type of burn you'll have.
+
+**Law Enforcement**
+• Your state's cannabis laws DO NOT apply at Burning Man — you are on FEDERAL land.
+• Never consent to a search. Say: "I do not consent to a search." Even if you have nothing to hide.
+• If asked where your camp is, say you don't remember or ask "Do you have a warrant?" Don't lead cops to your camp.
+• All prescription medication must be in its prescription bottle with your name on it.`,
+  },
+  {
+    title: 'Pre-Departure Task Checklist',
+    category: 'packing',
+    tags: ['pre-departure', 'checklist', 'tasks', 'before leaving', 'preparation', 'planning'],
+    content: `Don't just pack — handle your life before you disappear into the desert for a week+.
+
+**Must Do**
+• Get rest before the long drive — most BM accidents happen from sleep-deprived driving
+• Notify someone of your plans — where you're going, how long, when to expect you back, and how to reach you on playa (camp name, etc.)
+• Make arrangements for pets and plants
+• Save energy — turn off AC, electronics, appliances
+• Set up email auto-response
+• Print/download maps, passes, and guides (don't count on connectivity)
+• Get cash from ATM (for ice — $3/bag, and emergencies)
+• Charge all batteries and devices
+
+**Nice to Do**
+• Clean out perishables from fridge
+• Pay bills — don't want anything cancelled while you're gone
+• Take out garbage
+• Put mail on hold (especially if out longer than a week)
+
+**Smart Prep**
+• Write down every event and the locations of people you want to connect with in a small notebook — fits in your personal bag
+• Bring stamps & postcards — Burning Man has a fully-functioning postal service!
+• Take a photo of your packed setup for reference when repacking`,
+  },
+  {
+    title: 'Bathing & Hygiene Setup',
+    category: 'packing',
+    tags: ['bathing', 'shower', 'hygiene', 'solar shower', 'baby wipes', 'towel', 'toiletries'],
+    content: `Camp has heated showers, but you still need your own hygiene kit. The alkaline dust will destroy your skin if you don't stay on top of it.
+
+**Bathing Essentials**
+• Towel (quick-dry type) — bring two if you have space
+• Solar shower bag (3 gal, heats to 120°+ in a few hours) — backup if camp showers are busy
+• Water catch bin — for under shower (use one of your bins that you don't need during the week)
+• Teva's / flip flops / water shoes for in and after the shower
+• Spare shower nozzle
+
+**Daily Hygiene**
+• Baby wipes — this is your quick bath. You'll use a LOT.
+• Basic toiletries — toothbrush, toothpaste, biodegradable soap, deodorant
+• Shampoo, conditioner, hair brush, comb
+• Hand sanitizer — keep a small one with you at all times (on your bike, etc.)
+• Kleenex / small tissue packs — for when the porto is out of TP (happens a lot). Only 1-ply TP goes in portos.
+
+**Skin Survival**
+• Vinegar or witch hazel + container your feet & hands fit into — the alkaline desert will tear up your skin. Vinegar/witch hazel neutralizes it. Witch hazel smells way better.
+• Add vinegar to baby wipes and spray bottles
+• Moisturizer — bring multiple (by bed, in your bag, etc.)
+• Bag Balm — apply to hands and feet before hitting playa, then once daily. Prevents dehydration and swelling.
+• Neosporin for dry cracked noses — apply to inner edge of nostrils, let capillary action pull it in. Prevents nosebleeds.
+
+**Ladies**
+• Tampons or menstrual cup (DivaCup, Moon Cup, Lunette) — even if it's not your time, it may surprise you. DO NOT put tampons in port-o-potties — carry a personal trash bag.
+• Yeast infection cream/pill — the dust changes everything
+• Non-applicator tampons = less trash
+
+**Nose & Sinus Care**
+• Dust masks rated N-95 (bring 4+)
+• NOSK personal air filtration or nasal filters (WoodyKnows, First Defense)
+• Neti pot & saline (not table salt)
+• Saline nasal spray
+• Boogie Wipes — basically baby wipes for the nose
+• Essential oils — peppermint, rosemary, eucalyptus (2-3 drops in your dust mask, voila — you can breathe again)`,
+  },
   {
     title: 'Recommended Playa Gear — Shopping Links',
     category: 'external-links',
