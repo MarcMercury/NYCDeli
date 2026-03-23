@@ -5,6 +5,16 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Select 
 import type { FloorplanObjectRow, FloorplanObjectType } from '@/types/database'
 import { getTemplateForType, OBJECT_TEMPLATES } from './object-templates'
 
+// Types that have BRC-specific properties
+const FUEL_TYPES = new Set(['fuel_storage', 'propane_storage'])
+const PC_TYPES = new Set(['pc_container'])
+const RV_TYPES = new Set(['rv'])
+const ROAD_TYPES = new Set(['road'])
+const SIGN_TYPES = new Set(['sign'])
+const NEIGHBOR_TYPES = new Set(['neighbor_zone'])
+const DISTANCE_TYPES = new Set(['distance_marker'])
+const EXTINGUISHER_TYPES = new Set(['fire_extinguisher'])
+
 interface PropertiesPanelProps {
   selectedObject: FloorplanObjectRow | null
   allObjects: FloorplanObjectRow[]
@@ -231,6 +241,178 @@ export function PropertiesPanel({
             />
           </div>
         </div>
+
+        {/* BRC-Specific Properties */}
+        {PC_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              PC Container Info
+            </p>
+            <div className="space-y-2">
+              <Input
+                label="PC Number"
+                value={selectedObject.properties?.pc_number || ''}
+                onChange={e => updateProp('pc_number', e.target.value)}
+                placeholder="e.g. 12345"
+              />
+              <Select
+                label="Door Direction"
+                value={selectedObject.properties?.door_direction || ''}
+                onChange={e => updateProp('door_direction', e.target.value || undefined)}
+                options={[
+                  { value: '', label: 'Not set' },
+                  { value: 'north', label: 'North' },
+                  { value: 'south', label: 'South' },
+                  { value: 'east', label: 'East' },
+                  { value: 'west', label: 'West' },
+                ]}
+              />
+            </div>
+          </div>
+        )}
+
+        {FUEL_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Fuel Info
+            </p>
+            <Select
+              label="Fuel Type"
+              value={selectedObject.properties?.fuel_type || ''}
+              onChange={e => updateProp('fuel_type', e.target.value || undefined)}
+              options={[
+                { value: 'liquid', label: 'Liquid Fuel' },
+                { value: 'propane', label: 'Propane / LPG' },
+              ]}
+            />
+            <p className="text-[9px] text-red-600 mt-1">
+              Safety zones: 10ft (no combustibles), 20ft (fuel type separation), 50ft (storage-to-storage)
+            </p>
+          </div>
+        )}
+
+        {RV_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              RV Info
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!selectedObject.properties?.needs_pumpout}
+                  onChange={e => updateProp('needs_pumpout', e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-bold">Needs Pumpout</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!selectedObject.properties?.has_generator}
+                  onChange={e => updateProp('has_generator', e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-bold">Has Generator</span>
+              </label>
+              {selectedObject.properties?.needs_pumpout && (
+                <p className="text-[9px] text-amber-600">
+                  Ensure 20ft service access path to road for pumpout trucks
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {ROAD_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Road Info
+            </p>
+            <Input
+              label="Road Name"
+              value={selectedObject.properties?.road_name || ''}
+              onChange={e => updateProp('road_name', e.target.value)}
+              placeholder="e.g. Esplanade, 3:00 Plaza"
+            />
+          </div>
+        )}
+
+        {SIGN_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Sign Text
+            </p>
+            <Input
+              label="Sign Text"
+              value={selectedObject.properties?.sign_text || ''}
+              onChange={e => updateProp('sign_text', e.target.value)}
+              placeholder="Camp name, direction, etc."
+            />
+          </div>
+        )}
+
+        {NEIGHBOR_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Neighbor Info
+            </p>
+            <Input
+              label="Neighbor Camp Name"
+              value={selectedObject.properties?.neighbor_name || ''}
+              onChange={e => updateProp('neighbor_name', e.target.value)}
+              placeholder="Preferred neighbor camp"
+            />
+          </div>
+        )}
+
+        {DISTANCE_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Distance Marker
+            </p>
+            <div className="space-y-2">
+              <Input
+                label="Distance (ft)"
+                type="number"
+                min={0}
+                value={selectedObject.properties?.distance_ft || ''}
+                onChange={e => updateProp('distance_ft', e.target.value ? Number(e.target.value) : undefined)}
+                helpText="Override auto (defaults to object width)"
+              />
+              <Input
+                label="From Label"
+                value={selectedObject.properties?.from_label || ''}
+                onChange={e => updateProp('from_label', e.target.value)}
+                placeholder="Start reference"
+              />
+              <Input
+                label="To Label"
+                value={selectedObject.properties?.to_label || ''}
+                onChange={e => updateProp('to_label', e.target.value)}
+                placeholder="End reference"
+              />
+            </div>
+          </div>
+        )}
+
+        {EXTINGUISHER_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Extinguisher Type
+            </p>
+            <Select
+              label="Type"
+              value={selectedObject.properties?.ext_type || 'ABC'}
+              onChange={e => updateProp('ext_type', e.target.value)}
+              options={[
+                { value: 'ABC', label: 'ABC (General)' },
+                { value: '40B', label: '40-B (Fuel Storage)' },
+                { value: 'kitchen', label: 'Kitchen (Wet towel preferred)' },
+              ]}
+            />
+          </div>
+        )}
 
         {/* Responsibilities (for kitchen objects) */}
         {['kitchen', 'grill', 'prep_area', 'service_area'].includes(selectedObject.object_type) && (

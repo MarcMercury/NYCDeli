@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, Button, Badge, Input, Alert } from '@/components/ui'
 import { generateId, cn } from '@/lib/utils'
-import type { FloorplanConfigRow, FloorplanObjectRow, FloorplanObjectType, UtilityLineRow, UtilityLineType, UtilityLinePoint } from '@/types/database'
+import type { FloorplanConfigRow, FloorplanObjectRow, FloorplanObjectType, UtilityLineRow, UtilityLineType, UtilityLinePoint, FrontageSide } from '@/types/database'
 import {
   fetchActiveFloorplan,
   fetchFloorplanObjects,
@@ -20,6 +20,7 @@ import { syncSpotsFromFloorplan } from '@/lib/camp-spots'
 import { GridCanvas, type DrawingMode } from './grid-canvas'
 import { ObjectPalette } from './object-palette'
 import { PropertiesPanel } from './properties-panel'
+import { ValidationPanel } from './validation-panel'
 import { getTemplateForType, type ObjectTemplate } from './object-templates'
 
 export function FloorplanEditor() {
@@ -57,6 +58,23 @@ export function FloorplanEditor() {
   const [borderEast, setBorderEast] = useState('')
   const [borderWest, setBorderWest] = useState('')
 
+  // Frontage
+  const [frontageSides, setFrontageSides] = useState<FrontageSide[]>([])
+
+  // Safety & validation
+  const [showSafetyZones, setShowSafetyZones] = useState(false)
+  const [showValidation, setShowValidation] = useState(false)
+
+  // Camp metadata
+  const [campName, setCampName] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [playaName, setPlayaName] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+
+  // Export
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
+
   const selectedObject = objects.find(o => o.id === selectedObjectId) || null
 
   // Load floorplan
@@ -90,6 +108,12 @@ export function FloorplanEditor() {
     setBorderSouth(floorplan.border_label_south || '')
     setBorderEast(floorplan.border_label_east || '')
     setBorderWest(floorplan.border_label_west || '')
+    setFrontageSides(floorplan.frontage_sides || [])
+    setCampName(floorplan.camp_name || '')
+    setContactName(floorplan.contact_name || '')
+    setPlayaName(floorplan.playa_name || '')
+    setContactEmail(floorplan.contact_email || '')
+    setContactPhone(floorplan.contact_phone || '')
 
     const objs = await fetchFloorplanObjects(floorplan.id)
     setObjects(objs)
@@ -104,7 +128,7 @@ export function FloorplanEditor() {
     loadFloorplan()
   }, [loadFloorplan])
 
-  // Save dimensions
+  // Save dimensions & metadata
   async function saveDimensions() {
     if (!config) return
     setSaving(true)
@@ -116,6 +140,12 @@ export function FloorplanEditor() {
       border_label_south: borderSouth || null,
       border_label_east: borderEast || null,
       border_label_west: borderWest || null,
+      frontage_sides: frontageSides,
+      camp_name: campName || null,
+      contact_name: contactName || null,
+      playa_name: playaName || null,
+      contact_email: contactEmail || null,
+      contact_phone: contactPhone || null,
     })
     if (updated) {
       setConfig(updated)
@@ -148,6 +178,38 @@ export function FloorplanEditor() {
       setError('Failed to sync spots — check console for details')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  // Toggle frontage side
+  function toggleFrontage(side: FrontageSide) {
+    setFrontageSides(prev =>
+      prev.includes(side) ? prev.filter(s => s !== side) : [...prev, side]
+    )
+    setHasUnsavedChanges(true)
+  }
+
+  // Export layout to PNG
+  async function handleExport() {
+    const container = canvasContainerRef.current
+    if (!container) return
+    try {
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(container, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+      })
+      const link = document.createElement('a')
+      const name = (campName || config?.name || 'camp_layout').replace(/\s+/g, '_').slice(0, 15)
+      const now = new Date()
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      link.download = `${name}_${mm}.${dd}.png`
+      link.href = dataUrl
+      link.click()
+    } catch {
+      // html-to-image not installed — fall back to native canvas
+      setError('Export failed — install html-to-image package for PNG export')
     }
   }
 
@@ -655,6 +717,56 @@ export function FloorplanEditor() {
                         placeholder="e.g. Deep Playa"
                       />
                     </div>
+
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 pt-2">
+                      Frontage (Street-Facing Sides)
+                    </p>
+                    <div className="flex gap-2">
+                      {(['north', 'south', 'east', 'west'] as FrontageSide[]).map(side => (
+                        <label key={side} className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={frontageSides.includes(side)}
+                            onChange={() => toggleFrontage(side)}
+                            className="w-3.5 h-3.5 accent-green-500"
+                          />
+                          <span className="text-xs font-bold capitalize">{side}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 pt-2">
+                      Camp Info
+                    </p>
+                    <Input
+                      label="Camp Name"
+                      value={campName}
+                      onChange={e => { setCampName(e.target.value); setHasUnsavedChanges(true) }}
+                      placeholder="NYC Deli"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        label="Contact Name"
+                        value={contactName}
+                        onChange={e => { setContactName(e.target.value); setHasUnsavedChanges(true) }}
+                      />
+                      <Input
+                        label="Playa Name"
+                        value={playaName}
+                        onChange={e => { setPlayaName(e.target.value); setHasUnsavedChanges(true) }}
+                      />
+                      <Input
+                        label="Email"
+                        value={contactEmail}
+                        onChange={e => { setContactEmail(e.target.value); setHasUnsavedChanges(true) }}
+                      />
+                      <Input
+                        label="Phone"
+                        value={contactPhone}
+                        onChange={e => { setContactPhone(e.target.value); setHasUnsavedChanges(true) }}
+                      />
+                    </div>
+
                     <div className="flex gap-2">
                       <Button size="sm" onClick={saveDimensions} loading={saving}>
                         Apply
@@ -753,6 +865,31 @@ export function FloorplanEditor() {
                     />
                     <span className="text-[10px] font-bold uppercase">Labels</span>
                   </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showSafetyZones}
+                      onChange={e => setShowSafetyZones(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-red-500"
+                    />
+                    <span className="text-[10px] font-bold uppercase">Safety</span>
+                  </label>
+                  <Button
+                    size="sm"
+                    variant={showValidation ? 'primary' : 'secondary'}
+                    onClick={() => setShowValidation(v => !v)}
+                    className="text-[10px] px-2 py-0.5"
+                  >
+                    {showValidation ? '✓ BRC' : 'BRC'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleExport}
+                    className="text-[10px] px-2 py-0.5"
+                  >
+                    📷 Export
+                  </Button>
                   {/* Zoom */}
                   <div className="flex items-center gap-1 ml-2">
                     <Button
@@ -775,6 +912,7 @@ export function FloorplanEditor() {
               </CardHeader>
               <CardContent className="p-0 overflow-auto">
                 {config && (
+                  <div ref={canvasContainerRef}>
                   <GridCanvas
                     widthFt={config.width_ft}
                     lengthFt={config.length_ft}
@@ -800,7 +938,10 @@ export function FloorplanEditor() {
                       east: borderEast,
                       west: borderWest,
                     }}
+                    frontageSides={frontageSides}
+                    showSafetyZones={showSafetyZones}
                   />
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -821,6 +962,18 @@ export function FloorplanEditor() {
                 ).length}
               </div>
               <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
+                <span className="font-bold">Safety:</span>{' '}
+                {objects.filter(o =>
+                  ['fuel_storage', 'propane_storage', 'flame_effect', 'fire_extinguisher'].includes(o.object_type)
+                ).length}
+              </div>
+              <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
+                <span className="font-bold">Vehicles:</span>{' '}
+                {objects.filter(o =>
+                  ['vehicle', 'rv', 'pc_container'].includes(o.object_type)
+                ).length}
+              </div>
+              <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
                 <span className="font-bold">Locked:</span>{' '}
                 {objects.filter(o => o.is_locked).length}
               </div>
@@ -835,7 +988,7 @@ export function FloorplanEditor() {
           </div>
 
           {/* RIGHT: Properties Panel */}
-          <div className="xl:max-h-[calc(100vh-200px)] xl:overflow-y-auto">
+          <div className="xl:max-h-[calc(100vh-200px)] xl:overflow-y-auto space-y-4">
             <PropertiesPanel
               selectedObject={selectedObject}
               allObjects={objects}
@@ -847,6 +1000,13 @@ export function FloorplanEditor() {
               onSendBackward={handleSendBackward}
               onSetParent={handleSetParent}
             />
+            {showValidation && config && (
+              <ValidationPanel
+                objects={objects}
+                config={config}
+                onSelectObject={setSelectedObjectId}
+              />
+            )}
           </div>
         </div>
       </div>

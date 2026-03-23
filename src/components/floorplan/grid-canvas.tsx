@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import type { FloorplanObjectRow, UtilityLineRow, UtilityLineType, UtilityLinePoint } from '@/types/database'
+import type { FloorplanObjectRow, UtilityLineRow, UtilityLineType, UtilityLinePoint, FrontageSide } from '@/types/database'
 import { getTemplateForType } from './object-templates'
+import { computeSafetyZones } from './validation-engine'
 
 export type DrawingMode = null | 'power' | 'water'
 
@@ -11,6 +12,11 @@ const LINE_COLORS: Record<UtilityLineType, string> = {
   power: '#EAB308', // yellow-500
   water: '#3B82F6', // blue-500
 }
+
+// Objects that render with dashed borders
+const DASHED_BORDER_TYPES = new Set(['neighbor_zone', 'path_of_travel'])
+// Objects with special semi-transparent fill
+const INFRASTRUCTURE_TYPES = new Set(['fire_lane', 'road', 'path_of_travel', 'neighbor_zone'])
 
 interface GridCanvasProps {
   widthFt: number
@@ -32,6 +38,8 @@ interface GridCanvasProps {
   onSelectLine: (id: string | null) => void
   showUtilityLines: boolean
   borderLabels?: { north: string; south: string; east: string; west: string }
+  frontageSides?: FrontageSide[]
+  showSafetyZones?: boolean
 }
 
 export function GridCanvas({
@@ -54,6 +62,8 @@ export function GridCanvas({
   onSelectLine,
   showUtilityLines,
   borderLabels,
+  frontageSides = [],
+  showSafetyZones = false,
 }: GridCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [dragState, setDragState] = useState<{
@@ -240,6 +250,13 @@ export function GridCanvas({
 
   const hasBorderLabels = borderLabels && (borderLabels.north || borderLabels.south || borderLabels.east || borderLabels.west)
 
+  // Compute safety zones
+  const safetyZones = showSafetyZones ? computeSafetyZones(objects) : []
+
+  // Frontage border color
+  const frontageBorderStyle = (side: FrontageSide) =>
+    frontageSides.includes(side) ? '4px solid #22c55e' : '4px solid #000'
+
   return (
     <div className="relative" style={{ padding: hasBorderLabels ? '24px' : 0 }}>
       {/* Border labels rendered outside the canvas */}
@@ -248,8 +265,11 @@ export function GridCanvas({
           className="absolute left-0 right-0 top-0 flex justify-center pointer-events-none"
           style={{ height: 24 }}
         >
-          <span className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap">
-            {borderLabels.north}
+          <span className={cn(
+            'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+            frontageSides.includes('north') ? 'bg-green-500 text-white' : 'bg-black text-white'
+          )}>
+            {borderLabels.north}{frontageSides.includes('north') ? ' ★ FRONTAGE' : ''}
           </span>
         </div>
       )}
@@ -258,8 +278,11 @@ export function GridCanvas({
           className="absolute left-0 right-0 bottom-0 flex justify-center pointer-events-none"
           style={{ height: 24 }}
         >
-          <span className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap">
-            {borderLabels.south}
+          <span className={cn(
+            'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+            frontageSides.includes('south') ? 'bg-green-500 text-white' : 'bg-black text-white'
+          )}>
+            {borderLabels.south}{frontageSides.includes('south') ? ' ★ FRONTAGE' : ''}
           </span>
         </div>
       )}
@@ -269,10 +292,13 @@ export function GridCanvas({
           style={{ width: 24 }}
         >
           <span
-            className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap"
+            className={cn(
+              'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+              frontageSides.includes('west') ? 'bg-green-500 text-white' : 'bg-black text-white'
+            )}
             style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
           >
-            {borderLabels.west}
+            {borderLabels.west}{frontageSides.includes('west') ? ' ★ FRONTAGE' : ''}
           </span>
         </div>
       )}
@@ -282,20 +308,27 @@ export function GridCanvas({
           style={{ width: 24 }}
         >
           <span
-            className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap"
+            className={cn(
+              'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+              frontageSides.includes('east') ? 'bg-green-500 text-white' : 'bg-black text-white'
+            )}
             style={{ writingMode: 'vertical-rl' }}
           >
-            {borderLabels.east}
+            {borderLabels.east}{frontageSides.includes('east') ? ' ★ FRONTAGE' : ''}
           </span>
         </div>
       )}
 
     <div
       ref={canvasRef}
-      className="relative bg-amber-50 border-4 border-black cursor-crosshair overflow-hidden"
+      className="relative bg-amber-50 cursor-crosshair overflow-hidden"
       style={{
         width: widthFt * scale,
         height: lengthFt * scale,
+        borderTop: frontageBorderStyle('north'),
+        borderBottom: frontageBorderStyle('south'),
+        borderLeft: frontageBorderStyle('west'),
+        borderRight: frontageBorderStyle('east'),
         backgroundImage: showGrid
           ? `linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px),
              linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)`
@@ -356,12 +389,16 @@ export function GridCanvas({
         const isDragging = dragState?.objectId === obj.id
         const isResizing = resizeState?.objectId === obj.id
         const hasChildren = objects.some(o => o.parent_id === obj.id)
+        const isInfra = INFRASTRUCTURE_TYPES.has(obj.object_type)
+        const isDashed = DASHED_BORDER_TYPES.has(obj.object_type)
+        const isDistanceMarker = obj.object_type === 'distance_marker'
 
         return (
           <div
             key={obj.id}
             className={cn(
-              'absolute border-2 transition-shadow select-none',
+              'absolute transition-shadow select-none',
+              isDashed ? 'border-2 border-dashed' : 'border-2',
               isSelected
                 ? 'ring-2 ring-yellow-400 ring-offset-1 z-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
                 : 'hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.5)]',
@@ -374,15 +411,46 @@ export function GridCanvas({
               top: obj.y * scale,
               width: obj.width_ft * scale,
               height: obj.height_ft * scale,
-              backgroundColor: `${obj.color}cc`,
+              backgroundColor: isInfra ? `${obj.color}55` : `${obj.color}cc`,
               borderColor: obj.color,
               transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
               zIndex: isSelected ? 50 : obj.z_index,
             }}
             onPointerDown={e => handleObjectPointerDown(e, obj)}
           >
+            {/* Distance marker rendering */}
+            {isDistanceMarker && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-full flex items-center px-1">
+                  <div className="h-0.5 bg-gray-800 flex-1" />
+                  <span className="text-[8px] font-black text-gray-800 px-1 whitespace-nowrap bg-white/80">
+                    {obj.properties?.distance_ft ? `${obj.properties.distance_ft}ft` : `${obj.width_ft}ft`}
+                  </span>
+                  <div className="h-0.5 bg-gray-800 flex-1" />
+                </div>
+                {/* End caps */}
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-2 bg-gray-800" />
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 h-2 bg-gray-800" />
+              </div>
+            )}
+
+            {/* PC container door indicator */}
+            {obj.object_type === 'pc_container' && obj.properties?.door_direction && (
+              <div
+                className={cn(
+                  'absolute bg-yellow-400 flex items-center justify-center',
+                  obj.properties.door_direction === 'north' && 'top-0 left-1/2 -translate-x-1/2 w-6 h-1.5',
+                  obj.properties.door_direction === 'south' && 'bottom-0 left-1/2 -translate-x-1/2 w-6 h-1.5',
+                  obj.properties.door_direction === 'west' && 'left-0 top-1/2 -translate-y-1/2 w-1.5 h-6',
+                  obj.properties.door_direction === 'east' && 'right-0 top-1/2 -translate-y-1/2 w-1.5 h-6',
+                )}
+              >
+                <span className="text-[6px] font-bold">DOOR</span>
+              </div>
+            )}
+
             {/* Label */}
-            {showLabels && obj.width_ft * scale > 24 && (
+            {showLabels && obj.width_ft * scale > 24 && !isDistanceMarker && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px">
                 <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
                 <span
@@ -390,6 +458,30 @@ export function GridCanvas({
                 >
                   {obj.label || template?.label || obj.object_type}
                 </span>
+                {/* Show neighbor name for neighbor zones */}
+                {obj.object_type === 'neighbor_zone' && obj.properties?.neighbor_name && (
+                  <span className="text-[7px] text-gray-600 italic truncate max-w-full">
+                    {obj.properties.neighbor_name}
+                  </span>
+                )}
+                {/* Show road name */}
+                {obj.object_type === 'road' && obj.properties?.road_name && (
+                  <span className="text-[7px] text-gray-600 font-bold truncate max-w-full">
+                    {obj.properties.road_name}
+                  </span>
+                )}
+                {/* Show PC number */}
+                {obj.object_type === 'pc_container' && obj.properties?.pc_number && (
+                  <span className="text-[7px] bg-amber-700 text-white px-1 rounded-sm mt-0.5">
+                    PC#{obj.properties.pc_number}
+                  </span>
+                )}
+                {/* Show sign text */}
+                {obj.object_type === 'sign' && obj.properties?.sign_text && (
+                  <span className="text-[7px] text-gray-800 font-bold truncate max-w-full">
+                    {obj.properties.sign_text}
+                  </span>
+                )}
                 {obj.properties?.reservable && (
                   <span className="text-[7px] bg-green-500 text-white px-1 rounded-sm mt-0.5">
                     RESERVABLE
@@ -398,6 +490,12 @@ export function GridCanvas({
                 {hasChildren && (
                   <span className="text-[7px] bg-purple-500 text-white px-1 rounded-sm mt-0.5">
                     HAS SUB-AREAS
+                  </span>
+                )}
+                {/* Fire lane width indicator */}
+                {obj.object_type === 'fire_lane' && (
+                  <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">
+                    {Math.min(obj.width_ft, obj.height_ft)}ft WIDE
                   </span>
                 )}
               </div>
@@ -425,6 +523,42 @@ export function GridCanvas({
           </div>
         )
       })}
+
+      {/* Safety Zone SVG Overlay */}
+      {showSafetyZones && safetyZones.length > 0 && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={widthFt * scale}
+          height={lengthFt * scale}
+          style={{ zIndex: 5 }}
+        >
+          {safetyZones.map(zone =>
+            zone.radii.map((r, i) => (
+              <g key={`${zone.objectId}-${i}`}>
+                <circle
+                  cx={zone.cx * scale}
+                  cy={zone.cy * scale}
+                  r={r.radius * scale}
+                  fill="none"
+                  stroke={r.color}
+                  strokeWidth={1.5}
+                  strokeDasharray="6 3"
+                  opacity={0.6}
+                />
+                <text
+                  x={zone.cx * scale}
+                  y={zone.cy * scale - r.radius * scale - 4}
+                  textAnchor="middle"
+                  className="fill-current pointer-events-none"
+                  style={{ fontSize: '7px', fontWeight: 'bold', color: r.color }}
+                >
+                  {r.label}
+                </text>
+              </g>
+            ))
+          )}
+        </svg>
+      )}
 
       {/* Utility Lines SVG Overlay */}
       {showUtilityLines && (
