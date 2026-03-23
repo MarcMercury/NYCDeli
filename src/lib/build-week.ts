@@ -102,6 +102,29 @@ export async function updateQuestionStatus(questionId: string, status: 'open' | 
   if (error) throw error
 }
 
+export async function createBuildQuestion(question: {
+  question: string
+  category: string
+  context?: string
+  is_pain_point?: boolean
+}): Promise<BuildQuestion> {
+  const supabase = createClient()
+  const { data: existing } = await supabase
+    .from('build_questions')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order + 1 : 0
+
+  const { data, error } = await supabase
+    .from('build_questions')
+    .insert({ ...question, status: 'open', sort_order: nextOrder } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildQuestion
+}
+
 export async function updateResourceStatus(resourceId: string, status: 'have' | 'need' | 'fix' | 'discard') {
   const supabase = createClient()
   const { error } = await supabase

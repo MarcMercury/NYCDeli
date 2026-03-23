@@ -19,6 +19,7 @@ import {
   createBuildResource,
   updateBuildResource,
   deleteBuildResource,
+  createBuildQuestion,
   createInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
@@ -47,7 +48,7 @@ type Tab = { id: string; label: string }
 const tabs: Tab[] = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'inventory', label: 'Inventory' },
-  { id: 'issues', label: 'Issues' },
+  { id: 'issues', label: "Q's & Issues" },
   { id: 'shade', label: 'Shade Guide' },
   { id: 'info', label: 'Info' },
 ]
@@ -78,6 +79,8 @@ export default function BuildWeekPage() {
   const [editingInventory, setEditingInventory] = useState<BuildInventory | null>(null)
   const [savingInventory, setSavingInventory] = useState(false)
   const [updatingInventory, setUpdatingInventory] = useState<Record<string, boolean>>({})
+  const [showAddQuestion, setShowAddQuestion] = useState(false)
+  const [savingQuestion, setSavingQuestion] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -169,6 +172,19 @@ export default function BuildWeekPage() {
       // Silently fail
     } finally {
       setUpdatingQuestions(prev => ({ ...prev, [questionId]: false }))
+    }
+  }
+
+  const handleAddQuestion = async (data: QuestionFormData) => {
+    setSavingQuestion(true)
+    try {
+      const newQuestion = await createBuildQuestion(data)
+      setQuestions(prev => [...prev, newQuestion])
+      setShowAddQuestion(false)
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingQuestion(false)
     }
   }
 
@@ -344,7 +360,7 @@ export default function BuildWeekPage() {
             <span className="font-bold">{doneGoals}/{totalGoals} tasks</span>
             <div className="flex gap-3 text-xs text-gray-400">
               {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
-              {openIssueCount > 0 && <span className="text-yellow-600">{openIssueCount} open issues</span>}
+              {openIssueCount > 0 && <span className="text-yellow-600">{openIssueCount} open</span>}
               {inventory.length > 0 && <span>{verifiedCount}/{inventory.length} verified</span>}
               <span>{builders.length} builders</span>
             </div>
@@ -690,9 +706,9 @@ export default function BuildWeekPage() {
           </div>
         </TabPanel>
 
-        {/* ═══════════  ISSUES  ═══════════ */}
+        {/* ═══════════  Q'S & ISSUES  ═══════════ */}
         <TabPanel tabId="issues" activeTab={activeTab}>
-          <div className="mb-4">
+          <div className="flex items-center gap-2 mb-4">
             <select
               value={questionFilter}
               onChange={e => setQuestionFilter(e.target.value as typeof questionFilter)}
@@ -703,10 +719,24 @@ export default function BuildWeekPage() {
               <option value="resolved">Resolved ({questions.filter(q => q.status === 'resolved').length})</option>
               <option value="deferred">Deferred ({questions.filter(q => q.status === 'deferred').length})</option>
             </select>
+            <button
+              onClick={() => setShowAddQuestion(true)}
+              className="ml-auto px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
+            >
+              + Add
+            </button>
           </div>
 
+          {showAddQuestion && (
+            <QuestionForm
+              saving={savingQuestion}
+              onSave={handleAddQuestion}
+              onCancel={() => setShowAddQuestion(false)}
+            />
+          )}
+
           {filteredQuestions.length === 0 ? (
-            <p className="text-gray-400 text-sm">No issues match this filter.</p>
+            <p className="text-gray-400 text-sm">No items match this filter.</p>
           ) : (
             <div className="border-2 border-black bg-white divide-y divide-gray-100">
               {filteredQuestions.map(q => (
@@ -1651,6 +1681,100 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
           )}
         >
           {saving ? 'Saving…' : item ? 'Save Changes' : 'Add Item'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-1.5 text-sm font-bold bg-gray-200 hover:bg-gray-300"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ── Question / Issue Form ──
+
+type QuestionFormData = {
+  question: string
+  category: string
+  context?: string
+  is_pain_point?: boolean
+}
+
+function QuestionForm({ saving, onSave, onCancel }: {
+  saving: boolean
+  onSave: (data: QuestionFormData) => void
+  onCancel: () => void
+}) {
+  const [question, setQuestion] = useState('')
+  const [category, setCategory] = useState<string>('logistics')
+  const [context, setContext] = useState('')
+  const [isPainPoint, setIsPainPoint] = useState(false)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!question.trim()) return
+    onSave({
+      question: question.trim(),
+      category,
+      context: context.trim() || undefined,
+      is_pain_point: isPainPoint,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border-2 border-black bg-gray-50 p-3 mb-4 space-y-2">
+      <input
+        type="text"
+        value={question}
+        onChange={e => setQuestion(e.target.value)}
+        placeholder="Question or issue *"
+        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+        autoFocus
+      />
+
+      <div className="flex gap-2">
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="px-3 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
+        >
+          {CATEGORIES.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+
+        <label className="flex items-center gap-1.5 text-sm font-bold cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isPainPoint}
+            onChange={e => setIsPainPoint(e.target.checked)}
+            className="w-4 h-4"
+          />
+          🔥 Pain Point
+        </label>
+      </div>
+
+      <input
+        type="text"
+        value={context}
+        onChange={e => setContext(e.target.value)}
+        placeholder="Context / details (optional)"
+        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+      />
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={saving || !question.trim()}
+          className={cn(
+            'px-4 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800',
+            (saving || !question.trim()) && 'opacity-50 cursor-not-allowed'
+          )}
+        >
+          {saving ? 'Saving…' : 'Add'}
         </button>
         <button
           type="button"
