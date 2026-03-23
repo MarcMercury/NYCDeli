@@ -77,7 +77,7 @@ export async function signIn(_prevState: AuthState, formData: FormData): Promise
   if (user) {
     await supabase
       .from('user_profiles')
-      .update({ last_sign_in_at: new Date().toISOString() })
+      .update({ last_sign_in_at: new Date().toISOString() } as never)
       .eq('id', user.id)
   }
   if (user) {

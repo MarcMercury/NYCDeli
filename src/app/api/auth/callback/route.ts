@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       if (data.user) {
         await supabase
           .from('user_profiles')
-          .update({ last_sign_in_at: new Date().toISOString() })
+          .update({ last_sign_in_at: new Date().toISOString() } as never)
           .eq('id', data.user.id)
       }
       return NextResponse.redirect(`${origin}/pending`)
