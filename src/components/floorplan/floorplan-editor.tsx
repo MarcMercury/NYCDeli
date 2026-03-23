@@ -48,6 +48,12 @@ export function FloorplanEditor() {
   const [dimLength, setDimLength] = useState(300)
   const [dimGrid, setDimGrid] = useState(10)
 
+  // Border labels
+  const [borderNorth, setBorderNorth] = useState('')
+  const [borderSouth, setBorderSouth] = useState('')
+  const [borderEast, setBorderEast] = useState('')
+  const [borderWest, setBorderWest] = useState('')
+
   const selectedObject = objects.find(o => o.id === selectedObjectId) || null
 
   // Load floorplan
@@ -77,6 +83,10 @@ export function FloorplanEditor() {
     setDimWidth(floorplan.width_ft)
     setDimLength(floorplan.length_ft)
     setDimGrid(floorplan.grid_size_ft)
+    setBorderNorth(floorplan.border_label_north || '')
+    setBorderSouth(floorplan.border_label_south || '')
+    setBorderEast(floorplan.border_label_east || '')
+    setBorderWest(floorplan.border_label_west || '')
 
     const objs = await fetchFloorplanObjects(floorplan.id)
     setObjects(objs)
@@ -99,6 +109,10 @@ export function FloorplanEditor() {
       width_ft: dimWidth,
       length_ft: dimLength,
       grid_size_ft: dimGrid,
+      border_label_north: borderNorth || null,
+      border_label_south: borderSouth || null,
+      border_label_east: borderEast || null,
+      border_label_west: borderWest || null,
     })
     if (updated) {
       setConfig(updated)
@@ -561,6 +575,35 @@ export function FloorplanEditor() {
                       value={dimGrid}
                       onChange={e => setDimGrid(Number(e.target.value))}
                     />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 pt-2">
+                      Border Labels
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        label="North"
+                        value={borderNorth}
+                        onChange={e => setBorderNorth(e.target.value)}
+                        placeholder="e.g. 3:00 Plaza"
+                      />
+                      <Input
+                        label="South"
+                        value={borderSouth}
+                        onChange={e => setBorderSouth(e.target.value)}
+                        placeholder="e.g. 9:00 Plaza"
+                      />
+                      <Input
+                        label="West"
+                        value={borderWest}
+                        onChange={e => setBorderWest(e.target.value)}
+                        placeholder="e.g. Esplanade"
+                      />
+                      <Input
+                        label="East"
+                        value={borderEast}
+                        onChange={e => setBorderEast(e.target.value)}
+                        placeholder="e.g. Deep Playa"
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={saveDimensions} loading={saving}>
                         Apply
@@ -584,6 +627,37 @@ export function FloorplanEditor() {
                       <span>Grid:</span>
                       <span className="font-bold">{config?.grid_size_ft}ft</span>
                     </div>
+                    {(borderNorth || borderSouth || borderEast || borderWest) && (
+                      <>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 pt-1">
+                          Borders
+                        </p>
+                        {borderNorth && (
+                          <div className="flex justify-between">
+                            <span>North:</span>
+                            <span className="font-bold truncate ml-2">{borderNorth}</span>
+                          </div>
+                        )}
+                        {borderSouth && (
+                          <div className="flex justify-between">
+                            <span>South:</span>
+                            <span className="font-bold truncate ml-2">{borderSouth}</span>
+                          </div>
+                        )}
+                        {borderWest && (
+                          <div className="flex justify-between">
+                            <span>West:</span>
+                            <span className="font-bold truncate ml-2">{borderWest}</span>
+                          </div>
+                        )}
+                        {borderEast && (
+                          <div className="flex justify-between">
+                            <span>East:</span>
+                            <span className="font-bold truncate ml-2">{borderEast}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -669,6 +743,12 @@ export function FloorplanEditor() {
                     selectedLineId={selectedLineId}
                     onSelectLine={setSelectedLineId}
                     showUtilityLines={showUtilityLines}
+                    borderLabels={{
+                      north: borderNorth,
+                      south: borderSouth,
+                      east: borderEast,
+                      west: borderWest,
+                    }}
                   />
                 )}
               </CardContent>

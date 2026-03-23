@@ -31,6 +31,7 @@ interface GridCanvasProps {
   selectedLineId: string | null
   onSelectLine: (id: string | null) => void
   showUtilityLines: boolean
+  borderLabels?: { north: string; south: string; east: string; west: string }
 }
 
 export function GridCanvas({
@@ -52,6 +53,7 @@ export function GridCanvas({
   selectedLineId,
   onSelectLine,
   showUtilityLines,
+  borderLabels,
 }: GridCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [dragState, setDragState] = useState<{
@@ -236,7 +238,58 @@ export function GridCanvas({
   // Sort by z_index for rendering order
   const sortedObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
 
+  const hasBorderLabels = borderLabels && (borderLabels.north || borderLabels.south || borderLabels.east || borderLabels.west)
+
   return (
+    <div className="relative" style={{ padding: hasBorderLabels ? '24px' : 0 }}>
+      {/* Border labels rendered outside the canvas */}
+      {borderLabels?.north && (
+        <div
+          className="absolute left-0 right-0 top-0 flex justify-center pointer-events-none"
+          style={{ height: 24 }}
+        >
+          <span className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap">
+            {borderLabels.north}
+          </span>
+        </div>
+      )}
+      {borderLabels?.south && (
+        <div
+          className="absolute left-0 right-0 bottom-0 flex justify-center pointer-events-none"
+          style={{ height: 24 }}
+        >
+          <span className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap">
+            {borderLabels.south}
+          </span>
+        </div>
+      )}
+      {borderLabels?.west && (
+        <div
+          className="absolute left-0 top-0 bottom-0 flex items-center pointer-events-none"
+          style={{ width: 24 }}
+        >
+          <span
+            className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap"
+            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+          >
+            {borderLabels.west}
+          </span>
+        </div>
+      )}
+      {borderLabels?.east && (
+        <div
+          className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none"
+          style={{ width: 24 }}
+        >
+          <span
+            className="px-3 py-1 text-xs font-black uppercase tracking-widest bg-black text-white whitespace-nowrap"
+            style={{ writingMode: 'vertical-rl' }}
+          >
+            {borderLabels.east}
+          </span>
+        </div>
+      )}
+
     <div
       ref={canvasRef}
       className="relative bg-amber-50 border-4 border-black cursor-crosshair overflow-hidden"
@@ -504,6 +557,7 @@ export function GridCanvas({
           style={{ width: gridSizeFt * scale }}
         />
       </div>
+    </div>
     </div>
   )
 }

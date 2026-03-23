@@ -723,6 +723,10 @@ export interface FloorplanConfigRow {
   length_ft: number
   grid_size_ft: number
   is_active: boolean
+  border_label_north: string | null
+  border_label_south: string | null
+  border_label_east: string | null
+  border_label_west: string | null
   created_at: string
   updated_at: string
 }
@@ -733,6 +737,10 @@ export interface FloorplanConfigInsert {
   length_ft?: number
   grid_size_ft?: number
   is_active?: boolean
+  border_label_north?: string | null
+  border_label_south?: string | null
+  border_label_east?: string | null
+  border_label_west?: string | null
 }
 
 export interface FloorplanConfigUpdate {
@@ -741,6 +749,10 @@ export interface FloorplanConfigUpdate {
   length_ft?: number
   grid_size_ft?: number
   is_active?: boolean
+  border_label_north?: string | null
+  border_label_south?: string | null
+  border_label_east?: string | null
+  border_label_west?: string | null
 }
 
 export interface FloorplanObjectRow {
