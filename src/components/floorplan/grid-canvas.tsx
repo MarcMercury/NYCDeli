@@ -330,10 +330,10 @@ export function GridCanvas({
           >
             {/* Label */}
             {showLabels && obj.width_ft * scale > 24 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-0.5">
-                <span className="text-[10px]">{template?.icon || '📦'}</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px">
+                <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
                 <span
-                  className="text-[9px] font-black uppercase tracking-wider text-center leading-tight text-black/80 truncate max-w-full px-0.5"
+                  className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px"
                 >
                   {obj.label || template?.label || obj.object_type}
                 </span>

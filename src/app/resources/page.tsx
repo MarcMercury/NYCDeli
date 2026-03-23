@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 
 /* ------------------------------------------------------------------ */
 /*  Data types                                                        */
@@ -17,6 +17,7 @@ type ResourceCategory =
 
 interface Resource {
   title: string
+  slug?: string
   category: ResourceCategory
   content: string
   tags: string[]
@@ -323,6 +324,364 @@ Over 500 Mutant Vehicles (art/sound cars) attend Burning Man each year.`,
 • Contractor trash bags for each camper`,
   },
   {
+    title: 'Tent Spots',
+    slug: 'tent',
+    category: 'camp-amenities',
+    tags: ['tent', 'camping', 'shelter', 'spot', 'reservation'],
+    content: `**Your Home on the Playa**
+
+Each camper gets a designated tent spot with:
+• **10.5' shade canopy** over your tent (provided by camp)
+• **Ground tarp** under your tent (provided by camp)
+• **Electricity** available at your spot — bring an outdoor-rated extension cord
+
+**Tent Size Guidelines:**
+• Measure your tent footprint (width × length) before arrival
+• Spots vary in size — check the Camp Map to see which spots fit your tent
+• If your tent doesn't fit any available spots, DM Brian for help
+
+**Tips:**
+• Stake everything down securely — playa winds can reach 70+ mph
+• Bring extra ratchet straps and rebar stakes
+• Seal seams with tape to keep dust out
+• A shade tarp on top of your tent makes a huge difference`,
+  },
+  {
+    title: 'Kitchen',
+    slug: 'kitchen',
+    category: 'camp-amenities',
+    tags: ['kitchen', 'cooking', 'food', 'meals', 'breakfast'],
+    content: `**NYC Deli Full Kitchen**
+
+Our kitchen is one of the best on playa — a full professional-grade setup:
+• **Refrigerated box truck** with 17-gallon bins for food/drink storage
+• **Running hot & cold water** with grey-water disposal
+• **Two twin-burner electric stoves**, two coffeemakers, two microwaves
+• **Air convection oven** for baking and roasting
+• **Kitchen implements** and 3 sets of pots & pans
+• **Daily breakfast** Mon–Sat on service days
+
+**Kitchen Shifts:**
+Campers sign up for 2.5-hour kitchen shifts that include prepping, cooking, serving, and cleanup.
+
+**Rules:**
+• Clean as you go — leave the kitchen better than you found it
+• Label your personal food with your name and date
+• Report any equipment issues immediately`,
+  },
+  {
+    title: 'Grill Station',
+    slug: 'grill',
+    category: 'camp-amenities',
+    tags: ['grill', 'bbq', 'cooking', 'propane', 'grilling'],
+    content: `**Camp Grill Station**
+
+Our grill station is part of the kitchen zone:
+• Gas grill with propane management
+• Used for camp meals and special cookouts
+• Temperature monitoring required during use
+
+**Safety:**
+• Never leave the grill unattended while lit
+• Keep propane tanks upright and in shade
+• Report any gas smell immediately to a Camp Lead`,
+  },
+  {
+    title: 'Food Prep Area',
+    slug: 'prep_area',
+    category: 'camp-amenities',
+    tags: ['prep', 'food prep', 'chopping', 'sanitation', 'cooking'],
+    content: `**Food Preparation Station**
+
+Dedicated area for prepping meals:
+• Cutting boards, knives, and prep tools provided
+• Sanitation supplies available
+• Portioning station for meal service
+
+**Guidelines:**
+• Wash hands before and after handling food
+• Keep raw and cooked foods separate
+• Clean and sanitize surfaces after each use`,
+  },
+  {
+    title: 'Food Service Area',
+    slug: 'service_area',
+    category: 'camp-amenities',
+    tags: ['service', 'serving', 'food line', 'meals', 'distribution'],
+    content: `**Food Service & Distribution Point**
+
+Where camp meals are served to campers and guests:
+• Plating and serving station
+• Queue management area
+• Typically active during breakfast service
+
+**Shift Roles:**
+• 🍽️ Plating food
+• 🎪 Managing the food line and guiding bike parking
+• 🎵 DJ'ing during food service to keep the vibe going`,
+  },
+  {
+    title: 'Storage Areas',
+    slug: 'storage',
+    category: 'camp-amenities',
+    tags: ['storage', 'supplies', 'food storage', 'equipment'],
+    content: `**Camp Storage**
+
+Storage areas hold food supplies, equipment, and camp infrastructure:
+• Refrigerated truck for perishables
+• Dry storage for non-perishables and equipment
+• Personal storage bins in the refrigerated truck (17-gallon HDX tubs)
+
+**Tips:**
+• Label everything with your name
+• Keep storage areas organized — it helps everyone
+• Report any issues (leaks, pests, broken containers) to a Camp Lead`,
+  },
+  {
+    title: 'Shade Structures',
+    slug: 'shade_structure',
+    category: 'camp-amenities',
+    tags: ['shade', 'canopy', 'sun protection', 'shelter', 'chill'],
+    content: `**Camp Shade Structures**
+
+Shade is life on the playa. NYC Deli provides:
+• **10.5' shade canopy** over every tent spot
+• **Siberia** — 20×30 chill tent kept at 70°F during the day, heated at night (camp use only)
+• **Staten Island** — 20×40 chill tent kept at 70°F during the day (public use)
+• **Full-length mirrors** in chill tents
+• **40×40 roof deck** for camp use
+
+**Tips:**
+• Spend midday (11am–3pm) in shade — that's peak heat
+• Drink water constantly even while resting in shade
+• Chill tents have limited capacity — be mindful of space`,
+  },
+  {
+    title: 'Common Areas',
+    slug: 'common_area',
+    category: 'camp-amenities',
+    tags: ['common area', 'gathering', 'social', 'community', 'hangout'],
+    content: `**Shared Gathering Spaces**
+
+Community spaces where campers and guests hang out:
+• Main gathering area for camp meetings and socializing
+• Daily 15-minute camp meetings in Siberia after food service (12:30pm)
+• Art viewing, music, and general playa vibes
+
+**Etiquette:**
+• Clean up after yourself
+• Keep noise reasonable during quiet hours
+• Be welcoming to visitors — gifting culture applies here too`,
+  },
+  {
+    title: 'Stage & Sound',
+    slug: 'stage',
+    category: 'camp-amenities',
+    tags: ['stage', 'music', 'dj', 'performance', 'sound', 'entertainment'],
+    content: `**Performance Stage**
+
+NYC Deli has a stage area with:
+• Basic DJ setup provided by camp
+• Space for live performances and art
+• Sound system for music during food service and events
+
+**DJ'ing:**
+• DJ'ing during food service counts as a shift
+• Bring your own controller if you have one
+• Coordinate with Camp Leads for set times`,
+  },
+  {
+    title: 'Bar Area',
+    slug: 'bar',
+    category: 'camp-amenities',
+    tags: ['bar', 'drinks', 'cocktails', 'beverages', 'social'],
+    content: `**Camp Bar**
+
+A social hub for drinks and conversation:
+• Bring your own alcohol/drinks — this is a gifting culture, not a commercial bar
+• Share drinks and make new friends
+• Cups provided — bring a reusable cup too
+
+**Remember:**
+• Stay hydrated — alternate drinks with water
+• No opiates in camp
+• Be responsible and look out for each other`,
+  },
+  {
+    title: 'Art Car Pad',
+    slug: 'art_car',
+    category: 'camp-amenities',
+    tags: ['art car', 'mutant vehicle', 'transportation', 'playa ride'],
+    content: `**Art Car (Mutant Vehicle) Parking**
+
+Designated area for art car parking:
+• Art cars (Mutant Vehicles) must be DMV-registered on playa
+• Parking pad keeps vehicles organized and safe
+• Check camp schedule for art car ride-alongs
+
+**Tips:**
+• Never approach a moving art car from behind
+• Always ask the driver before boarding
+• Hold on tight and follow all safety instructions`,
+  },
+  {
+    title: 'Porta Potties',
+    slug: 'porta_potty',
+    category: 'camp-amenities',
+    tags: ['porta potty', 'bathroom', 'toilet', 'restroom', 'hygiene'],
+    content: `**Private Camp Porta Potties**
+
+NYC Deli has its own private portos:
+• **Cleaned and pumped daily** — much better than the public ones
+• Located within the camp boundary for easy access
+
+**Etiquette:**
+• Close the lid after use
+• Don't put anything in the porto besides waste and toilet paper
+• Report any issues (full, broken, no TP) to a Camp Lead
+• The public portos along the streets are available too, but ours are nicer!`,
+  },
+  {
+    title: 'Generator & Power',
+    slug: 'generator',
+    category: 'camp-amenities',
+    tags: ['generator', 'power', 'electricity', 'energy', 'charging'],
+    content: `**Camp Power System**
+
+NYC Deli provides electricity throughout camp:
+• **Generator-powered** electrical grid serving all tent spots
+• Electricity available at your tent — bring an **outdoor-rated extension cord**
+• Powers kitchen equipment, lighting, chill tent AC, and sound
+
+**Tips:**
+• Don't overload circuits — high-draw items (space heaters, hair dryers) may trip breakers
+• Report any electrical issues immediately
+• Keep cords off the ground where possible to avoid tripping hazards
+• Generator area is restricted — authorized personnel only`,
+  },
+  {
+    title: 'Water Station',
+    slug: 'water_station',
+    category: 'camp-amenities',
+    tags: ['water', 'hydration', 'drinking water', 'refill', 'station'],
+    content: `**Water Distribution Point**
+
+Stay hydrated — it's the #1 survival rule on playa:
+• Camp water station for refilling bottles and CamelBaks
+• Drink at least **1.5 gallons of water per day**
+• Running water available in the kitchen and shower areas
+
+**Tips:**
+• Always carry water with you when leaving camp
+• If your pee isn't clear, you're not drinking enough
+• Electrolyte packets help with hydration in extreme heat`,
+  },
+  {
+    title: 'First Aid Station',
+    slug: 'first_aid',
+    category: 'camp-amenities',
+    tags: ['first aid', 'medical', 'safety', 'health', 'emergency'],
+    content: `**Medical / First Aid Station**
+
+Basic first aid supplies available in camp:
+• Bandages, antiseptic, burn cream, pain relievers
+• Playa foot treatment supplies (vinegar rinse, moisturizer)
+• Sunscreen and aloe vera
+
+**Emergencies:**
+• For serious medical emergencies, call **911** or go to **Rampart** (BRC's medical facility at 9:00 & Esplanade)
+• Camp Leads have basic first aid training
+• Always inform someone if you're feeling unwell`,
+  },
+  {
+    title: 'Fire Pit',
+    slug: 'fire_pit',
+    category: 'camp-amenities',
+    tags: ['fire pit', 'fire', 'campfire', 'gathering', 'night'],
+    content: `**Communal Fire Area**
+
+A gathering spot for evening socializing:
+• Elevated fire pit (all burns must be off the ground on playa)
+• Capacity for ~20 people around the fire
+• Perfect for stories, music, and star-gazing
+
+**Safety:**
+• Never leave a fire unattended
+• Keep flammable materials away from the pit
+• No burning trash — that's MOOP
+• Fire must be fully extinguished before everyone leaves`,
+  },
+  {
+    title: 'Camp Entrances',
+    slug: 'entrance',
+    category: 'camp-amenities',
+    tags: ['entrance', 'entry', 'gate', 'welcome', 'access'],
+    content: `**Camp Entry Points**
+
+Designated entrances and exits for the camp:
+• Main entrance facing the street side
+• Welcome visitors with the gifting spirit
+• Bike parking near entrances
+
+**Tips:**
+• Lock your bike at entrances — bike theft is common on playa
+• Add lights to your bike (front + back) for night visibility
+• Guide visitors to the public areas (Staten Island chill tent, service area)`,
+  },
+  {
+    title: 'Shower Container',
+    slug: 'shower',
+    category: 'camp-amenities',
+    tags: ['shower', 'hygiene', 'water', 'clean', 'bathroom'],
+    content: `**Heated Showers**
+
+One of the most valued amenities at NYC Deli:
+• **3 heated showers** in a private side-opening container
+• **Mirror and sink** with running water in the shower container
+• Daily showers for Build Team members; scheduled access for all campers
+
+**Etiquette:**
+• Keep showers quick (5 minutes max) so everyone gets a turn
+• Clean up after yourself — no leaving towels or products behind
+• Report any plumbing issues immediately
+• Grey water is disposed of properly by camp infrastructure`,
+  },
+  {
+    title: 'Dumpster & Trash',
+    slug: 'dumpster',
+    category: 'camp-amenities',
+    tags: ['dumpster', 'trash', 'waste', 'moop', 'cleanup'],
+    content: `**Trash & MOOP Management**
+
+NYC Deli takes Leave No Trace seriously:
+• **30-foot camp dumpster** for all camp waste
+• **Two large trash cans** placed throughout camp
+• **Contractor trash bags** provided for each camper
+
+**Rules:**
+• MOOP sweep your tent area daily
+• Carry a personal MOOP bag when out on playa
+• Sort recyclables when possible
+• Don't dump grey water on the ground — use designated disposal`,
+  },
+  {
+    title: 'Bike Parking & Storage',
+    slug: 'bike_rack',
+    category: 'camp-amenities',
+    tags: ['bikes', 'bike rack', 'parking', 'bicycle', 'transportation'],
+    content: `**Camp Bike Parking**
+
+Designated areas for bike storage:
+• Bike racks near camp entrances
+• Camp-built 8-person couch platforms double as gathering spots near bike areas
+
+**Bike Tips:**
+• **Always lock your bike** — theft is real on playa
+• Add **lights** (front + back) for night riding — it's the law in BRC
+• Rent a bike through Dust Rentals (deadline: 7/7, check WhatsApp)
+• If you miss the deadline, DM Brian — he has a side-deal with Dust Rentals`,
+  },
+  {
     title: 'NYC Container — Personal Gear Transport',
     category: 'camp-amenities',
     tags: ['container', 'transport', 'shipping', 'gear', 'nyc container', 'tubs'],
@@ -556,6 +915,32 @@ Over 500 Mutant Vehicles (art/sound cars) attend Burning Man each year.`,
 export default function ResourcesPage() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | 'all'>('all')
+  const [openSlug, setOpenSlug] = useState<string | null>(null)
+  const scrolledRef = useRef(false)
+
+  // Deep link: if URL has #slug, filter to camp-amenities and open that resource
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '')
+    if (hash) {
+      const matchingResource = RESOURCES.find(r => r.slug === hash)
+      if (matchingResource) {
+        setActiveCategory(matchingResource.category)
+        setOpenSlug(hash)
+        scrolledRef.current = false
+      }
+    }
+  }, [])
+
+  // Scroll to the opened resource after render
+  useEffect(() => {
+    if (openSlug && !scrolledRef.current) {
+      const el = document.getElementById(`resource-${openSlug}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        scrolledRef.current = true
+      }
+    }
+  }, [openSlug])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -655,6 +1040,8 @@ export default function ResourcesPage() {
                 return (
                   <details
                     key={idx}
+                    id={resource.slug ? `resource-${resource.slug}` : undefined}
+                    open={resource.slug === openSlug || undefined}
                     className="group border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] open:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
                   >
                     <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-gray-50 list-none">

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Input, Select } from '@/components/ui'
-import type { FloorplanObjectRow } from '@/types/database'
-import { getTemplateForType } from './object-templates'
+import type { FloorplanObjectRow, FloorplanObjectType } from '@/types/database'
+import { getTemplateForType, OBJECT_TEMPLATES } from './object-templates'
 
 interface PropertiesPanelProps {
   selectedObject: FloorplanObjectRow | null
@@ -92,10 +92,23 @@ export function PropertiesPanel({
               value={selectedObject.label}
               onChange={e => onUpdateObject(selectedObject.id, { label: e.target.value })}
             />
-            <div className="flex items-center gap-2">
-              <Badge>{selectedObject.object_type.replace('_', ' ')}</Badge>
-              {selectedObject.is_locked && <Badge variant="warning">Locked</Badge>}
-            </div>
+            <Select
+              label="Type"
+              value={selectedObject.object_type}
+              onChange={e => {
+                const newType = e.target.value as FloorplanObjectType
+                const tmpl = getTemplateForType(newType)
+                onUpdateObject(selectedObject.id, {
+                  object_type: newType,
+                  color: tmpl?.defaultColor || selectedObject.color,
+                })
+              }}
+              options={OBJECT_TEMPLATES.map(t => ({
+                value: t.type,
+                label: `${t.icon} ${t.label}`,
+              }))}
+            />
+            {selectedObject.is_locked && <Badge variant="warning">Locked</Badge>}
           </div>
         </div>
 

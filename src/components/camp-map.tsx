@@ -546,6 +546,14 @@ export function CampMap() {
                   </div>
                 )}
 
+                {/* Link to more details in Resources */}
+                <a
+                  href={`/resources#${selectedObject.object.object_type}`}
+                  className="flex items-center gap-2 mt-3 px-3 py-2 text-xs font-bold uppercase tracking-wider border-2 border-black bg-yellow-400 hover:bg-yellow-300 transition-colors shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] w-full justify-center"
+                >
+                  📖 More Details
+                </a>
+
                 {/* Spot details if this is a reservable tent */}
                 {selectedObject.spot && (
                   <div className="mt-3 pt-3 border-t space-y-2">
