@@ -227,18 +227,17 @@ export async function fetchAllCampers() {
 
 /**
  * Sync camp_spots from reservable floorplan objects.
- * Creates missing spots and updates positions/sizes of existing ones.
- * Links spots to floorplan objects by ID for reliable matching.
- * Returns the count of created and updated spots.
+ * - Deletes orphaned spots (no reservation and no matching object)
+ * - Creates missing spots for new objects
+ * - Updates existing linked spots with current positions/sizes
+ * Returns the count of created, updated, and deleted spots.
  */
 export async function syncSpotsFromFloorplan(
   objects: FloorplanObjectRow[]
-): Promise<{ created: number; updated: number }> {
+): Promise<{ created: number; updated: number; deleted: number }> {
   const supabase = createClient()
 
-  // Get reservable objects (typically tents)
   const reservable = objects.filter(o => o.properties?.reservable)
-  if (reservable.length === 0) return { created: 0, updated: 0 }
 
   // Fetch existing spots
   const { data: existingSpots } = await supabase
@@ -247,9 +246,20 @@ export async function syncSpotsFromFloorplan(
 
   const spots = existingSpots ?? []
 
+  if (reservable.length === 0) {
+    // Delete all unreserved spots
+    const unreserved = spots.filter(s => !s.floorplan_object_id)
+    for (const s of unreserved) {
+      await supabase.from('camp_spots' as never).delete().eq('id' as never, s.id)
+    }
+    return { created: 0, updated: 0, deleted: unreserved.length }
+  }
+
+  const reservableIds = new Set(reservable.map(o => o.id))
   const matchedSpotIds = new Set<string>()
   let created = 0
   let updated = 0
+  let deleted = 0
 
   // Sort reservable objects for consistent labeling (top-to-bottom, left-to-right)
   const sorted = [...reservable].sort((a, b) => {
@@ -276,22 +286,16 @@ export async function syncSpotsFromFloorplan(
     }
     spotInRow++
 
-    // Find existing spot: first by object ID, then by position
+    // Find existing spot linked to this object
     const existing = spots.find(
       s => !matchedSpotIds.has(s.id) && s.floorplan_object_id === obj.id
-    ) || spots.find(
-      s => !matchedSpotIds.has(s.id) &&
-        Math.abs(Number(s.x_position) - obj.x) < 5 &&
-        Math.abs(Number(s.y_position) - obj.y) < 5
     )
 
     if (existing) {
       matchedSpotIds.add(existing.id)
-      // Always update to ensure link + position are correct
       await supabase
         .from('camp_spots' as never)
         .update({
-          floorplan_object_id: obj.id,
           x_position: obj.x,
           y_position: obj.y,
           spot_width_ft: obj.width_ft,
@@ -326,7 +330,7 @@ export async function syncSpotsFromFloorplan(
 
       if (error) {
         console.error('Failed to create camp spot:', error)
-        // Duplicate row_label+spot_number — bump spot_number and retry
+        // Duplicate row_label+spot_number — bump and retry
         if (error.code === '23505') {
           spotInRow++
           const { error: retryError } = await supabase
@@ -357,5 +361,22 @@ export async function syncSpotsFromFloorplan(
     }
   }
 
-  return { created, updated }
+  // Delete orphaned spots (not linked to any current reservable object, no reservation)
+  const { data: reservations } = await supabase
+    .from('camp_reservations' as never)
+    .select('spot_id') as unknown as { data: { spot_id: string }[] | null }
+
+  const reservedSpotIds = new Set((reservations ?? []).map(r => r.spot_id))
+
+  for (const spot of spots) {
+    if (matchedSpotIds.has(spot.id)) continue
+    if (reservedSpotIds.has(spot.id)) continue
+    // Spot is unlinked and unreserved — delete it
+    if (!spot.floorplan_object_id || !reservableIds.has(spot.floorplan_object_id)) {
+      await supabase.from('camp_spots' as never).delete().eq('id' as never, spot.id)
+      deleted++
+    }
+  }
+
+  return { created, updated, deleted }
 }

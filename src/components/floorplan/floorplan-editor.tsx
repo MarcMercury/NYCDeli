@@ -131,15 +131,17 @@ export function FloorplanEditor() {
     setError(null)
     try {
       const result = await syncSpotsFromFloorplan(objects)
-      if (result.created === 0 && result.updated === 0) {
+      const parts: string[] = []
+      if (result.created > 0) parts.push(`${result.created} created`)
+      if (result.updated > 0) parts.push(`${result.updated} updated`)
+      if (result.deleted > 0) parts.push(`${result.deleted} orphans removed`)
+      if (parts.length === 0) {
         const reservableCount = objects.filter(o => o.properties?.reservable).length
-        if (reservableCount === 0) {
-          setSyncResult('No reservable objects found — mark tents as reservable first')
-        } else {
-          setSyncResult(`All ${reservableCount} spots already synced`)
-        }
+        setSyncResult(reservableCount === 0
+          ? 'No reservable objects found — mark tents as reservable first'
+          : `All ${reservableCount} spots already synced`)
       } else {
-        setSyncResult(`Synced: ${result.created} created, ${result.updated} updated`)
+        setSyncResult(`Synced: ${parts.join(', ')}`)
       }
     } catch (err) {
       console.error('Sync failed:', err)
