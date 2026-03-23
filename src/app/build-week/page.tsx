@@ -48,6 +48,7 @@ const tabs: Tab[] = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'issues', label: 'Issues' },
+  { id: 'shade', label: 'Shade Guide' },
   { id: 'info', label: 'Info' },
 ]
 
@@ -807,6 +808,339 @@ export default function BuildWeekPage() {
               ))}
             </div>
           )}
+        </TabPanel>
+
+        {/* ═══════════  SHADE GUIDE  ═══════════ */}
+        <TabPanel tabId="shade" activeTab={activeTab}>
+          <div className="space-y-2">
+            {/* Hero / PDF Link */}
+            <div className="border-2 border-black bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⛺</span>
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-wider">Shade Structure Build Guide</h2>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Everything the team needs to know about building shade structures for the playa.
+                    Read the full guide before build week — it covers structure types, materials, anchoring, wind resistance, and more.
+                  </p>
+                  <a
+                    href="https://futureturtles.com/2026/Guide%20to%20Burning%20Man%20Shade%20Structures.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
+                  >
+                    📄 Read Full PDF Guide ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Structure Types */}
+            <RefSection
+              title="Common Shade Structure Types"
+              icon="🏗️"
+              isOpen={!!expandedRef.shadeTypes}
+              onToggle={() => toggleRef('shadeTypes')}
+            >
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-bold">Monkey Hut (Hoop Shade)</p>
+                  <p className="text-xs text-gray-600">
+                    Curved hoops of EMT conduit or PVC covered with shade cloth. Simple, affordable, and proven on the playa.
+                    Great for covering a row of tents or a communal hangout area. Typically 10–20 ft wide.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold">Carport / Costco Canopy</p>
+                  <p className="text-xs text-gray-600">
+                    Pre-fab steel carport frames (10×20, 10×30) with aluminet or shade cloth draped over them.
+                    Fast to assemble. Must be heavily anchored — these act as sails in high wind.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold">Custom EMT Frame</p>
+                  <p className="text-xs text-gray-600">
+                    Custom-built steel or EMT conduit frame structures. More labor-intensive but can be designed
+                    for specific camp layouts. Use swaged fittings or Maker Pipe connectors for joints.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold">Hexayurt</p>
+                  <p className="text-xs text-gray-600">
+                    Rigid panel shelters made from polyiso insulation boards. Excellent for sleeping — keeps heat out
+                    during the day and warmth in at night. Requires tape hinges and careful assembly.
+                  </p>
+                </div>
+              </div>
+            </RefSection>
+
+            {/* Key Design Principles */}
+            <RefSection
+              title="Key Design Principles"
+              icon="📐"
+              isOpen={!!expandedRef.shadeDesign}
+              onToggle={() => toggleRef('shadeDesign')}
+            >
+              <ul className="text-xs text-gray-600 space-y-1.5 list-disc list-inside">
+                <li><strong>Wind is #1 threat.</strong> Structures must survive 75+ mph gusts. Over-anchor everything. If it can catch wind, it will.</li>
+                <li><strong>Orientation matters.</strong> Align long axis with prevailing wind (typically 3 o&apos;clock / 9 o&apos;clock direction). Minimize broad faces perpendicular to wind.</li>
+                <li><strong>Ventilation.</strong> Leave gaps for air to flow through — a fully enclosed shade sail becomes a parachute. Open sides on the leeward end.</li>
+                <li><strong>UV protection.</strong> Aluminet reflects ~70% of radiant heat and lasts years. Standard tarps degrade fast and don&apos;t breathe.</li>
+                <li><strong>Height.</strong> Higher structures catch more wind. Keep shade at the minimum usable height — 7 ft clearance is plenty.</li>
+                <li><strong>Redundancy.</strong> Every connection point should have a backup. Zip ties fail, knots loosen, ratchet straps walk. Use multiple attachment methods.</li>
+                <li><strong>MOOP-proof everything.</strong> Cap open pipe ends. Secure loose fabric edges. Tape over sharp fittings. Nothing should be able to break off and blow away.</li>
+              </ul>
+            </RefSection>
+
+            {/* Anchoring */}
+            <RefSection
+              title="Anchoring & Staking"
+              icon="⚓"
+              isOpen={!!expandedRef.shadeAnchoring}
+              onToggle={() => toggleRef('shadeAnchoring')}
+            >
+              <div className="space-y-2">
+                <p className="text-xs text-gray-600">
+                  The playa surface is hardpan clay, 6–12 inches deep, over softer alkaline silt. Your anchoring must account for both layers.
+                </p>
+                <ul className="text-xs text-gray-600 space-y-1.5 list-disc list-inside">
+                  <li><strong>Rebar stakes (3/8&quot; or 1/2&quot;, 18–24&quot; long)</strong> — The standard. Pound at a 45° angle away from the structure. Minimum 4 per structure leg, more on wind-facing sides.</li>
+                  <li><strong>Lag bolts</strong> — 12&quot;+ lag bolts screwed into playa with an impact driver. Excellent holding power. Use fender washers to create attachment points.</li>
+                  <li><strong>Deadman anchors</strong> — Bury a cross-bar (pipe, wood) 12–18&quot; deep with cable attached. Best for soft playa areas.</li>
+                  <li><strong>Guy wires</strong> — Run from the top of the structure to stakes at a 45° angle. Use turnbuckles or ratchet straps to tension. Essential for tall structures.</li>
+                </ul>
+                <p className="text-xs text-amber-700 bg-amber-50 p-2 mt-2">
+                  ⚠️ Always cap exposed rebar with tennis balls, rebar caps, or pipe caps. Uncapped rebar is the #1 cause of serious injuries at Burning Man.
+                </p>
+              </div>
+            </RefSection>
+
+            {/* Materials Checklist */}
+            <RefSection
+              title="Common Materials"
+              icon="🔩"
+              isOpen={!!expandedRef.shadeMaterials}
+              onToggle={() => toggleRef('shadeMaterials')}
+            >
+              <div className="text-xs text-gray-600">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {[
+                    'EMT conduit (3/4" or 1")',
+                    'Aluminet / shade cloth',
+                    'Ratchet straps (1" and 2")',
+                    'Rebar stakes (18–24")',
+                    'Zip ties (UV-rated)',
+                    'Hose clamps',
+                    'Bungee cords / ball bungees',
+                    'Paracord / guy wire',
+                    'Swaged fittings / Maker Pipe',
+                    'Duct tape (Gorilla brand)',
+                    'Tennis balls / rebar caps',
+                    'Turnbuckles',
+                    'Carabiners',
+                    'Fender washers',
+                    'Lag bolts (12")',
+                    'Wire / safety wire',
+                  ].map(item => (
+                    <span key={item} className="py-0.5">• {item}</span>
+                  ))}
+                </div>
+              </div>
+            </RefSection>
+
+            {/* ━━━ RATCHET STRAPS HOW-TO ━━━ */}
+            <div className="border-2 border-blue-300 bg-blue-50/40">
+              <button
+                onClick={() => toggleRef('ratchetStraps')}
+                className="w-full text-left px-4 py-2.5 flex items-center gap-2 hover:bg-blue-50 transition-colors"
+              >
+                <span>🔧</span>
+                <span className="flex-1 text-sm font-bold">How to Use Ratchet Straps</span>
+                <span className="text-[10px] font-bold text-blue-600 mr-2">MUST-READ</span>
+                <span className="text-gray-300 text-xs">{expandedRef.ratchetStraps ? '▾' : '▸'}</span>
+              </button>
+              {expandedRef.ratchetStraps && (
+                <div className="px-4 pb-4">
+                  <p className="text-xs text-gray-600 mb-3">
+                    Ratchet straps are the backbone of shade structure assembly on the playa. Learn how to use them properly — a loose strap will fail in wind, an over-tightened one will bend your frame.
+                  </p>
+
+                  {/* Parts of a Ratchet Strap */}
+                  <div className="mb-4">
+                    <p className="text-xs font-bold mb-1">Parts of a Ratchet Strap</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <div className="bg-white p-2 border border-gray-200">
+                        <span className="font-bold">Fixed End</span> — Short strap sewn directly to the ratchet axle. This side stays anchored.
+                      </div>
+                      <div className="bg-white p-2 border border-gray-200">
+                        <span className="font-bold">Free End</span> — Long strap that threads through the ratchet. This wraps around the object.
+                      </div>
+                      <div className="bg-white p-2 border border-gray-200">
+                        <span className="font-bold">Ratchet Mechanism</span> — The lever that tensions the strap by winding it around the axle.
+                      </div>
+                      <div className="bg-white p-2 border border-gray-200">
+                        <span className="font-bold">Release Lever</span> — Pull to fully open the ratchet and release all tension.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step by step */}
+                  <div className="mb-4">
+                    <p className="text-xs font-bold mb-2">Step-by-Step: Threading &amp; Tensioning</p>
+                    <ol className="space-y-2">
+                      {[
+                        { step: 'Open the ratchet', detail: 'Pull the release lever to fully open the ratchet mechanism until it\'s flat. The axle slot should be visible and accessible.' },
+                        { step: 'Thread the free end', detail: 'Feed the free (long) end of the strap up through the bottom of the axle slot and pull it through. Make sure the strap sits flat with no twists.' },
+                        { step: 'Position and wrap', detail: 'Route the fixed end around one anchor point and the free end around the other (pole, rebar, frame joint). Remove all slack by pulling the free end tight by hand.' },
+                        { step: 'Ratchet to tension', detail: 'Pump the ratchet handle up and down to take up slack. The strap should be taut but not deforming the frame — you want firm tension, not maximum cranking.' },
+                        { step: 'Lock it closed', detail: 'Once tensioned, close the ratchet handle flat against the body. It locks automatically. Tuck or tie off any excess strap so it doesn\'t flap in the wind.' },
+                        { step: 'To release', detail: 'Pull the release lever fully open (past center), then pull the strap free from the axle. The mechanism fully opens and all tension is released.' },
+                      ].map((s, i) => (
+                        <li key={i} className="flex gap-2 text-xs">
+                          <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+                            {i + 1}
+                          </span>
+                          <div>
+                            <span className="font-bold">{s.step}</span>
+                            <span className="text-gray-600"> — {s.detail}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  {/* Common mistakes */}
+                  <div className="mb-4">
+                    <p className="text-xs font-bold mb-1">Common Mistakes</p>
+                    <ul className="text-xs text-red-700 space-y-1 list-disc list-inside bg-red-50 p-2 border border-red-200">
+                      <li><strong>Twisted straps</strong> — A twist reduces strength by ~50% and causes abrasion wear. Always keep flat.</li>
+                      <li><strong>Over-tensioning</strong> — Cranking too hard bends EMT conduit and can crack fittings. Firm, not maximum.</li>
+                      <li><strong>No tail management</strong> — Loose flapping tails shred in wind and become MOOP. Tie off or roll excess strap.</li>
+                      <li><strong>Wrong size</strong> — Use 1&quot; straps for light duty (shade cloth to frame). Use 2&quot; straps for structural loads (frame to anchors).</li>
+                      <li><strong>Sun degradation</strong> — Polyester straps last longer than nylon in UV. Replace any strap with fraying or fading.</li>
+                    </ul>
+                  </div>
+
+                  {/* Pro tips */}
+                  <div className="mb-4">
+                    <p className="text-xs font-bold mb-1">Pro Tips for the Playa</p>
+                    <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                      <li>Bring 2× as many ratchet straps as you think you need. They break, get lost, and you always find new uses.</li>
+                      <li>Color-code straps by size/purpose with tape so anyone can grab the right one.</li>
+                      <li>Check strap tension daily — temperature swings cause thermal expansion and loosening.</li>
+                      <li>Spray ratchet mechanisms with silicone lube before the burn — playa dust jams them.</li>
+                      <li>Practice threading ratchet straps at home. On the playa in 100°F heat is not the time to learn.</li>
+                    </ul>
+                  </div>
+
+                  {/* Videos */}
+                  <div>
+                    <p className="text-xs font-bold mb-2">📹 Video Resources</p>
+                    <div className="space-y-1.5">
+                      <a
+                        href="https://www.youtube.com/watch?v=UVY8cGt-mM0"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline block"
+                      >
+                        How to Use a Ratchet Strap (Basic tutorial) ↗
+                      </a>
+                      <a
+                        href="https://www.youtube.com/watch?v=H5YjJMFjP0M"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline block"
+                      >
+                        How to Thread &amp; Release a Ratchet Strap ↗
+                      </a>
+                      <a
+                        href="https://www.youtube.com/results?search_query=burning+man+shade+structure+build"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline block"
+                      >
+                        🔍 Search: Burning Man Shade Structure Builds (YouTube) ↗
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Assembly Overview */}
+            <RefSection
+              title="General Assembly Steps"
+              icon="🔨"
+              isOpen={!!expandedRef.shadeAssembly}
+              onToggle={() => toggleRef('shadeAssembly')}
+            >
+              <ol className="space-y-2">
+                {[
+                  { step: 'Lay out your footprint', detail: 'Mark corners with rebar. Verify dimensions against your camp layout before cutting or assembling anything.' },
+                  { step: 'Assemble frame on the ground', detail: 'Connect all frame joints, fittings, and cross-braces while the structure is flat. Much easier than working overhead.' },
+                  { step: 'Attach shade cloth to frame', detail: 'Drape aluminet or shade cloth and secure with ball bungees, zip ties, or hose clamps while it\'s still on the ground.' },
+                  { step: 'Raise the structure', detail: 'Lift with enough people (minimum 4 for a carport). Have someone ready at each leg to drop it onto rebar stakes.' },
+                  { step: 'Stake and anchor legs', detail: 'Pound rebar at 45° angles. Use ratchet straps to secure legs to rebar. Minimum 2 stakes per leg, 4 on wind-facing sides.' },
+                  { step: 'Run guy wires / straps', detail: 'Attach guy lines from the top of the frame to buried stakes at 45° angle out from the base. Tension with turnbuckles or ratchet straps.' },
+                  { step: 'Tension the shade cloth', detail: 'Pull aluminet taut and secure all edges. Loose fabric flaps in wind, causes noise, and will eventually tear free.' },
+                  { step: 'MOOP check', detail: 'Walk the entire structure. Cap all rebar, secure all loose ends, tape sharp edges, tie off strap tails.' },
+                ].map((s, i) => (
+                  <li key={i} className="flex gap-2 text-xs">
+                    <span className="flex-shrink-0 w-5 h-5 bg-black text-white flex items-center justify-center text-[10px] font-bold">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <span className="font-bold">{s.step}</span>
+                      <span className="text-gray-600"> — {s.detail}</span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </RefSection>
+
+            {/* External Resources */}
+            <RefSection
+              title="Additional Resources"
+              icon="🔗"
+              isOpen={!!expandedRef.shadeLinks}
+              onToggle={() => toggleRef('shadeLinks')}
+            >
+              <div className="space-y-1.5">
+                <a
+                  href="https://futureturtles.com/2026/Guide%20to%20Burning%20Man%20Shade%20Structures.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline block"
+                >
+                  📄 Future Turtles — Complete Shade Structure Guide (PDF) ↗
+                </a>
+                <a
+                  href="https://burningman.org/event/preparation/playa-living/shade/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline block"
+                >
+                  🏜️ Burning Man Official — Shade on the Playa ↗
+                </a>
+                <a
+                  href="https://www.youtube.com/results?search_query=monkey+hut+burning+man+build"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline block"
+                >
+                  🔍 Search: Monkey Hut Build Videos (YouTube) ↗
+                </a>
+                <a
+                  href="https://www.youtube.com/results?search_query=carport+shade+structure+burning+man"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline block"
+                >
+                  🔍 Search: Carport Shade Structure Videos (YouTube) ↗
+                </a>
+              </div>
+            </RefSection>
+          </div>
         </TabPanel>
 
         {/* ═══════════  INFO (read-only)  ═══════════ */}
