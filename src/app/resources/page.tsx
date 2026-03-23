@@ -836,6 +836,194 @@ Designated areas for bike storage:
     link: 'https://playaevents.burningman.org/',
   },
 
+  /* ---- Aggregated Packing Resources (from past camp planning docs) ---- */
+  {
+    title: 'Comprehensive Personal Packing Checklist',
+    category: 'packing',
+    tags: ['packing list', 'checklist', 'detailed', 'tent', 'bedding', 'clothing', 'bikes', 'food', 'gear'],
+    content: `A detailed, categorized packing checklist compiled from experienced campers. Use this alongside the Absolute Essentials list.
+
+**Tent Setup**
+• Tent (measure footprint before arrival)
+• Carpet or rug for tent floor
+• Bed sheet (to cover bed during the day — keeps dust off)
+• Hanging clip lights or LED string lights
+• 25-foot (min) outdoor extension cord
+• Clothing rack
+• Hangers
+• Portable evaporative cooler (optional but amazing)
+• Painter shoe covers (for running into the tent with shoes on)
+
+**Bedding & Sleep**
+• Sleeping bag rated to 30°F
+• Air mattress or sleeping pad
+• Pillows
+• Sleep mask & earplugs
+• Noise-cancelling earbuds (optional)
+• Rechargeable battery-operated fan
+• Warm sleepwear
+
+**Costumes & Clothing**
+• Goggles (ski or swim style)
+• Dust masks / N95 respirators
+• Boots/shoes (plus a backup pair)
+• Camp sandals / shower sandals
+• Hats & scarves (for warmth and sun)
+• Boonie hat or wide-brim hat
+• Utility belt / fanny pack
+• Backpack or hydration pack
+• Glow items / LED accessories for nighttime
+• Thermal top and bottoms (nights get cold!)
+• Lots of socks
+• Safety pins
+• Hanging organizer for accessories
+• Warm jacket or faux fur coat for night
+• Fun outfits and costumes — go wild
+
+**Bikes & Mobility**
+• Bike lock (digit lock recommended — no key to lose)
+• Bike lights (front headlight + rear)
+• Bike decorations (helps you find yours in a sea of bikes)
+• Bike basket (insulated is a bonus)
+• Bike totem or flag (helps locate your bike at large events)
+
+**Food & Cooking**
+• Reusable utensils (fork, knife, spoon)
+• Reusable plate, cup, and bowl
+• Non-perishable snacks: dried mango, nuts, protein bars (ones that won't melt)
+• Trash bags + ziploc bags
+• Coffee (camp has coffeemakers)
+
+**Water & Hydration**
+• Refillable water bottles / CamelBak
+• Electrolyte tablets or mixes (LMNT, Nuun, etc.)
+
+**Documents & Essentials**
+• Burning Man ticket + vehicle/bus pass
+• ID / license & health insurance card
+• Laminated copy of ID (attach to your cup)
+• Credit card / cash (you shouldn't need money on playa, but just in case)
+• Phone + portable charger + waterproof case
+• Event map/guide
+
+**Playa Gear & Fun**
+• Journal / burn journal
+• Drinks tumbler with lid (pro tip: tape a copy of your ID to it)
+• Dust/waterproof phone case
+• Camera (disposable or polaroid — great for gifting photos)
+• Parasol umbrellas (extras make great playa gifts)
+• Portable speaker
+• Batteries — AA and AAA
+• Large mirror (to share with tentmates)
+• Name / contact info tags (laminated)
+• Face gems, body glitter (non-MOOP types only!)
+
+**MOOP & Leave No Trace**
+• MOOP bags (carry one at all times)
+• Vinegar spray (for cleaning)`,
+  },
+  {
+    title: 'Always Carry on Playa',
+    category: 'packing',
+    tags: ['carry', 'essentials', 'on-body', 'must have', 'daily carry', 'safety'],
+    content: `These items should be on you (or in your pack) at **all times** when out on playa:
+
+• **Goggles** — dust storms hit without warning
+• **Dust mask** — protect your lungs
+• **Water** — at least one full bottle, always
+• **Snacks** — you burn more calories than you think
+• **Flashlight or headlamp** — playa is pitch black at night
+• **Toilet paper / tissues** — portos run out
+• **Cup with ID** — your ticket to drinks everywhere (copy of ID taped on)
+• **Sunscreen** — reapply every 2 hours
+• **Lip balm** with SPF — your lips will crack without it
+• **Basic first aid** — a couple bandaids, some ibuprofen
+• **Thermal top** — for when temperature drops at night
+• **Contacts / glasses** — if you need them
+• **Hand sanitizer** — portos don't have sinks
+
+**Pro tip:** A fanny pack or utility belt keeps all of this accessible without a bulky backpack.`,
+  },
+  {
+    title: 'First Aid & Playa Health Guide',
+    category: 'packing',
+    tags: ['first aid', 'medicine', 'health', 'playa foot', 'hygiene', 'otc', 'vitamins', 'womens health'],
+    content: `**Over-the-Counter Meds to Pack**
+Build a shared first aid stash or bring your own supply:
+• Emergency-C or Emergen-C packets
+• Ibuprofen (Advil) — for headaches, inflammation, general pain
+• Acetaminophen (Tylenol) — alternate with ibuprofen
+• Excedrin — for stronger headaches
+• Benadryl — for allergic reactions, also helps with sleep
+• Zyrtec or similar daily antihistamine — dust is relentless
+• Allergy eye drops
+• Saline nasal spray — keeps nasal passages from drying and cracking
+
+**First Aid Supplies**
+• Bandaids (assorted sizes)
+• Neosporin / antibiotic ointment
+• Alcohol wipes
+• Lens wipes (for goggles and glasses)
+• Aloe vera / burn cream
+• Sunscreen SPF 50+
+
+**Playa Foot Prevention & Treatment**
+The alkaline playa dust causes chemical burns on your feet (and hands):
+• Vinegar or witch hazel + a container your feet and hands fit into — soak daily
+• Add a little vinegar to your baby wipes and spray bottle
+• Moisturizer after soaking
+• Antibiotic ointment for any cracks
+
+**Recovery & Vitamins**
+• Daily multivitamins
+• Recovery vitamin packs
+• Emergen-C or similar immune support
+• Pill container — consolidate all meds into one organizer
+
+**Women's Health on the Playa**
+The dust and dehydration can wreak havoc — come prepared:
+• Female urination device (pee standing up — game changer for portos)
+• Vaginal wipes for dust cleanup (pH-balanced)
+• Boric acid suppositories (for pH balance)
+• Monistat cream (the dust changes everything)
+• Diaper cream for skin irritation or rash
+• Condoms / personal items
+
+**General Hygiene**
+• Body wipes / shower wipes (for days between showers)
+• Face/makeup wipes
+• Witch hazel body wipes
+• Biodegradable soap
+• Lotion — lots of it (travel-size packs are great)
+• Quick-dry towels
+• Portable mirror
+• Hand sanitizer (travel size, multiple)
+• Wet wipes (make sure they're biodegradable)
+• Spray bottle for misting yourself and others (great playa gift)`,
+  },
+  {
+    title: 'Recommended Playa Gear — Shopping Links',
+    category: 'external-links',
+    tags: ['shopping', 'amazon', 'gear', 'products', 'cooler', 'health', 'buy'],
+    content: `Helpful product links sourced from past camper shopping lists. These are not endorsements — just things that worked well on playa.
+
+**Tent Comfort**
+• Portable Evaporative Cooler (Hessaire MC12V) — keeps your tent liveable during the day
+
+**Women's Health & Hygiene**
+• Female Urination Device — essential for porto comfort
+• AZO Boric Acid Suppositories — vaginal pH support
+• Good Clean Love Moisturizing Wipes — pH-balanced wipes for dust cleanup
+• Diaper Cream (hypoallergenic, phthalate/paraben-free) — for skin irritation and rash
+
+**General Tips for Shopping:**
+• Buy in bulk and split with campmates — saves money and weight
+• Travel-size packs of wipes, sanitizer, and lotion are easier to carry on playa
+• Check Amazon wishlists from experienced burners for more ideas
+• Sign up for the camp's container shipping to avoid checking oversized luggage`,
+    link: 'https://www.homedepot.com/p/Hessaire-900-CFM-2-Speed-Portable-Evaporative-Cooler-for-350-sq-ft-in-Gray-MC12V/327848113',
+  },
+
   /* ---- External Links ---- */
   {
     title: 'Burning Man Official Website',
