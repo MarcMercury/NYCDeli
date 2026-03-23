@@ -5,16 +5,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badg
 import { cn } from '@/lib/utils'
 import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow } from '@/types/database'
 import { fetchActiveFloorplan, fetchFloorplanObjects } from '@/lib/floorplan'
-import { fetchSpotsWithReservations, reserveSpot, releaseReservation, isCampSelectionEnabled, doesTentFitSpot } from '@/lib/camp-spots'
+import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFitSpot } from '@/lib/camp-spots'
 import { createClient } from '@/lib/supabase/client'
 import { getTemplateForType } from '@/components/floorplan/object-templates'
 
-type MapMode = 'explore' | 'reserve'
+type WizardStep = 'identify' | 'verify-dimensions' | 'confirm'
 
-interface InfoPanelData {
-  type: 'object' | 'spot'
-  object?: FloorplanObjectRow
-  spot?: CampSpotWithReservation
+interface SelectedObject {
+  object: FloorplanObjectRow
+  spot: CampSpotWithReservation | null
 }
 
 export function CampMap() {
@@ -29,31 +28,24 @@ export function CampMap() {
   // User/camper identity
   const [camper, setCamper] = useState<CamperRow | null>(null)
   const [email, setEmail] = useState('')
-  const [isIdentified, setIsIdentified] = useState(false)
   const [identifyLoading, setIdentifyLoading] = useState(false)
-  const [selectionEnabled, setSelectionEnabled] = useState(false)
 
   // Map interaction
-  const [mode, setMode] = useState<MapMode>('explore')
   const [scale, setScale] = useState(2.5)
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
-  const [infoPanelData, setInfoPanelData] = useState<InfoPanelData | null>(null)
+  const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(null)
   const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null)
   const [showGrid, setShowGrid] = useState(false)
   const [showLabels, setShowLabels] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Layers
-  const [layers, setLayers] = useState({
-    structures: true,
-    kitchen: true,
-    utilities: true,
-    boundaries: true,
-    tents: true,
-  })
+  // Reserve Wizard
+  const [wizardStep, setWizardStep] = useState<WizardStep | null>(null)
+  const [wizardTentWidth, setWizardTentWidth] = useState('')
+  const [wizardTentLength, setWizardTentLength] = useState('')
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -63,12 +55,7 @@ export function CampMap() {
     setError(null)
 
     try {
-      const [floorplan, selEnabled] = await Promise.all([
-        fetchActiveFloorplan(),
-        isCampSelectionEnabled(),
-      ])
-
-      setSelectionEnabled(selEnabled)
+      const floorplan = await fetchActiveFloorplan()
 
       if (!floorplan) {
         setError('No camp layout has been created yet. Check back later!')
@@ -96,7 +83,7 @@ export function CampMap() {
     loadData()
   }, [loadData])
 
-  // Identify camper
+  // Identify camper (wizard step 1)
   async function handleIdentify(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -115,9 +102,13 @@ export function CampMap() {
         return
       }
 
-      setCamper(data as CamperRow)
-      setIsIdentified(true)
-      setMode('reserve')
+      const camperData = data as CamperRow
+      setCamper(camperData)
+      // Pre-fill tent dimensions from registration
+      setWizardTentWidth(String(camperData.shelter_width_ft))
+      setWizardTentLength(String(camperData.shelter_length_ft))
+      // Move to dimension verification step
+      setWizardStep('verify-dimensions')
     } catch {
       setError('Something went wrong looking you up.')
     } finally {
@@ -127,7 +118,6 @@ export function CampMap() {
 
   // Pan handlers
   function handlePointerDown(e: React.PointerEvent) {
-    // Only pan on middle mouse button or if clicking empty canvas space
     if (e.button === 1 || (e.button === 0 && (e.target as HTMLElement).dataset.canvas === 'true')) {
       setIsPanning(true)
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y })
@@ -148,31 +138,24 @@ export function CampMap() {
     setIsPanning(false)
   }
 
-  // Zoom with mouse wheel
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault()
     const delta = e.deltaY > 0 ? -0.25 : 0.25
     setScale(prev => Math.max(0.5, Math.min(6, prev + delta)))
   }
 
-  // Click on an object
+  // Click on an object — always show info, attach matching spot if reservable
   function handleObjectClick(obj: FloorplanObjectRow) {
     setSidebarOpen(true)
-    // Check if it's a reservable tent
-    if (obj.properties?.reservable && mode === 'reserve') {
-      // Try to find a matching camp spot for this tent
-      const matchingSpot = findSpotForObject(obj)
-      if (matchingSpot) {
-        setInfoPanelData({ type: 'spot', spot: matchingSpot, object: obj })
-        return
-      }
-    }
-    setInfoPanelData({ type: 'object', object: obj })
+    setWizardStep(null)
+    setError(null)
+    setSuccess(null)
+    const spot = obj.properties?.reservable ? findSpotForObject(obj) : null
+    setSelectedObject({ object: obj, spot })
   }
 
   // Find a camp spot that matches a floorplan tent object's position
   function findSpotForObject(obj: FloorplanObjectRow): CampSpotWithReservation | null {
-    // Match by proximity — spots have x_position/y_position, objects have x/y
     return spots.find(s => {
       const dx = Math.abs(s.x_position - obj.x)
       const dy = Math.abs(s.y_position - obj.y)
@@ -180,23 +163,54 @@ export function CampMap() {
     }) || null
   }
 
-  // Reserve a spot from the map
-  async function handleReserveSpot(spot: CampSpotWithReservation) {
-    if (!camper) return
+  // Start the reserve wizard
+  function handleStartReserve() {
+    setError(null)
+    if (camper) {
+      // Already identified — pre-fill and go to dimension verification
+      setWizardTentWidth(String(camper.shelter_width_ft))
+      setWizardTentLength(String(camper.shelter_length_ft))
+      setWizardStep('verify-dimensions')
+    } else {
+      setWizardStep('identify')
+    }
+  }
+
+  // Verify dimensions and move to confirm step
+  function handleVerifyDimensions(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const spot = selectedObject?.spot
+    if (!spot) return
+
+    const width = parseFloat(wizardTentWidth)
+    const length = parseFloat(wizardTentLength)
+
+    if (!width || !length || width <= 0 || length <= 0) {
+      setError('Please enter valid tent dimensions.')
+      return
+    }
+
+    const fitCheck = doesTentFitSpot(width, length, spot)
+    if (!fitCheck.fits) {
+      setError(fitCheck.reason ?? "Your tent doesn't fit this spot.")
+      return
+    }
+
+    setWizardStep('confirm')
+  }
+
+  // Final reservation
+  async function handleConfirmReserve() {
+    if (!camper || !selectedObject?.spot) return
     setActionLoading(true)
     setError(null)
     setSuccess(null)
 
     try {
-      // Check tent fit
-      const fitCheck = doesTentFitSpot(camper.shelter_width_ft, camper.shelter_length_ft, spot)
-      if (!fitCheck.fits) {
-        setError(fitCheck.reason ?? "Your tent doesn't fit this spot.")
-        setActionLoading(false)
-        return
-      }
+      const spot = selectedObject.spot
 
-      // Release existing reservation if any
+      // Release existing reservation if camper already has one
       const existingReservation = spots.find(s => s.reservation?.camper_id === camper.id)
       if (existingReservation?.reservation) {
         await releaseReservation(existingReservation.reservation.id)
@@ -204,7 +218,8 @@ export function CampMap() {
 
       await reserveSpot(spot.id, camper.id)
       setSuccess(`Spot ${spot.label} is yours! 🏕️`)
-      setInfoPanelData(null)
+      setWizardStep(null)
+      setSelectedObject(null)
       await loadData()
     } catch {
       setError('Failed to reserve spot. It may have just been taken.')
@@ -224,7 +239,8 @@ export function CampMap() {
     try {
       await releaseReservation(spot.reservation.id)
       setSuccess(`Spot ${spot.label} released.`)
-      setInfoPanelData(null)
+      setSelectedObject(null)
+      setWizardStep(null)
       await loadData()
     } catch {
       setError('Failed to release spot.')
@@ -233,36 +249,23 @@ export function CampMap() {
     }
   }
 
-  // Reset view
   function handleResetView() {
     setPanOffset({ x: 0, y: 0 })
     setScale(2.5)
   }
 
-  // Get spot status color for tent overlay
+  // Spot overlay ring colors on the map
   function getSpotOverlayClass(obj: FloorplanObjectRow): string {
     if (!obj.properties?.reservable) return ''
     const spot = findSpotForObject(obj)
     if (!spot) return ''
     if (spot.reservation?.camper_id === camper?.id) return 'ring-4 ring-yellow-400'
     if (spot.reservation) return 'ring-4 ring-red-400'
-    if (camper) {
-      const fitCheck = doesTentFitSpot(camper.shelter_width_ft, camper.shelter_length_ft, spot)
-      if (!fitCheck.fits) return 'ring-4 ring-orange-400 opacity-60'
-    }
     return 'ring-4 ring-emerald-400'
   }
 
-  // Sorted objects by z-index
-  const sortedObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
-
-  // Filter by layer visibility
-  const visibleObjects = sortedObjects.filter(obj => {
-    const template = getTemplateForType(obj.object_type)
-    if (!template) return layers.structures
-    if (obj.object_type === 'tent') return layers.tents
-    return layers[template.category as keyof typeof layers] ?? true
-  })
+  // Sorted objects by z-index — all always visible
+  const visibleObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
 
   // My reservation
   const myReservation = spots.find(s => s.reservation?.camper_id === camper?.id)
@@ -303,45 +306,12 @@ export function CampMap() {
           <h1 className="text-lg font-black uppercase tracking-wider text-yellow-400">
             🏕️ Camp Map
           </h1>
-          <Badge variant={mode === 'explore' ? 'default' : 'success'}>
-            {mode === 'explore' ? '👁️ Explore' : '🏕️ Reserve'}
-          </Badge>
           {myReservation && (
             <Badge variant="warning">Your Spot: {myReservation.label}</Badge>
           )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Mode Toggle */}
-          {selectionEnabled && (
-            <div className="flex border border-gray-600 rounded-sm overflow-hidden">
-              <button
-                onClick={() => setMode('explore')}
-                className={cn(
-                  'px-3 py-1 text-xs font-bold uppercase transition-colors',
-                  mode === 'explore' ? 'bg-yellow-400 text-black' : 'hover:bg-gray-800'
-                )}
-              >
-                👁️ Explore
-              </button>
-              <button
-                onClick={() => {
-                  if (!isIdentified) {
-                    setInfoPanelData(null)
-                    // Will show identify form in sidebar
-                  }
-                  setMode('reserve')
-                }}
-                className={cn(
-                  'px-3 py-1 text-xs font-bold uppercase transition-colors',
-                  mode === 'reserve' ? 'bg-emerald-400 text-black' : 'hover:bg-gray-800'
-                )}
-              >
-                🏕️ Reserve
-              </button>
-            </div>
-          )}
-
           {/* Zoom controls */}
           <div className="flex items-center gap-1">
             <button
@@ -451,19 +421,18 @@ export function CampMap() {
               {visibleObjects.map(obj => {
                 const template = getTemplateForType(obj.object_type)
                 const isHovered = hoveredObjectId === obj.id
-                const isSelected = infoPanelData?.object?.id === obj.id
-                const spotOverlay = mode === 'reserve' ? getSpotOverlayClass(obj) : ''
+                const isSelected = selectedObject?.object?.id === obj.id
+                const spotOverlay = getSpotOverlayClass(obj)
                 const isReservable = obj.properties?.reservable
 
                 return (
                   <div
                     key={obj.id}
                     className={cn(
-                      'absolute border-2 transition-all duration-150 select-none',
+                      'absolute border-2 transition-all duration-150 select-none cursor-pointer',
                       isHovered && 'shadow-[4px_4px_0px_0px_rgba(0,0,0,0.6)] z-30',
                       isSelected && 'ring-2 ring-blue-400 ring-offset-2 z-40 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
-                      isReservable && mode === 'reserve' && 'cursor-pointer hover:scale-[1.02]',
-                      !isReservable && 'cursor-pointer',
+                      isReservable && 'hover:scale-[1.02]',
                       spotOverlay
                     )}
                     style={{
@@ -491,7 +460,7 @@ export function CampMap() {
                           {obj.label || template?.label || obj.object_type}
                         </span>
                         {/* Reservation status indicators for tents */}
-                        {isReservable && mode === 'reserve' && (() => {
+                        {isReservable && (() => {
                           const spot = findSpotForObject(obj)
                           if (!spot) return null
                           if (spot.reservation?.camper_id === camper?.id) {
@@ -501,12 +470,6 @@ export function CampMap() {
                             return <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">{spot.camper?.playa_name || 'Taken'}</span>
                           }
                           return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
-                        })()}
-                        {/* In explore mode, show who's there */}
-                        {isReservable && mode === 'explore' && (() => {
-                          const spot = findSpotForObject(obj)
-                          if (!spot?.reservation) return null
-                          return <span className="text-[7px] bg-black/70 text-white px-1 rounded-sm mt-0.5">{spot.camper?.playa_name || spot.camper?.full_name || 'Reserved'}</span>
                         })()}
                       </div>
                     )}
@@ -518,7 +481,7 @@ export function CampMap() {
               <div
                 data-canvas="true"
                 className="absolute inset-0 -z-10"
-                onClick={() => setInfoPanelData(null)}
+                onClick={() => { setSelectedObject(null); setWizardStep(null) }}
               />
             </div>
           </div>
@@ -541,12 +504,125 @@ export function CampMap() {
           )}
         >
           <div className="min-w-[340px] p-4 space-y-4">
-          {/* Identify / Reserve Mode */}
-          {mode === 'reserve' && !isIdentified && (
+
+          {/* Object Info Panel — always shown when an object is selected */}
+          {selectedObject && (
+            <Card className="border-blue-500 border-2">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <span>{getTemplateForType(selectedObject.object.object_type)?.icon || '📦'}</span>
+                  {selectedObject.object.label}
+                </CardTitle>
+                <CardDescription>
+                  {getTemplateForType(selectedObject.object.object_type)?.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Type</span>
+                  <Badge>{selectedObject.object.object_type.replace(/_/g, ' ')}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Size</span>
+                  <span className="font-bold">{selectedObject.object.width_ft}×{selectedObject.object.height_ft}ft</span>
+                </div>
+                {selectedObject.object.properties?.capacity && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Capacity</span>
+                    <span className="font-bold">{selectedObject.object.properties.capacity} people</span>
+                  </div>
+                )}
+                {selectedObject.object.properties?.description && (
+                  <p className="text-gray-600 text-xs mt-2 p-2 bg-gray-50 border">{selectedObject.object.properties.description}</p>
+                )}
+                {selectedObject.object.properties?.responsibilities && (
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-500 mb-1">Includes</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(selectedObject.object.properties.responsibilities as string[]).map((r, i) => (
+                        <Badge key={i}>{r}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Spot details if this is a reservable tent */}
+                {selectedObject.spot && (
+                  <div className="mt-3 pt-3 border-t space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Spot</span>
+                      <span className="font-black text-lg">{selectedObject.spot.label}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Space</span>
+                      <span className="font-bold">{selectedObject.spot.spot_width_ft}×{selectedObject.spot.spot_length_ft}ft</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Fits tent</span>
+                      <span className="font-bold text-xs">
+                        {selectedObject.spot.min_tent_width_ft}–{selectedObject.spot.max_tent_width_ft}ft × {selectedObject.spot.min_tent_length_ft}–{selectedObject.spot.max_tent_length_ft}ft
+                      </span>
+                    </div>
+                    <div className="flex gap-2 text-xs mt-1">
+                      {selectedObject.spot.has_power && <span className="px-2 py-0.5 bg-yellow-100 border border-yellow-500">⚡ Power</span>}
+                      {selectedObject.spot.has_shade && <span className="px-2 py-0.5 bg-blue-100 border border-blue-500">⛱️ Shade</span>}
+                      {selectedObject.spot.is_accessible && <span className="px-2 py-0.5 bg-purple-100 border border-purple-500">♿ Accessible</span>}
+                    </div>
+
+                    {/* Reservation status */}
+                    {selectedObject.spot.reservation && selectedObject.spot.reservation.camper_id !== camper?.id && (
+                      <div className="p-2 bg-red-50 border border-red-300 text-xs text-center">
+                        <p className="font-bold text-red-700">🔒 Reserved by {selectedObject.spot.camper?.playa_name || selectedObject.spot.camper?.full_name || 'a camper'}</p>
+                      </div>
+                    )}
+
+                    {/* Your spot — release option */}
+                    {selectedObject.spot.reservation?.camper_id === camper?.id && (
+                      <div className="space-y-2">
+                        <div className="p-2 bg-yellow-50 border-2 border-yellow-400 text-center">
+                          <p className="font-black">🏕️ This is YOUR spot!</p>
+                        </div>
+                        <Button
+                          variant="danger"
+                          onClick={() => handleReleaseSpot(selectedObject.spot!)}
+                          loading={actionLoading}
+                          className="w-full"
+                        >
+                          🔓 Release This Spot
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* RESERVE button — only if spot is available and not already yours */}
+                    {!selectedObject.spot.reservation && !wizardStep && (
+                      <Button
+                        onClick={handleStartReserve}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider text-base py-3"
+                      >
+                        🏕️ Reserve This Spot
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => { setSelectedObject(null); setWizardStep(null) }}
+                  className="text-xs text-gray-500 underline mt-2"
+                >
+                  Close
+                </button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ===== RESERVE WIZARD ===== */}
+
+          {/* Step 1: Identify — enter email */}
+          {wizardStep === 'identify' && (
             <Card className="border-emerald-500 border-2">
               <CardHeader>
-                <CardTitle className="text-sm">🏕️ Reserve a Spot</CardTitle>
-                <CardDescription>Enter your email to claim a tent site</CardDescription>
+                <CardTitle className="text-sm">Step 1 of 3 — Identify Yourself</CardTitle>
+                <CardDescription>Enter the email you registered with</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleIdentify} className="space-y-3">
@@ -561,165 +637,142 @@ export function CampMap() {
                   <Button type="submit" loading={identifyLoading} className="w-full">
                     Find My Registration
                   </Button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(null)}
+                    className="text-xs text-gray-500 underline w-full text-center"
+                  >
+                    Cancel
+                  </button>
                 </form>
               </CardContent>
             </Card>
           )}
 
-          {/* Camper Info */}
-          {camper && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">🧑 Your Info</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Name</span>
-                  <span className="font-bold">{camper.playa_name || camper.full_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Shelter</span>
-                  <span className="font-bold capitalize">{camper.shelter_type}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Tent Size</span>
-                  <span className="font-bold">{camper.shelter_width_ft}×{camper.shelter_length_ft}ft</span>
-                </div>
-                {camper.power_required && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Power</span>
-                    <span className="font-bold">⚡ {camper.power_type}</span>
-                  </div>
-                )}
-                {myReservation && (
-                  <div className="mt-2 p-2 bg-yellow-50 border-2 border-yellow-400 text-center">
-                    <p className="font-black text-lg">{myReservation.label}</p>
-                    <p className="text-xs text-gray-500">Your current spot</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Info Panel — Object details */}
-          {infoPanelData?.type === 'object' && infoPanelData.object && (
-            <Card className="border-blue-500 border-2">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <span>{getTemplateForType(infoPanelData.object.object_type)?.icon || '📦'}</span>
-                  {infoPanelData.object.label}
-                </CardTitle>
-                <CardDescription>
-                  {getTemplateForType(infoPanelData.object.object_type)?.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Type</span>
-                  <Badge>{infoPanelData.object.object_type.replace(/_/g, ' ')}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Size</span>
-                  <span className="font-bold">{infoPanelData.object.width_ft}×{infoPanelData.object.height_ft}ft</span>
-                </div>
-                {infoPanelData.object.properties?.capacity && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Capacity</span>
-                    <span className="font-bold">{infoPanelData.object.properties.capacity} people</span>
-                  </div>
-                )}
-                {infoPanelData.object.properties?.description && (
-                  <p className="text-gray-600 text-xs mt-2 p-2 bg-gray-50 border">{infoPanelData.object.properties.description}</p>
-                )}
-                {infoPanelData.object.properties?.responsibilities && (
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-500 mb-1">Includes</p>
-                    <div className="flex flex-wrap gap-1">
-                      {(infoPanelData.object.properties.responsibilities as string[]).map((r, i) => (
-                        <Badge key={i}>{r}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <button
-                  onClick={() => setInfoPanelData(null)}
-                  className="text-xs text-gray-500 underline mt-2"
-                >
-                  Close
-                </button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Info Panel — Spot reservation details */}
-          {infoPanelData?.type === 'spot' && infoPanelData.spot && (
+          {/* Step 2: Verify Tent Dimensions */}
+          {wizardStep === 'verify-dimensions' && camper && selectedObject?.spot && (
             <Card className="border-emerald-500 border-2">
               <CardHeader>
-                <CardTitle className="text-sm">
-                  {infoPanelData.spot.reservation?.camper_id === camper?.id
-                    ? '⚠️ Your Spot'
-                    : infoPanelData.spot.reservation
-                    ? '🔒 Reserved Spot'
-                    : '✅ Available Spot'}
-                </CardTitle>
+                <CardTitle className="text-sm">Step 2 of 3 — Verify Your Tent Size</CardTitle>
+                <CardDescription>
+                  Confirm your tent dimensions fit this spot. Measurements from your registration are pre-filled — update them if they&apos;ve changed.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm space-y-3">
+                  {/* Camper info summary */}
+                  <div className="p-2 bg-gray-50 border text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Camper</span>
+                      <span className="font-bold">{camper.playa_name || camper.full_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Shelter Type</span>
+                      <span className="font-bold capitalize">{camper.shelter_type}</span>
+                    </div>
+                  </div>
+
+                  {/* Spot constraints */}
+                  <div className="p-2 bg-blue-50 border border-blue-200 text-xs">
+                    <p className="font-bold text-blue-800 mb-1">📐 This spot accepts tents:</p>
+                    <p>Width: <strong>{selectedObject.spot.min_tent_width_ft}–{selectedObject.spot.max_tent_width_ft} ft</strong></p>
+                    <p>Length: <strong>{selectedObject.spot.min_tent_length_ft}–{selectedObject.spot.max_tent_length_ft} ft</strong></p>
+                  </div>
+
+                  {/* Editable dimensions */}
+                  <form onSubmit={handleVerifyDimensions} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Tent Width (ft)"
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={wizardTentWidth}
+                        onChange={e => setWizardTentWidth(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Tent Length (ft)"
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={wizardTentLength}
+                        onChange={e => setWizardTentLength(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full">
+                      ✅ Verify &amp; Continue
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(null)}
+                      className="text-xs text-gray-500 underline w-full text-center"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Confirm Reservation */}
+          {wizardStep === 'confirm' && camper && selectedObject?.spot && (
+            <Card className="border-emerald-500 border-2">
+              <CardHeader>
+                <CardTitle className="text-sm">Step 3 of 3 — Confirm Reservation</CardTitle>
+                <CardDescription>
+                  Your tent fits! Review the details and confirm.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="text-3xl font-black text-center">{infoPanelData.spot.label}</div>
+                <div className="text-center p-3 bg-emerald-50 border-2 border-emerald-400">
+                  <p className="text-3xl font-black">{selectedObject.spot.label}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedObject.spot.spot_width_ft}×{selectedObject.spot.spot_length_ft}ft spot
+                  </p>
+                </div>
                 <div className="text-sm space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Space</span>
-                    <span className="font-bold">{infoPanelData.spot.spot_width_ft}×{infoPanelData.spot.spot_length_ft}ft</span>
+                    <span className="text-gray-500">Camper</span>
+                    <span className="font-bold">{camper.playa_name || camper.full_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Size</span>
-                    <Badge>{infoPanelData.spot.size_category.toUpperCase()}</Badge>
+                    <span className="text-gray-500">Your Tent</span>
+                    <span className="font-bold">{wizardTentWidth}×{wizardTentLength}ft</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Fits tent</span>
-                    <span className="font-bold text-xs">
-                      {infoPanelData.spot.min_tent_width_ft}-{infoPanelData.spot.max_tent_width_ft}ft × {infoPanelData.spot.min_tent_length_ft}-{infoPanelData.spot.max_tent_length_ft}ft
-                    </span>
-                  </div>
-                  <div className="flex gap-2 text-xs mt-1">
-                    {infoPanelData.spot.has_power && <span className="px-2 py-0.5 bg-yellow-100 border border-yellow-500">⚡ Power</span>}
-                    {infoPanelData.spot.has_shade && <span className="px-2 py-0.5 bg-blue-100 border border-blue-500">⛱️ Shade</span>}
-                    {infoPanelData.spot.is_accessible && <span className="px-2 py-0.5 bg-purple-100 border border-purple-500">♿ Accessible</span>}
-                  </div>
-                  {infoPanelData.spot.reservation && infoPanelData.spot.reservation.camper_id !== camper?.id && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-300 text-xs">
-                      <p className="font-bold text-red-700">Reserved by {infoPanelData.spot.camper?.playa_name || infoPanelData.spot.camper?.full_name || 'a camper'}</p>
-                    </div>
-                  )}
                 </div>
-
-                {/* Action buttons */}
-                {isIdentified && camper && !infoPanelData.spot.reservation && (
-                  <Button
-                    onClick={() => handleReserveSpot(infoPanelData.spot!)}
-                    loading={actionLoading}
-                    className="w-full"
-                  >
-                    🏕️ Reserve This Spot
-                  </Button>
+                {myReservation && myReservation.id !== selectedObject.spot.id && (
+                  <div className="p-2 bg-yellow-50 border border-yellow-400 text-xs">
+                    <p className="font-bold text-yellow-800">⚠️ You currently have spot {myReservation.label}. Reserving this one will release your current spot.</p>
+                  </div>
                 )}
-                {infoPanelData.spot.reservation?.camper_id === camper?.id && (
-                  <Button
-                    variant="danger"
-                    onClick={() => handleReleaseSpot(infoPanelData.spot!)}
-                    loading={actionLoading}
-                    className="w-full"
-                  >
-                    🔓 Release This Spot
-                  </Button>
-                )}
+                <Button
+                  onClick={handleConfirmReserve}
+                  loading={actionLoading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider text-base py-3"
+                >
+                  🏕️ Confirm Reservation
+                </Button>
                 <button
-                  onClick={() => setInfoPanelData(null)}
+                  type="button"
+                  onClick={() => setWizardStep('verify-dimensions')}
                   className="text-xs text-gray-500 underline w-full text-center"
                 >
-                  Close
+                  ← Back to dimensions
                 </button>
               </CardContent>
             </Card>
+          )}
+
+          {/* No selection prompt */}
+          {!selectedObject && !wizardStep && (
+            <div className="text-center text-gray-400 py-8">
+              <div className="text-4xl mb-3">👆</div>
+              <p className="font-bold uppercase text-sm">Click any object on the map</p>
+              <p className="text-xs mt-1">See details and reserve available tent spots</p>
+            </div>
           )}
 
           {/* Tips */}
@@ -731,12 +784,9 @@ export function CampMap() {
               <p>🖱️ <strong>Click + drag</strong> to pan around the map</p>
               <p>🔍 <strong>Scroll wheel</strong> to zoom in/out</p>
               <p>👆 <strong>Click any object</strong> to see details</p>
-              {selectionEnabled && (
-                <>
-                  <p>🏕️ <strong>Switch to Reserve mode</strong> to claim a tent spot</p>
-                  <p>🏷️ <strong>Colored rings</strong> show spot availability</p>
-                </>
-              )}
+              <p>🟢 <strong>Green ring</strong> = available tent spot</p>
+              <p>🔴 <strong>Red ring</strong> = taken by another camper</p>
+              <p>🟡 <strong>Yellow ring</strong> = your reserved spot</p>
             </CardContent>
           </Card>
 
