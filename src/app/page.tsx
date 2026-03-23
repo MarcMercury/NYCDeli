@@ -1,81 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { CountdownTimer } from '@/components/countdown-timer'
-
-const modules = [
-  {
-    href: '/intake',
-    icon: '📝',
-    title: 'Register',
-    description: 'Start here. 9-step intake covering identity, arrival, shelter, infrastructure, participation, skills, build week, safety, and bio.',
-    status: 'Required',
-    statusColor: 'text-red-400',
-  },
-  {
-    href: '/profile',
-    icon: '👤',
-    title: 'Your Profile',
-    description: 'Four-tab hub: bio & photo uploads, camper details, your personal shift schedule, and the full team schedule.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/campers',
-    icon: '🐀',
-    title: 'Campers Directory',
-    description: 'Search by name, playa name, or email. View photos, bios, shelter info, and build week / kitchen participation.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/map',
-    icon: '🏕️',
-    title: 'Camp Map',
-    description: 'Interactive camp map with spot selection, zone assignments, and real-time camper placement.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/layout-view',
-    icon: '🗺️',
-    title: 'Camp Layout',
-    description: 'Zoomable 2D grid view with layer toggles for tents, shade, kitchen, and zones — color-coded by shelter type.',
-    status: 'View Only',
-    statusColor: 'text-blue-400',
-  },
-  {
-    href: '/events',
-    icon: '🗓️',
-    title: 'Events Calendar',
-    description: 'Pre-burn gatherings, fundraisers, shopping trips, and socials — color-coded across 6 event categories.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/kitchen',
-    icon: '🍳',
-    title: 'Kitchen Shifts',
-    description: 'Sign-up sheet, role definitions, shift coverage, and scheduling across deli, prep, grill, assembly, runners, and more.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/schedule',
-    icon: '📅',
-    title: 'Your Schedule',
-    description: 'All Shifts and My Schedule tabs with email lookup, status badges, and date/time sorting. Show up.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/build-week',
-    icon: '🔨',
-    title: 'Build Week',
-    description: 'Four tabs: phased tasks with progress tracking, resource management, issue log, and builder coordination info.',
-    status: 'Upcoming',
-    statusColor: 'text-yellow-400',
-  },
-]
+import { getUserProfile } from '@/lib/auth'
 
 const amenities = [
   { icon: '💧', text: 'Potable water at multiple fill-up points' },
@@ -102,7 +28,10 @@ const tentGuidelines = [
   { people: 'Four People', dimensions: '10 x 17.5' },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
+  const profile = await getUserProfile()
+  const isApproved = profile?.role === 'user' || profile?.role === 'admin'
+
   return (
     <div className="min-h-screen nyc-home-dark">
       {/* Countdown Timer */}
@@ -272,16 +201,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mt-8 max-w-3xl mx-auto">
-            <div className="bg-yellow-500/10 border-2 border-[#fccc0a]/40 p-6">
-              <h3 className="font-black uppercase text-sm mb-2 text-[#fccc0a]">RV Services Available</h3>
-              <p className="text-sm text-gray-300">
-                RVs can be provided power, potable water, and grey-water removal. There will be an 
-                additional charge per RV receiving extra services. All vehicles parked in camp require 
-                prior discussion with Brian before playa.
-              </p>
-            </div>
-          </div>
+
         </div>
       </section>
 
@@ -302,7 +222,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-black text-white mb-1">Event Week Camper</h3>
               <p className="text-sm text-gray-400 mb-4">Arriving for the event</p>
-              <div className="text-4xl font-black text-[#fccc0a] mb-4 nyc-neon-subtle">$900</div>
+              <div className="text-4xl font-black text-[#fccc0a] mb-4 nyc-neon-subtle">{isApproved ? '$900' : 'See fee after approval'}</div>
               <ul className="text-sm space-y-2 text-gray-300">
                 <li>All camp amenities included</li>
                 <li>Daily meal during 6 days of food service</li>
@@ -317,7 +237,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-black text-white mb-1">Builder</h3>
               <p className="text-sm text-gray-400 mb-4">22 spots — come early, build camp</p>
-              <div className="text-4xl font-black text-green-400 mb-4">$450</div>
+              <div className="text-4xl font-black text-green-400 mb-4">{isApproved ? '$450' : 'See fee after approval'}</div>
               <ul className="text-sm space-y-2 text-gray-300">
                 <li>50% off camp fee</li>
                 <li>Free housing at Fernley Build House</li>
@@ -411,7 +331,8 @@ export default function HomePage() {
 
       <div className="nyc-tag-stripe" />
 
-      {/* Tent Guidelines — Dark industrial */}
+      {/* Tent Guidelines — Dark industrial (approved users only) */}
+      {isApproved && (
       <section className="py-16 px-4 bg-[#111]">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
@@ -448,6 +369,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Build Week — Graffiti hero with spray splatters */}
       <section className="relative py-16 px-4 nyc-graffiti-hero nyc-grime nyc-drips">
@@ -466,7 +388,7 @@ export default function HomePage() {
               <ul className="space-y-3 text-sm text-gray-300">
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 font-bold">&#10003;</span>
-                  <span><strong className="text-white">$450 camp fee</strong> (half the regular price)</span>
+                  <span><strong className="text-white">{isApproved ? '$450 camp fee' : 'Half-price camp fee'}</strong> (half the regular price)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 font-bold">&#10003;</span>
@@ -512,40 +434,7 @@ export default function HomePage() {
 
       <div className="nyc-tag-stripe" />
 
-      {/* Modules Grid — Brick wall with poster cards */}
-      <section className="relative py-16 px-4 nyc-brick-wall nyc-grime">
-        <div className="relative z-10 max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
-            Camp System Modules
-          </h2>
-          <p className="text-center text-gray-300 mb-12">
-            Nine modules to manage your burn — registration, profile, directory, maps, events, kitchen, schedule, and build week.
-          </p>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {modules.map((module, i) => (
-              <Link key={module.href} href={module.href} className="group">
-                <div
-                  className="h-full bg-black/80 border border-white/10 p-6 nyc-poster"
-                  style={{ transform: `rotate(${i % 2 === 0 ? '-0.5' : '0.5'}deg)` }}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-4xl">{module.icon}</span>
-                    <span className={`text-xs font-black uppercase ${module.statusColor}`}>
-                      {module.status}
-                    </span>
-                  </div>
-                  <h3 className="mt-4 text-lg font-black text-white">{module.title}</h3>
-                  <p className="text-sm text-gray-400 mt-1">{module.description}</p>
-                  <span className="inline-block mt-4 text-sm font-bold text-[#fccc0a] group-hover:text-[#ffd93d]">
-                    Go to {module.title} &rarr;
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* Important Dates — Subway schedule board */}
       <section className="bg-[#0a0a0a] py-16 px-4">
