@@ -4,18 +4,23 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-  Badge, Alert, Button, Input, Tabs, TabPanel, Select
+  Badge, Alert, Button, Input, Tabs, TabPanel, Select, Textarea
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
-import { updateCamperAction, deleteCamperAction, updateTaskStatusAction, updateSettingAction } from '@/app/actions/admin'
-import type { Camper, BuildTask, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate } from '@/types/database'
+import { updateCamperAction, deleteCamperAction, updateTaskStatusAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction } from '@/app/actions/admin'
+import { getAllDraftShiftCategories, type DraftShiftCategory, type DraftShiftPosition } from '@/lib/shift-draft'
+import type { Camper, BuildTask, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
 
 type Tab = { id: string; label: string }
 
+interface UserWithCamper extends UserProfileRow {
+  camper: Camper | null
+}
+
 const tabs: Tab[] = [
-  { id: 'campers', label: 'Campers' },
-  { id: 'schedule', label: 'Schedule' },
+  { id: 'campers', label: 'Campers & Users' },
+  { id: 'kitchen-shifts', label: 'Kitchen Shifts' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'settings', label: 'Settings' },
 ]
@@ -23,6 +28,7 @@ const tabs: Tab[] = [
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('campers')
   const [campers, setCampers] = useState<Camper[]>([])
+  const [users, setUsers] = useState<UserWithCamper[]>([])
   const [tasks, setTasks] = useState<BuildTask[]>([])
   const [settings, setSettings] = useState<SystemSetting[]>([])
   const [shifts, setShifts] = useState<KitchenShift[]>([])
@@ -30,16 +36,23 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [fetchErrors, setFetchErrors] = useState<Record<string, string>>({})
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserWithCamper | null>(null)
   const [selectedCamper, setSelectedCamper] = useState<Camper | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [userFilter, setUserFilter] = useState<'all' | 'linked' | 'unlinked' | 'admin' | 'pending'>('all')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  // Kitchen shift editor state
+  const [shiftCategories, setShiftCategories] = useState<DraftShiftCategory[]>([])
+  const [editingPosition, setEditingPosition] = useState<DraftShiftPosition | null>(null)
+  const [editForm, setEditForm] = useState<{ role: string; time: string; description: string }>({ role: '', time: '', description: '' })
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
     const errors: Record<string, string> = {}
     
-    const [campersRes, tasksRes, settingsRes, shiftsRes, assignmentsRes] = await Promise.all([
+    const [campersRes, usersRes, tasksRes, settingsRes, shiftsRes, assignmentsRes] = await Promise.all([
       supabase.from('campers').select('*').order('created_at', { ascending: false }),
+      supabase.from('user_profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('build_tasks').select('*').order('phase').order('status'),
       supabase.from('system_settings').select('*').order('key'),
       supabase.from('kitchen_shifts').select('*').order('date'),
@@ -47,16 +60,48 @@ export default function AdminPage() {
     ])
 
     if (campersRes.error) errors.campers = campersRes.error.message
+    if (usersRes.error) errors.users = usersRes.error.message
     if (tasksRes.error) errors.tasks = tasksRes.error.message
     if (settingsRes.error) errors.settings = settingsRes.error.message
     if (shiftsRes.error) errors.shifts = shiftsRes.error.message
     if (assignmentsRes.error) errors.assignments = assignmentsRes.error.message
 
-    setCampers(campersRes.data || [])
+    const campersData = (campersRes.data || []) as Camper[]
+    const usersData = (usersRes.data || []) as UserProfileRow[]
+    
+    // Build users with linked camper data
+    const usersWithCampers: UserWithCamper[] = usersData.map(user => ({
+      ...user,
+      camper: campersData.find(c => c.id === user.camper_id || c.email === user.email) || null,
+    }))
+    
+    // Find campers that have no linked user profile
+    const linkedCamperIds = new Set(usersWithCampers.filter(u => u.camper).map(u => u.camper!.id))
+    const orphanCampers = campersData.filter(c => !linkedCamperIds.has(c.id))
+    
+    // Create synthetic user entries for orphan campers
+    const orphanUsers: UserWithCamper[] = orphanCampers.map(c => ({
+      id: `orphan-${c.id}`,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+      email: c.email,
+      role: 'user' as UserRole,
+      camper_id: c.id,
+      approved_at: null,
+      approved_by: null,
+      denied_at: null,
+      denied_reason: null,
+      bio: null,
+      camper: c,
+    }))
+
+    setCampers(campersData)
+    setUsers([...usersWithCampers, ...orphanUsers])
     setTasks(tasksRes.data || [])
     setSettings(settingsRes.data || [])
     setShifts(shiftsRes.data || [])
     setAssignments(assignmentsRes.data || [])
+    setShiftCategories(getAllDraftShiftCategories())
     setFetchErrors(errors)
     setLastRefreshed(new Date())
     setLoading(false)
@@ -67,11 +112,22 @@ export default function AdminPage() {
     fetchData()
   }, [fetchData])
 
-  const filteredCampers = campers.filter(c => 
-    c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.playa_name && c.playa_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = 
+      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.camper?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.camper?.playa_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    
+    if (!matchesSearch) return false
+    
+    switch (userFilter) {
+      case 'linked': return !!u.camper
+      case 'unlinked': return !u.camper
+      case 'admin': return u.role === 'admin'
+      case 'pending': return u.role === 'pending'
+      default: return true
+    }
+  })
 
   const updateCamper = async (camperId: string, updates: CamperUpdate) => {
     const result = await updateCamperAction(camperId, updates)
@@ -112,6 +168,32 @@ export default function AdminPage() {
     } else {
       setMessage({ type: 'success', text: 'Camper deleted' })
       setSelectedCamper(null)
+      setSelectedUser(null)
+      fetchData()
+    }
+  }
+
+  const updateUserRole = async (profileId: string, role: UserRole) => {
+    if (profileId.startsWith('orphan-')) {
+      setMessage({ type: 'error', text: 'This camper has no user profile to update. They need to register/login first.' })
+      return
+    }
+    const result = await updateUserRoleAction(profileId, role)
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Role update failed' })
+    } else {
+      setMessage({ type: 'success', text: 'User role updated' })
+      fetchData()
+    }
+  }
+
+  const updateUserBio = async (profileId: string, bio: string) => {
+    if (profileId.startsWith('orphan-')) return
+    const result = await updateUserProfileAction(profileId, { bio })
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Profile update failed' })
+    } else {
+      setMessage({ type: 'success', text: 'Profile updated' })
       fetchData()
     }
   }
@@ -201,12 +283,22 @@ export default function AdminPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardContent className="py-4 text-center">
+              {fetchErrors.users ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.users}>⚠</p>
+              ) : (
+                <p className="text-3xl font-black">{users.length}</p>
+              )}
+              <p className="text-xs uppercase tracking-wider text-gray-500">Total Users</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4 text-center">
               {fetchErrors.campers ? (
                 <p className="text-2xl font-black text-red-500" title={fetchErrors.campers}>⚠</p>
               ) : (
                 <p className="text-3xl font-black">{campers.length}</p>
               )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Registered</p>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Campers</p>
             </CardContent>
           </Card>
           <Card>
@@ -276,16 +368,34 @@ export default function AdminPage() {
         {/* Tabs */}
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-        {/* Campers Tab */}
+        {/* Campers & Users Tab */}
         <TabPanel tabId="campers" activeTab={activeTab}>
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Camper List */}
+            {/* User/Camper List */}
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>All Campers ({campers.length})</CardTitle>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle>All Users & Campers ({filteredUsers.length})</CardTitle>
+                    <div className="flex gap-1 flex-wrap">
+                      {(['all', 'linked', 'unlinked', 'admin', 'pending'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setUserFilter(f)}
+                          className={cn(
+                            "text-xs px-2 py-1 border-2 uppercase tracking-wider font-bold transition-colors",
+                            userFilter === f
+                              ? "bg-black text-white border-black"
+                              : "border-gray-300 text-gray-500 hover:border-black"
+                          )}
+                        >
+                          {f === 'linked' ? 'Has Profile' : f === 'unlinked' ? 'No Profile' : f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <Input
-                    placeholder="Search by name or email..."
+                    placeholder="Search by name, playa name, or email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="mt-2"
@@ -296,31 +406,45 @@ export default function AdminPage() {
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 bg-white border-b-2 border-black">
                         <tr>
-                          <th className="text-left p-3 font-bold uppercase tracking-wider">Name</th>
-                          <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Shelter</th>
-                          <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Arrival</th>
+                          <th className="text-left p-3 font-bold uppercase tracking-wider">Name / Email</th>
+                          <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Role</th>
+                          <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Status</th>
                           <th className="text-left p-3 font-bold uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredCampers.map(camper => (
+                        {filteredUsers.map(user => (
                           <tr 
-                            key={camper.id}
+                            key={user.id}
                             className={cn(
                               "border-b border-gray-200 hover:bg-gray-50 cursor-pointer",
-                              selectedCamper?.id === camper.id && "bg-yellow-50"
+                              selectedUser?.id === user.id && "bg-yellow-50"
                             )}
-                            onClick={() => setSelectedCamper(camper)}
+                            onClick={() => {
+                              setSelectedUser(user)
+                              setSelectedCamper(user.camper ? { ...user.camper } : null)
+                            }}
                           >
                             <td className="p-3">
-                              <p className="font-bold">{camper.playa_name || camper.full_name}</p>
-                              <p className="text-xs text-gray-500">{camper.email}</p>
+                              <p className="font-bold">
+                                {user.camper?.playa_name || user.camper?.full_name || user.email}
+                              </p>
+                              <p className="text-xs text-gray-500">{user.email}</p>
                             </td>
                             <td className="p-3 hidden md:table-cell">
-                              <Badge>{camper.shelter_type}</Badge>
+                              <Badge variant={
+                                user.role === 'admin' ? 'error' :
+                                user.role === 'pending' ? 'warning' : 'success'
+                              }>
+                                {user.role}
+                              </Badge>
                             </td>
                             <td className="p-3 hidden md:table-cell">
-                              {formatDate(camper.arrival_date)}
+                              {user.camper ? (
+                                <Badge variant="success">Linked</Badge>
+                              ) : (
+                                <Badge variant="warning">No Camper Profile</Badge>
+                              )}
                             </td>
                             <td className="p-3">
                               <Button 
@@ -328,11 +452,446 @@ export default function AdminPage() {
                                 variant="secondary"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setSelectedCamper(camper)
+                                  setSelectedUser(user)
+                                  setSelectedCamper(user.camper ? { ...user.camper } : null)
                                 }}
                               >
                                 Edit
                               </Button>
+                            </td>
+                          </tr>
+                        ))}
+                        {filteredUsers.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-gray-500">
+                              No users matching your filters.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* User/Camper Detail Editor */}
+            <div>
+              {selectedUser ? (
+                <div className="space-y-4">
+                  {/* User Profile Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>User Profile</CardTitle>
+                      <CardDescription>{selectedUser.email}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="text-xs font-bold uppercase">Role</label>
+                        <Select
+                          options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'user', label: 'User (Approved)' },
+                            { value: 'admin', label: 'Admin' },
+                          ]}
+                          value={selectedUser.role}
+                          onChange={(e) => updateUserRole(selectedUser.id, e.target.value as UserRole)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase">Bio</label>
+                        <Textarea
+                          value={selectedUser.bio || ''}
+                          onChange={(e) => setSelectedUser({ ...selectedUser, bio: e.target.value })}
+                          rows={3}
+                          className="mt-1"
+                        />
+                        <Button
+                          size="sm"
+                          className="mt-1"
+                          onClick={() => updateUserBio(selectedUser.id, selectedUser.bio || '')}
+                        >
+                          Save Bio
+                        </Button>
+                      </div>
+                      {selectedUser.approved_at && (
+                        <p className="text-xs text-gray-500">
+                          Approved: {formatDate(selectedUser.approved_at)}
+                        </p>
+                      )}
+                      {!selectedUser.camper && !selectedUser.id.startsWith('orphan-') && (
+                        <Alert variant="warning">
+                          This user has no linked camper profile. They may need to complete the intake form.
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Camper Profile Card */}
+                  {selectedCamper ? (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Camper Profile</CardTitle>
+                        <CardDescription>Registration data & camp details</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <label className="text-xs font-bold uppercase">Full Name</label>
+                          <Input 
+                            value={selectedCamper.full_name}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, full_name: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Playa Name</label>
+                          <Input 
+                            value={selectedCamper.playa_name || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, playa_name: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Email</label>
+                          <Input 
+                            value={selectedCamper.email}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, email: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Phone</label>
+                          <Input 
+                            value={selectedCamper.phone || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, phone: e.target.value})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs font-bold uppercase">Arrival Date</label>
+                            <Input 
+                              type="date"
+                              value={selectedCamper.arrival_date}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, arrival_date: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold uppercase">Departure Date</label>
+                            <Input 
+                              type="date"
+                              value={selectedCamper.departure_date}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, departure_date: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Shelter Type</label>
+                          <Select
+                            options={[
+                              { value: 'tent', label: 'Tent' },
+                              { value: 'shiftpod', label: 'Shiftpod' },
+                              { value: 'rv', label: 'RV' },
+                              { value: 'vehicle', label: 'Vehicle' },
+                              { value: 'other', label: 'Other' },
+                            ]}
+                            value={selectedCamper.shelter_type}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, shelter_type: e.target.value as Camper['shelter_type']})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-xs font-bold uppercase">L (ft)</label>
+                            <Input 
+                              type="number"
+                              value={selectedCamper.shelter_length_ft}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, shelter_length_ft: parseFloat(e.target.value)})}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold uppercase">W (ft)</label>
+                            <Input 
+                              type="number"
+                              value={selectedCamper.shelter_width_ft}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, shelter_width_ft: parseFloat(e.target.value)})}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold uppercase">H (ft)</label>
+                            <Input 
+                              type="number"
+                              value={selectedCamper.shelter_height_ft || ''}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, shelter_height_ft: e.target.value ? parseFloat(e.target.value) : null})}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs font-bold uppercase">Layout X</label>
+                            <Input 
+                              type="number"
+                              value={selectedCamper.layout_x || ''}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, layout_x: e.target.value ? parseFloat(e.target.value) : null})}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold uppercase">Layout Y</label>
+                            <Input 
+                              type="number"
+                              value={selectedCamper.layout_y || ''}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, layout_y: e.target.value ? parseFloat(e.target.value) : null})}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Dietary Restrictions</label>
+                          <Input 
+                            value={selectedCamper.dietary_restrictions || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, dietary_restrictions: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Emergency Contact</label>
+                          <Input 
+                            value={selectedCamper.emergency_contact || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, emergency_contact: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Medical Conditions</label>
+                          <Input 
+                            value={selectedCamper.medical_conditions || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, medical_conditions: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Notes</label>
+                          <Textarea 
+                            value={selectedCamper.notes || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, notes: e.target.value})}
+                            rows={3}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedCamper.placement_locked}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, placement_locked: e.target.checked})}
+                            />
+                            <span className="text-sm">Lock Placement</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedCamper.is_admin}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, is_admin: e.target.checked})}
+                            />
+                            <span className="text-sm">Is Admin</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedCamper.build_week_attending}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, build_week_attending: e.target.checked})}
+                            />
+                            <span className="text-sm">Build Week Attending</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedCamper.kitchen_participation}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, kitchen_participation: e.target.checked})}
+                            />
+                            <span className="text-sm">Kitchen Participation</span>
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedCamper.early_arrival}
+                              onChange={(e) => setSelectedCamper({...selectedCamper, early_arrival: e.target.checked})}
+                            />
+                            <span className="text-sm">Early Arrival</span>
+                          </label>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Skills</label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedCamper.skills.map(skill => (
+                              <Badge key={skill}>{getSkillDisplayName(skill)}</Badge>
+                            ))}
+                            {selectedCamper.skills.length === 0 && (
+                              <span className="text-xs text-gray-400">No skills listed</span>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <Button 
+                          variant="danger" 
+                          size="sm"
+                          onClick={() => deleteCamper(selectedCamper.id)}
+                        >
+                          Delete Camper
+                        </Button>
+                        <Button 
+                          onClick={() => updateCamper(selectedCamper.id, selectedCamper)}
+                        >
+                          Save Changes
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ) : (
+                    <Card>
+                      <CardContent className="py-8 text-center text-gray-500">
+                        <p>No camper profile linked</p>
+                        <p className="text-xs mt-1">This user needs to complete the intake form.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    Select a user to view & edit their profile
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabPanel>
+
+        {/* Kitchen Shifts Tab */}
+        <TabPanel tabId="kitchen-shifts" activeTab={activeTab}>
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black uppercase tracking-wider">Kitchen Shift Builder</h2>
+                <p className="text-sm text-gray-600">
+                  View and edit all kitchen shift positions, times, and roles. Changes here affect the draft board.
+                </p>
+              </div>
+              <Link href="/admin/shift-draft">
+                <Button>🎯 Go to Shift Draft</Button>
+              </Link>
+            </div>
+
+            {/* Position Editor Modal */}
+            {editingPosition && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <Card className="max-w-md w-full border-4 border-yellow-500">
+                  <CardHeader>
+                    <CardTitle>Edit Shift Position</CardTitle>
+                    <CardDescription>Category: {editingPosition.category}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold uppercase">Role Name</label>
+                      <Input
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase">Time</label>
+                      <Input
+                        value={editForm.time}
+                        onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
+                        placeholder="e.g. 9:30AM–12:00PM"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase">Description</label>
+                      <Textarea
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                  </CardContent>
+                  <div className="flex gap-2 p-4 border-t-2 border-gray-200">
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => setEditingPosition(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={async () => {
+                        const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                        const result = await updateShiftPositionAction(editingPosition.id, {
+                          role: editForm.role,
+                          time: editForm.time,
+                          description: editForm.description,
+                          category: editingPosition.category,
+                        })
+                        if (result.success) {
+                          setMessage({ type: 'success', text: `Updated position: ${editForm.role}` })
+                          setEditingPosition(null)
+                        } else {
+                          setMessage({ type: 'error', text: result.error || 'Update failed' })
+                        }
+                      }}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {/* Shift Categories Grid */}
+            {shiftCategories.map((cat, catIdx) => (
+              <Card key={catIdx}>
+                <CardHeader className="pb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-lg">{cat.name}</CardTitle>
+                    <div className="flex gap-2">
+                      {cat.time && <Badge variant="info">{cat.time}</Badge>}
+                      {cat.note && <Badge variant="default">{cat.note}</Badge>}
+                      <Badge variant="success">{cat.positions.length} positions</Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200 bg-gray-50">
+                          <th className="text-left p-2 pl-4 font-bold uppercase tracking-wider text-xs">#</th>
+                          <th className="text-left p-2 font-bold uppercase tracking-wider text-xs">Role</th>
+                          <th className="text-left p-2 font-bold uppercase tracking-wider text-xs">Time</th>
+                          <th className="text-left p-2 font-bold uppercase tracking-wider text-xs hidden md:table-cell">Description</th>
+                          <th className="text-left p-2 font-bold uppercase tracking-wider text-xs">Tags</th>
+                          <th className="text-left p-2 pr-4 font-bold uppercase tracking-wider text-xs">Edit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.positions.map((pos, posIdx) => (
+                          <tr key={pos.id} className="border-b border-gray-100 hover:bg-yellow-50">
+                            <td className="p-2 pl-4 text-gray-400 font-mono text-xs">{posIdx + 1}</td>
+                            <td className="p-2 font-medium">{pos.role}</td>
+                            <td className="p-2 text-gray-600 text-xs whitespace-nowrap">{pos.time || cat.time || '—'}</td>
+                            <td className="p-2 text-gray-500 text-xs hidden md:table-cell max-w-xs truncate">{pos.description || '—'}</td>
+                            <td className="p-2">
+                              <div className="flex gap-1">
+                                {pos.requiresExp && <Badge variant="warning" className="text-[10px] py-0 px-1">EXP</Badge>}
+                                {pos.countsDouble && <Badge variant="info" className="text-[10px] py-0 px-1">2×</Badge>}
+                              </div>
+                            </td>
+                            <td className="p-2 pr-4">
+                              <button
+                                className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                onClick={() => {
+                                  setEditingPosition(pos)
+                                  setEditForm({
+                                    role: pos.role,
+                                    time: pos.time || '',
+                                    description: pos.description || '',
+                                  })
+                                }}
+                              >
+                                Edit
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -341,140 +900,19 @@ export default function AdminPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            ))}
 
-            {/* Camper Detail/Edit */}
-            <div>
-              {selectedCamper ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Edit Camper</CardTitle>
-                    <CardDescription>{selectedCamper.email}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <label className="text-xs font-bold uppercase">Full Name</label>
-                      <Input 
-                        value={selectedCamper.full_name}
-                        onChange={(e) => setSelectedCamper({...selectedCamper, full_name: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold uppercase">Playa Name</label>
-                      <Input 
-                        value={selectedCamper.playa_name || ''}
-                        onChange={(e) => setSelectedCamper({...selectedCamper, playa_name: e.target.value})}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-bold uppercase">Length (ft)</label>
-                        <Input 
-                          type="number"
-                          value={selectedCamper.shelter_length_ft}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, shelter_length_ft: parseFloat(e.target.value)})}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase">Width (ft)</label>
-                        <Input 
-                          type="number"
-                          value={selectedCamper.shelter_width_ft}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, shelter_width_ft: parseFloat(e.target.value)})}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-bold uppercase">Layout X</label>
-                        <Input 
-                          type="number"
-                          value={selectedCamper.layout_x || ''}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, layout_x: e.target.value ? parseFloat(e.target.value) : null})}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase">Layout Y</label>
-                        <Input 
-                          type="number"
-                          value={selectedCamper.layout_y || ''}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, layout_y: e.target.value ? parseFloat(e.target.value) : null})}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedCamper.placement_locked}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, placement_locked: e.target.checked})}
-                        />
-                        <span className="text-sm">Lock Placement</span>
-                      </label>
-                    </div>
-                    <div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedCamper.is_admin}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, is_admin: e.target.checked})}
-                        />
-                        <span className="text-sm">Is Admin</span>
-                      </label>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold uppercase">Skills</label>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedCamper.skills.map(skill => (
-                          <Badge key={skill}>{getSkillDisplayName(skill)}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button 
-                      variant="danger" 
-                      size="sm"
-                      onClick={() => deleteCamper(selectedCamper.id)}
-                    >
-                      Delete
-                    </Button>
-                    <Button 
-                      onClick={() => updateCamper(selectedCamper.id, selectedCamper)}
-                    >
-                      Save Changes
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="py-12 text-center text-gray-500">
-                    Select a camper to edit
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-        </TabPanel>
-
-        {/* Schedule Tab */}
-        <TabPanel tabId="schedule" activeTab={activeTab}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Schedule Management</CardTitle>
-              <CardDescription>
-                Create and manage kitchen shifts and assignments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert variant="info" className="mb-4">
-                Shift management coming soon. For now, edit directly in Supabase.
-              </Alert>
-              
-              <div className="space-y-4">
-                <h4 className="font-bold">Current Shifts ({shifts.length})</h4>
+            {/* Current DB Shifts */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Database Shifts ({shifts.length})</CardTitle>
+                <CardDescription>
+                  Shifts stored in the kitchen_shifts table (used by the legacy schedule system).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 {shifts.length === 0 ? (
-                  <p className="text-gray-500">No shifts created yet.</p>
+                  <p className="text-gray-500 text-center py-4">No shifts in database. The draft system uses the shift positions above.</p>
                 ) : (
                   <div className="space-y-2">
                     {shifts.slice(0, 10).map(shift => (
@@ -493,9 +931,9 @@ export default function AdminPage() {
                     )}
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabPanel>
 
         {/* Tasks Tab */}

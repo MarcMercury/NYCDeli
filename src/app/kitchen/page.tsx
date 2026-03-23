@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent,
-  Badge, Tabs, TabPanel, Alert, Button
+  Badge, Tabs, TabPanel, Alert, Button, Input
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -279,6 +279,12 @@ export default function KitchenPage() {
   const [submitting, setSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  // Admin editing state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminEditing, setAdminEditing] = useState(false)
+  const [editingCell, setEditingCell] = useState<{ catIdx: number; posIdx: number; field: 'role' | 'time' | 'description' } | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [adminMessage, setAdminMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
@@ -325,6 +331,14 @@ export default function KitchenPage() {
           .eq('email', user.email!)
           .single() as unknown as { data: { id: string } | null }
         setCurrentUser({ id: user.id, camperId: camper?.id || null })
+        
+        // Check if user is admin
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single() as unknown as { data: { role: string } | null }
+        setIsAdmin(profile?.role === 'admin')
       }
 
       const { data: camperData } = await supabase
@@ -537,6 +551,40 @@ export default function KitchenPage() {
           Mostly judgment. Lots of judgment.
         </Alert>
 
+        {/* Admin Controls */}
+        {isAdmin && (
+          <div className="mb-6">
+            <Card className={cn("border-2", adminEditing ? "border-yellow-500 bg-yellow-50" : "border-gray-300")}>
+              <CardContent className="py-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold uppercase tracking-wider">⚙️ Admin Mode</span>
+                  {adminEditing && (
+                    <Badge variant="warning">Editing Enabled</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={adminEditing ? 'danger' : 'secondary'}
+                    onClick={() => {
+                      setAdminEditing(!adminEditing)
+                      setEditingCell(null)
+                    }}
+                  >
+                    {adminEditing ? 'Exit Edit Mode' : 'Edit Shifts & Times'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            {adminMessage && (
+              <Alert variant={adminMessage.type === 'success' ? 'success' : 'error'} className="mt-2">
+                {adminMessage.text}
+                <button className="ml-4 underline" onClick={() => setAdminMessage(null)}>Dismiss</button>
+              </Alert>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
@@ -568,32 +616,100 @@ export default function KitchenPage() {
                     <CardContent className="pt-2">
                       <div className="divide-y divide-gray-200">
                         {category.positions.map((pos, posIdx) => (
-                          <div key={posIdx} className="py-2">
+                          <div key={posIdx} className={cn("py-2", adminEditing && "hover:bg-yellow-50 rounded px-1")}>
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-1">
                                 <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
                                   {posIdx + 1}
                                 </span>
-                                <span className="font-medium">{pos.role}</span>
-                                {pos.note && (
+                                {adminEditing && editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'role' ? (
+                                  <div className="flex gap-1 items-center flex-1">
+                                    <Input
+                                      value={editValue}
+                                      onChange={(e) => setEditValue(e.target.value)}
+                                      className="text-sm py-0.5"
+                                      autoFocus
+                                      onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
+                                    />
+                                    <button className="text-xs text-green-600 font-bold" onClick={async () => {
+                                      const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                      await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { role: editValue, category: category.name })
+                                      setAdminMessage({ type: 'success', text: `Updated role` })
+                                      setEditingCell(null)
+                                    }}>✓</button>
+                                    <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
+                                  </div>
+                                ) : (
+                                  <span
+                                    className={cn("font-medium", adminEditing && "cursor-pointer hover:underline")}
+                                    onClick={() => { if (adminEditing) { setEditingCell({ catIdx, posIdx, field: 'role' }); setEditValue(pos.role) } }}
+                                  >
+                                    {pos.role}
+                                  </span>
+                                )}
+                                {pos.note && !adminEditing && (
                                   <span className="text-xs text-gray-500">({pos.note})</span>
                                 )}
                               </div>
-                              <div className="flex gap-2">
-                                {pos.time && (
-                                  <Badge variant="info">{pos.time}</Badge>
-                                )}
+                              <div className="flex gap-2 items-center">
+                                {adminEditing && editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'time' ? (
+                                  <div className="flex gap-1 items-center">
+                                    <Input
+                                      value={editValue}
+                                      onChange={(e) => setEditValue(e.target.value)}
+                                      className="text-xs py-0.5 w-32"
+                                      placeholder="e.g. 9:30–12:00"
+                                      autoFocus
+                                      onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
+                                    />
+                                    <button className="text-xs text-green-600 font-bold" onClick={async () => {
+                                      const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                      await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { time: editValue, category: category.name })
+                                      setAdminMessage({ type: 'success', text: `Updated time` })
+                                      setEditingCell(null)
+                                    }}>✓</button>
+                                    <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
+                                  </div>
+                                ) : pos.time ? (
+                                  <Badge
+                                    variant="info"
+                                    className={cn(adminEditing && "cursor-pointer hover:ring-2 ring-yellow-400")}
+                                    onClick={() => { if (adminEditing) { setEditingCell({ catIdx, posIdx, field: 'time' }); setEditValue(pos.time || '') } }}
+                                  >
+                                    {pos.time}
+                                  </Badge>
+                                ) : adminEditing ? (
+                                  <button className="text-xs text-blue-500 underline" onClick={() => { setEditingCell({ catIdx, posIdx, field: 'time' }); setEditValue('') }}>+ time</button>
+                                ) : null}
                                 {pos.requiresExp && (
                                   <Badge variant="warning">Kitchen Exp. Required</Badge>
                                 )}
                                 {pos.countsDouble && (
-                                  <Badge variant="success">Counts 2\u00d7</Badge>
+                                  <Badge variant="success">Counts 2×</Badge>
                                 )}
                               </div>
                             </div>
-                            {pos.description && (
-                              <p className="text-xs text-gray-500 ml-8 mt-0.5">{pos.description}</p>
-                            )}
+                            {adminEditing && editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'description' ? (
+                              <div className="ml-8 mt-1 flex gap-1 items-start">
+                                <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5 flex-1" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
+                                <button className="text-xs text-green-600 font-bold mt-1" onClick={async () => {
+                                  const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                  await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { description: editValue, category: category.name })
+                                  setAdminMessage({ type: 'success', text: `Updated description` })
+                                  setEditingCell(null)
+                                }}>✓</button>
+                                <button className="text-xs text-gray-400 mt-1" onClick={() => setEditingCell(null)}>✕</button>
+                              </div>
+                            ) : pos.description ? (
+                              <p
+                                className={cn("text-xs text-gray-500 ml-8 mt-0.5", adminEditing && "cursor-pointer hover:underline hover:text-gray-700")}
+                                onClick={() => { if (adminEditing) { setEditingCell({ catIdx, posIdx, field: 'description' }); setEditValue(pos.description || '') } }}
+                              >
+                                {pos.description}
+                              </p>
+                            ) : adminEditing ? (
+                              <button className="text-xs text-blue-500 underline ml-8 mt-0.5" onClick={() => { setEditingCell({ catIdx, posIdx, field: 'description' }); setEditValue('') }}>+ description</button>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -929,6 +1045,11 @@ export default function KitchenPage() {
                   ) : (
                     /* Static sign-up grid when no active draft */
                     <div className="overflow-x-auto">
+                      {adminEditing && (
+                        <Alert variant="info" className="mb-2">
+                          <strong>Admin Edit Mode:</strong> Click on any role name or time cell in the grid to edit it inline.
+                        </Alert>
+                      )}
                       <table className="w-full border-collapse border-2 border-black text-sm">
                         <thead>
                           <tr className="bg-gray-100">
@@ -953,16 +1074,54 @@ export default function KitchenPage() {
                                 </tr>
                                 {uniquePositions.map((pos, posIdx) => {
                                   const slots = countSlots([category], pos.role, pos.time)
+                                  const gridCellKey = `grid-${catIdx}-${posIdx}`
                                   return (
-                                    <tr key={`${catIdx}-${posIdx}`} className="hover:bg-gray-50">
+                                    <tr key={`${catIdx}-${posIdx}`} className={cn("hover:bg-gray-50", adminEditing && "hover:bg-yellow-50")}>
                                       <td className="border-2 border-black px-3 py-2">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium">{pos.role}</span>
-                                          {pos.requiresExp && <Badge variant="warning" className="text-[10px] px-1 py-0">Exp.</Badge>}
-                                          {pos.countsDouble && <Badge variant="success" className="text-[10px] px-1 py-0">2×</Badge>}
-                                        </div>
+                                        {adminEditing && editingCell?.catIdx === catIdx + 100 && editingCell?.posIdx === posIdx && editingCell?.field === 'role' ? (
+                                          <div className="flex gap-1 items-center">
+                                            <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
+                                            <button className="text-xs text-green-600 font-bold" onClick={async () => {
+                                              const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                              await updateShiftPositionAction(gridCellKey, { role: editValue, category: category.name })
+                                              setAdminMessage({ type: 'success', text: `Updated role` })
+                                              setEditingCell(null)
+                                            }}>✓</button>
+                                            <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
+                                          </div>
+                                        ) : (
+                                          <div
+                                            className={cn("flex items-center gap-2", adminEditing && "cursor-pointer hover:underline")}
+                                            onClick={() => { if (adminEditing) { setEditingCell({ catIdx: catIdx + 100, posIdx, field: 'role' }); setEditValue(pos.role) } }}
+                                          >
+                                            <span className="font-medium">{pos.role}</span>
+                                            {pos.requiresExp && <Badge variant="warning" className="text-[10px] px-1 py-0">Exp.</Badge>}
+                                            {pos.countsDouble && <Badge variant="success" className="text-[10px] px-1 py-0">2×</Badge>}
+                                            {adminEditing && <span className="text-[10px] text-blue-400">✎</span>}
+                                          </div>
+                                        )}
                                       </td>
-                                      <td className="border-2 border-black px-2 py-2 text-center text-xs text-gray-600 whitespace-nowrap">{pos.time ?? '—'}</td>
+                                      <td className="border-2 border-black px-2 py-2 text-center text-xs text-gray-600 whitespace-nowrap">
+                                        {adminEditing && editingCell?.catIdx === catIdx + 100 && editingCell?.posIdx === posIdx && editingCell?.field === 'time' ? (
+                                          <div className="flex gap-1 items-center">
+                                            <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5 w-24" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
+                                            <button className="text-xs text-green-600 font-bold" onClick={async () => {
+                                              const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                              await updateShiftPositionAction(gridCellKey, { time: editValue, category: category.name })
+                                              setAdminMessage({ type: 'success', text: `Updated time` })
+                                              setEditingCell(null)
+                                            }}>✓</button>
+                                            <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
+                                          </div>
+                                        ) : (
+                                          <span
+                                            className={cn(adminEditing && "cursor-pointer hover:underline")}
+                                            onClick={() => { if (adminEditing) { setEditingCell({ catIdx: catIdx + 100, posIdx, field: 'time' }); setEditValue(pos.time ?? '') } }}
+                                          >
+                                            {pos.time ?? '—'}{adminEditing && <span className="text-[10px] text-blue-400 ml-0.5">✎</span>}
+                                          </span>
+                                        )}
+                                      </td>
                                       <td className="border-2 border-black px-2 py-2 text-center text-xs font-bold">{slots}</td>
                                       {DELI_DAYS.map(day => (
                                         <td key={day} className="border-2 border-black px-2 py-2 text-center">
