@@ -306,13 +306,11 @@ export async function syncSpotsFromFloorplan(
       }
     } else {
       // Create new spot
-      const label = `${rowLabel}${spotInRow}`
       const { error } = await supabase
         .from('camp_spots' as never)
         .insert({
           row_label: rowLabel,
           spot_number: spotInRow,
-          label,
           x_position: obj.x,
           y_position: obj.y,
           spot_width_ft: obj.width_ft,
@@ -328,7 +326,35 @@ export async function syncSpotsFromFloorplan(
           is_available: true,
         } as never)
 
-      if (!error) created++
+      if (error) {
+        console.error('Failed to create camp spot:', error)
+        // Duplicate row_label+spot_number — bump spot_number and retry
+        if (error.code === '23505') {
+          spotInRow++
+          const { error: retryError } = await supabase
+            .from('camp_spots' as never)
+            .insert({
+              row_label: rowLabel,
+              spot_number: spotInRow,
+              x_position: obj.x,
+              y_position: obj.y,
+              spot_width_ft: obj.width_ft,
+              spot_length_ft: obj.height_ft,
+              size_category: obj.width_ft <= 8 ? 'small' : obj.width_ft <= 12 ? 'medium' : 'large',
+              min_tent_width_ft: 4,
+              max_tent_width_ft: obj.width_ft,
+              min_tent_length_ft: 4,
+              max_tent_length_ft: obj.height_ft,
+              has_power: false,
+              has_shade: false,
+              is_accessible: false,
+              is_available: true,
+            } as never)
+          if (!retryError) created++
+        }
+      } else {
+        created++
+      }
     }
   }
 
