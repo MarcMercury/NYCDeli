@@ -200,6 +200,11 @@ export function FloorplanEditor() {
       setObjects(prev => prev.map(o => (o.id === newObj.id ? saved : o)))
       setSelectedObjectId(saved.id)
       setHasUnsavedChanges(false)
+    } else {
+      // Remove ghost object that failed to persist
+      setObjects(prev => prev.filter(o => o.id !== newObj.id))
+      setSelectedObjectId(null)
+      setError(`Failed to save "${template.label}" — object type may not be supported in the database`)
     }
   }
 
@@ -276,6 +281,11 @@ export function FloorplanEditor() {
       setObjects(prev => prev.map(o => (o.id === newObj.id ? saved : o)))
       setSelectedObjectId(saved.id)
       setHasUnsavedChanges(false)
+    } else {
+      // Remove ghost object that failed to persist
+      setObjects(prev => prev.filter(o => o.id !== newObj.id))
+      setSelectedObjectId(null)
+      setError(`Failed to save duplicate of "${source.label}" — object type may not be supported in the database`)
     }
   }
 
