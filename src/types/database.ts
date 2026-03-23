@@ -704,6 +704,13 @@ export type FloorplanObjectType =
   | 'storage'
   | 'entrance'
   | 'fence'
+  | 'refrigerated_truck'
+  | 'bike_parking'
+  | 'greywater_tank'
+  | 'swamp_cooler'
+  | 'table'
+  | 'shower_container'
+  | 'sink_hose'
   | 'custom'
 
 export interface FloorplanObjectProperties {
