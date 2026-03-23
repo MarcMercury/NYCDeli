@@ -52,13 +52,21 @@ export async function fetchSpotsWithReservations(): Promise<CampSpotWithReservat
   })
 }
 
-/** Reserve a spot for a camper */
+/** Reserve a spot for a camper (releases any existing reservation first) */
 export async function reserveSpot(
   spotId: string,
   camperId: string,
   reservedBy?: string
 ): Promise<void> {
   const supabase = createClient()
+
+  // Release any existing reservation for this camper first
+  await supabase
+    .from('camp_reservations' as never)
+    .delete()
+    .eq('camper_id' as never, camperId)
+    .eq('status' as never, 'reserved')
+
   const { error } = await supabase
     .from('camp_reservations' as never)
     .insert({
