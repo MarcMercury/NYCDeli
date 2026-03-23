@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { CampSpotRow, CampReservationRow, CampSpotWithReservation } from '@/types/database'
+import type { CampSpotRow, CampReservationRow, CampSpotWithReservation, FloorplanObjectRow } from '@/types/database'
 
 /** Fetch all spots with their active reservation + camper info */
 export async function fetchSpotsWithReservations(): Promise<CampSpotWithReservation[]> {
@@ -223,4 +223,114 @@ export async function fetchAllCampers() {
 
   if (error) throw error
   return data ?? []
+}
+
+/**
+ * Sync camp_spots from reservable floorplan objects.
+ * Creates missing spots and updates positions/sizes of existing ones.
+ * Returns the count of created and updated spots.
+ */
+export async function syncSpotsFromFloorplan(
+  objects: FloorplanObjectRow[]
+): Promise<{ created: number; updated: number }> {
+  const supabase = createClient()
+
+  // Get reservable objects (typically tents)
+  const reservable = objects.filter(o => o.properties?.reservable)
+  if (reservable.length === 0) return { created: 0, updated: 0 }
+
+  // Fetch existing spots
+  const { data: existingSpots } = await supabase
+    .from('camp_spots' as never)
+    .select('*') as unknown as { data: CampSpotRow[] | null }
+
+  const spots = existingSpots ?? []
+
+  // Match existing spots to objects by position proximity
+  const matchedSpotIds = new Set<string>()
+  let created = 0
+  let updated = 0
+
+  // Sort reservable objects for consistent labeling (top-to-bottom, left-to-right)
+  const sorted = [...reservable].sort((a, b) => {
+    const rowA = Math.floor(a.y / 20)
+    const rowB = Math.floor(b.y / 20)
+    if (rowA !== rowB) return rowA - rowB
+    return a.x - b.x
+  })
+
+  // Assign row labels (A, B, C, ...) based on Y position clusters
+  let currentRow = -1
+  let rowLabel = 'A'
+  let spotInRow = 0
+  const rowThreshold = 20
+
+  for (const obj of sorted) {
+    const objRow = Math.floor(obj.y / rowThreshold)
+    if (objRow !== currentRow) {
+      if (currentRow >= 0) {
+        rowLabel = String.fromCharCode(rowLabel.charCodeAt(0) + 1)
+      }
+      currentRow = objRow
+      spotInRow = 0
+    }
+    spotInRow++
+
+    // Find existing spot at this position
+    const existing = spots.find(
+      s => !matchedSpotIds.has(s.id) && Math.abs(s.x_position - obj.x) < 5 && Math.abs(s.y_position - obj.y) < 5
+    )
+
+    if (existing) {
+      matchedSpotIds.add(existing.id)
+      // Update position/size if changed
+      const needsUpdate =
+        existing.x_position !== obj.x ||
+        existing.y_position !== obj.y ||
+        existing.spot_width_ft !== obj.width_ft ||
+        existing.spot_length_ft !== obj.height_ft
+
+      if (needsUpdate) {
+        await supabase
+          .from('camp_spots' as never)
+          .update({
+            x_position: obj.x,
+            y_position: obj.y,
+            spot_width_ft: obj.width_ft,
+            spot_length_ft: obj.height_ft,
+            max_tent_width_ft: obj.width_ft,
+            max_tent_length_ft: obj.height_ft,
+          } as never)
+          .eq('id' as never, existing.id)
+        updated++
+      }
+    } else {
+      // Create new spot
+      const label = `${rowLabel}${spotInRow}`
+      const { error } = await supabase
+        .from('camp_spots' as never)
+        .insert({
+          row_label: rowLabel,
+          spot_number: spotInRow,
+          label,
+          x_position: obj.x,
+          y_position: obj.y,
+          spot_width_ft: obj.width_ft,
+          spot_length_ft: obj.height_ft,
+          size_category: obj.width_ft <= 8 ? 'small' : obj.width_ft <= 12 ? 'medium' : 'large',
+          min_tent_width_ft: 4,
+          max_tent_width_ft: obj.width_ft,
+          min_tent_length_ft: 4,
+          max_tent_length_ft: obj.height_ft,
+          has_power: false,
+          has_shade: false,
+          is_accessible: false,
+          is_available: true,
+        } as never)
+
+      if (!error) created++
+    }
+  }
+
+  return { created, updated }
 }

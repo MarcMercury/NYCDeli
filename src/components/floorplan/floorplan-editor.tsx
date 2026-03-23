@@ -16,6 +16,7 @@ import {
   createUtilityLine,
   deleteUtilityLine,
 } from '@/lib/floorplan'
+import { syncSpotsFromFloorplan } from '@/lib/camp-spots'
 import { GridCanvas, type DrawingMode } from './grid-canvas'
 import { ObjectPalette } from './object-palette'
 import { PropertiesPanel } from './properties-panel'
@@ -27,6 +28,8 @@ export function FloorplanEditor() {
   const [objects, setObjects] = useState<FloorplanObjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Editor state
@@ -119,6 +122,20 @@ export function FloorplanEditor() {
       setEditingDimensions(false)
     }
     setSaving(false)
+  }
+
+  // Sync reservable objects → camp_spots table
+  async function handleSyncSpots() {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const result = await syncSpotsFromFloorplan(objects)
+      setSyncResult(`Synced: ${result.created} created, ${result.updated} updated`)
+    } catch {
+      setError('Failed to sync spots')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   // Drop new object onto canvas
@@ -420,6 +437,17 @@ export function FloorplanEditor() {
             {hasUnsavedChanges && (
               <Badge variant="warning">Unsaved Changes</Badge>
             )}
+            {syncResult && (
+              <Badge>{syncResult}</Badge>
+            )}
+            <Button
+              variant="secondary"
+              onClick={handleSyncSpots}
+              loading={syncing}
+              disabled={syncing}
+            >
+              🔄 Sync Spots
+            </Button>
             <Button
               onClick={handleSaveAll}
               loading={saving}
