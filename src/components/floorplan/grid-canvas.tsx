@@ -496,17 +496,6 @@ export function GridCanvas({
         </div>
       )}
 
-      {/* Compass */}
-      <div className="absolute top-2 right-2 bg-white/80 border-2 border-black p-2 text-xs pointer-events-none select-none">
-        <div className="text-center font-bold">N</div>
-        <div className="flex justify-between">
-          <span>W</span>
-          <span className="mx-2">⊕</span>
-          <span>E</span>
-        </div>
-        <div className="text-center font-bold">S</div>
-      </div>
-
       {/* Scale indicator */}
       <div className="absolute bottom-2 left-2 bg-white/80 border-2 border-black px-2 py-1 text-xs font-bold pointer-events-none select-none">
         {gridSizeFt}ft
