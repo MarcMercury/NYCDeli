@@ -595,6 +595,7 @@ export interface CampSpotRow {
   is_accessible: boolean
   is_available: boolean
   notes: string | null
+  floorplan_object_id: string | null
 }
 
 export interface CampSpotInsert {
@@ -614,6 +615,7 @@ export interface CampSpotInsert {
   is_accessible?: boolean
   is_available?: boolean
   notes?: string | null
+  floorplan_object_id?: string | null
 }
 
 export interface CampSpotUpdate {

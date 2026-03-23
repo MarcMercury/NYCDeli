@@ -154,8 +154,12 @@ export function CampMap() {
     setSelectedObject({ object: obj, spot })
   }
 
-  // Find a camp spot that matches a floorplan tent object's position
+  // Find a camp spot that matches a floorplan tent object
   function findSpotForObject(obj: FloorplanObjectRow): CampSpotWithReservation | null {
+    // Primary: match by direct link
+    const byId = spots.find(s => s.floorplan_object_id === obj.id)
+    if (byId) return byId
+    // Fallback: match by position proximity
     return spots.find(s => {
       const dx = Math.abs(s.x_position - obj.x)
       const dy = Math.abs(s.y_position - obj.y)

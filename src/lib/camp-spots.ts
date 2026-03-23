@@ -228,6 +228,7 @@ export async function fetchAllCampers() {
 /**
  * Sync camp_spots from reservable floorplan objects.
  * Creates missing spots and updates positions/sizes of existing ones.
+ * Links spots to floorplan objects by ID for reliable matching.
  * Returns the count of created and updated spots.
  */
 export async function syncSpotsFromFloorplan(
@@ -246,7 +247,6 @@ export async function syncSpotsFromFloorplan(
 
   const spots = existingSpots ?? []
 
-  // Match existing spots to objects by position proximity
   const matchedSpotIds = new Set<string>()
   let created = 0
   let updated = 0
@@ -276,41 +276,39 @@ export async function syncSpotsFromFloorplan(
     }
     spotInRow++
 
-    // Find existing spot at this position
+    // Find existing spot: first by object ID, then by position
     const existing = spots.find(
-      s => !matchedSpotIds.has(s.id) && Math.abs(s.x_position - obj.x) < 5 && Math.abs(s.y_position - obj.y) < 5
+      s => !matchedSpotIds.has(s.id) && s.floorplan_object_id === obj.id
+    ) || spots.find(
+      s => !matchedSpotIds.has(s.id) &&
+        Math.abs(Number(s.x_position) - obj.x) < 5 &&
+        Math.abs(Number(s.y_position) - obj.y) < 5
     )
 
     if (existing) {
       matchedSpotIds.add(existing.id)
-      // Update position/size if changed
-      const needsUpdate =
-        existing.x_position !== obj.x ||
-        existing.y_position !== obj.y ||
-        existing.spot_width_ft !== obj.width_ft ||
-        existing.spot_length_ft !== obj.height_ft
-
-      if (needsUpdate) {
-        await supabase
-          .from('camp_spots' as never)
-          .update({
-            x_position: obj.x,
-            y_position: obj.y,
-            spot_width_ft: obj.width_ft,
-            spot_length_ft: obj.height_ft,
-            max_tent_width_ft: obj.width_ft,
-            max_tent_length_ft: obj.height_ft,
-          } as never)
-          .eq('id' as never, existing.id)
-        updated++
-      }
+      // Always update to ensure link + position are correct
+      await supabase
+        .from('camp_spots' as never)
+        .update({
+          floorplan_object_id: obj.id,
+          x_position: obj.x,
+          y_position: obj.y,
+          spot_width_ft: obj.width_ft,
+          spot_length_ft: obj.height_ft,
+          max_tent_width_ft: obj.width_ft,
+          max_tent_length_ft: obj.height_ft,
+        } as never)
+        .eq('id' as never, existing.id)
+      updated++
     } else {
-      // Create new spot
+      // Create new spot linked to this object
       const { error } = await supabase
         .from('camp_spots' as never)
         .insert({
           row_label: rowLabel,
           spot_number: spotInRow,
+          floorplan_object_id: obj.id,
           x_position: obj.x,
           y_position: obj.y,
           spot_width_ft: obj.width_ft,
@@ -336,6 +334,7 @@ export async function syncSpotsFromFloorplan(
             .insert({
               row_label: rowLabel,
               spot_number: spotInRow,
+              floorplan_object_id: obj.id,
               x_position: obj.x,
               y_position: obj.y,
               spot_width_ft: obj.width_ft,
