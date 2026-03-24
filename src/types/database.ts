@@ -745,6 +745,7 @@ export interface FloorplanObjectProperties {
   fuel_type?: 'liquid' | 'propane'
   pc_number?: string
   door_direction?: 'north' | 'south' | 'east' | 'west'
+  opening_side?: 'north' | 'south' | 'east' | 'west'
   road_name?: string
   needs_pumpout?: boolean
   has_generator?: boolean

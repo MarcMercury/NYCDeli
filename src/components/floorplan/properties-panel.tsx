@@ -9,6 +9,7 @@ import { getTemplateForType, OBJECT_TEMPLATES } from './object-templates'
 const FUEL_TYPES = new Set(['fuel_storage', 'propane_storage'])
 const PC_TYPES = new Set(['pc_container'])
 const RV_TYPES = new Set(['rv'])
+const TENT_TYPES = new Set(['tent'])
 const ROAD_TYPES = new Set(['road'])
 const SIGN_TYPES = new Set(['sign'])
 const NEIGHBOR_TYPES = new Set(['neighbor_zone'])
@@ -243,6 +244,26 @@ export function PropertiesPanel({
         </div>
 
         {/* BRC-Specific Properties */}
+        {TENT_TYPES.has(selectedObject.object_type) && (
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+              Tent Opening
+            </p>
+            <Select
+              label="Opening Side"
+              value={selectedObject.properties?.opening_side || ''}
+              onChange={e => updateProp('opening_side', e.target.value || undefined)}
+              options={[
+                { value: '', label: 'Not set' },
+                { value: 'north', label: '▲ North' },
+                { value: 'south', label: '▼ South' },
+                { value: 'east', label: '▶ East' },
+                { value: 'west', label: '◀ West' },
+              ]}
+            />
+          </div>
+        )}
+
         {PC_TYPES.has(selectedObject.object_type) && (
           <div>
             <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
