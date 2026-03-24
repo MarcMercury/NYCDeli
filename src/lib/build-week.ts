@@ -296,16 +296,13 @@ export const RESOURCE_STATUS_COLORS: Record<string, string> = {
 }
 
 export const INVENTORY_CATEGORY_ICONS: Record<string, string> = {
-  structures: '🏗️',
-  electrical: '⚡',
-  kitchen: '🍳',
-  water: '💧',
-  shade: '⛱️',
-  lighting: '💡',
-  tools: '🔧',
-  safety: '🛡️',
-  signage: '🪧',
-  decor: '🎨',
-  personal: '🧑',
-  misc: '📦',
+  shade_structure: '⛱️',
+  tool: '🔧',
+  large_equipment: '🚛',
+  container: '📦',
+  kitchen_item: '🍳',
+  av_equip: '🔊',
+  amenity_equip: '🛋️',
+  other: '🏷️',
+  bm_utility: '⚡',
 }

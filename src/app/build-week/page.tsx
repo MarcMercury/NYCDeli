@@ -1816,18 +1816,15 @@ type InventoryFormData = {
 }
 
 const INVENTORY_CATEGORIES: { value: InventoryCategory; label: string }[] = [
-  { value: 'structures', label: 'Structures' },
-  { value: 'electrical', label: 'Electrical' },
-  { value: 'kitchen', label: 'Kitchen' },
-  { value: 'water', label: 'Water' },
-  { value: 'shade', label: 'Shade' },
-  { value: 'lighting', label: 'Lighting' },
-  { value: 'tools', label: 'Tools' },
-  { value: 'safety', label: 'Safety' },
-  { value: 'signage', label: 'Signage' },
-  { value: 'decor', label: 'Decor' },
-  { value: 'personal', label: 'Personal' },
-  { value: 'misc', label: 'Misc' },
+  { value: 'shade_structure', label: 'Shade Structure' },
+  { value: 'tool', label: 'Tool' },
+  { value: 'large_equipment', label: 'Large Equipment/Vehicle' },
+  { value: 'container', label: 'Container' },
+  { value: 'kitchen_item', label: 'Kitchen Item' },
+  { value: 'av_equip', label: 'A/V Equip' },
+  { value: 'amenity_equip', label: 'Amenity Equip' },
+  { value: 'other', label: 'Other' },
+  { value: 'bm_utility', label: 'BM Utility' },
 ]
 
 function InventoryForm({ item, saving, onSave, onCancel }: {
@@ -1837,7 +1834,7 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
   onCancel: () => void
 }) {
   const [name, setName] = useState(item?.name || '')
-  const [category, setCategory] = useState<string>(item?.category || 'misc')
+  const [category, setCategory] = useState<string>(item?.category || 'other')
   const [description, setDescription] = useState(item?.description || '')
   const [quantityExpected, setQuantityExpected] = useState(item?.quantity_expected ?? 1)
   const [notes, setNotes] = useState(item?.notes || '')

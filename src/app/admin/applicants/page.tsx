@@ -8,7 +8,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { UserProfileRow, CamperRow } from '@/types/database'
-import { adminResetPasswordAction } from '@/app/actions/admin'
+import { adminResetPasswordAction, archiveDeniedApplicantAction, deleteDeniedApplicantAction } from '@/app/actions/admin'
 
 interface ApplicantWithCamper extends UserProfileRow {
   camper: CamperRow | null
@@ -26,6 +26,7 @@ export default function ApplicantReviewPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [resetPassword, setResetPassword] = useState('')
   const [showResetPassword, setShowResetPassword] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'archive' | 'delete' | null>(null)
 
   const fetchApplicants = useCallback(async () => {
     const supabase = createClient()
@@ -138,6 +139,34 @@ export default function ApplicantReviewPage() {
     setActionLoading(false)
   }
 
+  const handleArchive = async (applicant: ApplicantWithCamper) => {
+    setActionLoading(true)
+    const result = await archiveDeniedApplicantAction(applicant.id)
+    if (result.success) {
+      setMessage({ type: 'success', text: `${applicant.email} has been archived. They can now reapply.` })
+      setSelectedApplicant(null)
+      setConfirmAction(null)
+      fetchApplicants()
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to archive applicant' })
+    }
+    setActionLoading(false)
+  }
+
+  const handleDelete = async (applicant: ApplicantWithCamper) => {
+    setActionLoading(true)
+    const result = await deleteDeniedApplicantAction(applicant.id)
+    if (result.success) {
+      setMessage({ type: 'success', text: `${applicant.email} has been permanently deleted. They can now reapply.` })
+      setSelectedApplicant(null)
+      setConfirmAction(null)
+      fetchApplicants()
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to delete applicant' })
+    }
+    setActionLoading(false)
+  }
+
   const getStatusBadge = (applicant: ApplicantWithCamper) => {
     if (applicant.denied_at) return <Badge variant="error">Denied</Badge>
     if (applicant.role === 'pending') return <Badge variant="warning">Pending</Badge>
@@ -201,7 +230,7 @@ export default function ApplicantReviewPage() {
             applicants.map(applicant => (
               <button
                 key={applicant.id}
-                onClick={() => { setSelectedApplicant(applicant); setShowResetPassword(false); setResetPassword('') }}
+                onClick={() => { setSelectedApplicant(applicant); setShowResetPassword(false); setResetPassword(''); setConfirmAction(null) }}
                 className={cn(
                   'w-full text-left p-4 border-2 border-black transition-all',
                   selectedApplicant?.id === applicant.id
@@ -447,15 +476,80 @@ export default function ApplicantReviewPage() {
 
               {/* Re-approve or re-deny for already processed */}
               {(selectedApplicant.role === 'user' || selectedApplicant.denied_at) && (
-                <CardFooter className="border-t-2 border-black pt-4">
+                <CardFooter className="border-t-2 border-black pt-4 flex flex-col gap-4">
                   {selectedApplicant.denied_at && (
-                    <Button
-                      onClick={() => handleApprove(selectedApplicant)}
-                      disabled={actionLoading}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      ✅ Approve (Override Denial)
-                    </Button>
+                    <>
+                      <div className="flex gap-3 w-full">
+                        <Button
+                          onClick={() => handleApprove(selectedApplicant)}
+                          disabled={actionLoading}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          ✅ Approve (Override Denial)
+                        </Button>
+                      </div>
+
+                      {/* Archive / Delete actions for denied applicants */}
+                      {confirmAction ? (
+                        <div className="w-full space-y-3">
+                          <Alert variant="warning">
+                            <strong>
+                              {confirmAction === 'archive'
+                                ? '📦 Archive this applicant?'
+                                : '🗑️ Permanently delete this applicant?'}
+                            </strong>
+                            <p className="mt-1 text-sm">
+                              {confirmAction === 'archive'
+                                ? 'Their data will be saved to an archive and their account removed, allowing them to reapply with the same email.'
+                                : 'All data will be permanently removed with no record kept. They will be able to reapply with the same email.'}
+                            </p>
+                          </Alert>
+                          <div className="flex gap-3">
+                            <Button
+                              onClick={() =>
+                                confirmAction === 'archive'
+                                  ? handleArchive(selectedApplicant)
+                                  : handleDelete(selectedApplicant)
+                              }
+                              disabled={actionLoading}
+                              variant="danger"
+                              className="flex-1"
+                            >
+                              {actionLoading
+                                ? 'Processing...'
+                                : confirmAction === 'archive'
+                                  ? '📦 Confirm Archive'
+                                  : '🗑️ Confirm Delete'}
+                            </Button>
+                            <Button
+                              onClick={() => setConfirmAction(null)}
+                              variant="secondary"
+                              className="flex-1"
+                              disabled={actionLoading}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3 w-full">
+                          <Button
+                            onClick={() => setConfirmAction('archive')}
+                            variant="secondary"
+                            className="flex-1"
+                          >
+                            📦 Archive &amp; Allow Reapply
+                          </Button>
+                          <Button
+                            onClick={() => setConfirmAction('delete')}
+                            variant="danger"
+                            className="flex-1"
+                          >
+                            🗑️ Delete &amp; Allow Reapply
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardFooter>
               )}
