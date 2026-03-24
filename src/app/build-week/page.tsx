@@ -616,7 +616,7 @@ export default function BuildWeekPage() {
               <option value="all">All Categories ({unifiedItems.length})</option>
               {allCategories.map(cat => (
                 <option key={cat} value={cat}>
-                  {(INVENTORY_CATEGORY_ICONS[cat] || CATEGORY_ICONS[cat] || '📦')} {cat.charAt(0).toUpperCase() + cat.slice(1)} ({unifiedItems.filter(i => i.category === cat).length})
+                  {(INVENTORY_CATEGORY_ICONS[cat] || CATEGORY_ICONS[cat] || '📦')} {CATEGORIES.find(c => c.value === cat)?.label || INVENTORY_CATEGORIES.find(c => c.value === cat)?.label || cat} ({unifiedItems.filter(i => i.category === cat).length})
                 </option>
               ))}
             </select>
@@ -681,7 +681,7 @@ export default function BuildWeekPage() {
                   const catItems = filteredUnifiedItems.filter(i => i.category === cat)
                   if (catItems.length === 0) return null
                   const isExpanded = !!expandedCategories[cat]
-                  const catLabel = INVENTORY_CATEGORIES.find(c => c.value === cat)?.label || cat
+                  const catLabel = CATEGORIES.find(c => c.value === cat)?.label || INVENTORY_CATEGORIES.find(c => c.value === cat)?.label || cat
                   const catIcon = INVENTORY_CATEGORY_ICONS[cat] || CATEGORY_ICONS[cat] || '📦'
                   return (
                     <div key={cat} className="border-2 border-black bg-white">
