@@ -653,21 +653,21 @@ export default function BuildWeekPage() {
             </div>
           </div>
 
-          {/* ── Add / Edit Forms ── */}
-          {(showAddResource || editingResource) && (
+          {/* ── Add Forms (new items only) ── */}
+          {showAddResource && !editingResource && (
             <ResourceForm
-              resource={editingResource}
+              resource={null}
               saving={savingResource}
-              onSave={editingResource ? handleEditResource : handleAddResource}
-              onCancel={() => { setShowAddResource(false); setEditingResource(null); setAddItemType(null) }}
+              onSave={handleAddResource}
+              onCancel={() => { setShowAddResource(false); setAddItemType(null) }}
             />
           )}
-          {(showAddInventory || editingInventory) && (
+          {showAddInventory && !editingInventory && (
             <InventoryForm
-              item={editingInventory}
+              item={null}
               saving={savingInventory}
-              onSave={editingInventory ? handleEditInventory : handleAddInventory}
-              onCancel={() => { setShowAddInventory(false); setEditingInventory(null); setAddItemType(null) }}
+              onSave={handleAddInventory}
+              onCancel={() => { setShowAddInventory(false); setAddItemType(null) }}
             />
           )}
 
@@ -721,6 +721,23 @@ export default function BuildWeekPage() {
                                   item.status === 'discard' && 'opacity-40',
                                 )}
                               >
+                                {/* ── Inline Edit Form ── */}
+                                {item.source === 'resource' && editingResource?.id === item.id ? (
+                                  <ResourceForm
+                                    resource={editingResource}
+                                    saving={savingResource}
+                                    onSave={handleEditResource}
+                                    onCancel={() => { setEditingResource(null); setAddItemType(null) }}
+                                  />
+                                ) : item.source === 'checklist' && editingInventory?.id === item.id ? (
+                                  <InventoryForm
+                                    item={editingInventory}
+                                    saving={savingInventory}
+                                    onSave={handleEditInventory}
+                                    onCancel={() => { setEditingInventory(null); setAddItemType(null) }}
+                                  />
+                                ) : (
+                                  <>
                                 {/* Desktop: grid layout */}
                                 <div className="hidden sm:grid grid-cols-[1fr_60px_60px_60px_60px_90px_1fr_auto] gap-2 items-center">
                                   {/* Item name */}
@@ -967,6 +984,8 @@ export default function BuildWeekPage() {
                                     )}
                                   </div>
                                 </div>
+                                  </>
+                                )}
                               </div>
                             ))}
                           </div>
