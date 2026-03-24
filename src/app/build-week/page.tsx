@@ -15,6 +15,8 @@ import {
   fetchBuildInventory,
   updateGoalStatus,
   updateQuestionStatus,
+  updateBuildQuestion,
+  deleteBuildQuestion,
   updateResourceStatus,
   createBuildResource,
   updateBuildResource,
@@ -103,6 +105,7 @@ export default function BuildWeekPage() {
   const [resolutionInputs, setResolutionInputs] = useState<Record<string, string>>({})
   const [showResolutionInput, setShowResolutionInput] = useState<Record<string, boolean>>({})
   const [questionFilter, setQuestionFilter] = useState<'all' | 'open' | 'resolved' | 'deferred'>('all')
+  const [editingQuestion, setEditingQuestion] = useState<BuildQuestion | null>(null)
   const [expandedRef, setExpandedRef] = useState<Record<string, boolean>>({ schedule: true })
   const [showAddResource, setShowAddResource] = useState(false)
   const [editingResource, setEditingResource] = useState<BuildResource | null>(null)
@@ -227,6 +230,38 @@ export default function BuildWeekPage() {
       // Silently fail
     } finally {
       setSavingQuestion(false)
+    }
+  }
+
+  const handleEditQuestion = async (data: QuestionFormData) => {
+    if (!editingQuestion) return
+    setSavingQuestion(true)
+    try {
+      await updateBuildQuestion(editingQuestion.id, data)
+      setQuestions(prev =>
+        prev.map(q => q.id === editingQuestion.id
+          ? { ...q, question: data.question, category: data.category as BuildCategory, context: data.context ?? null, is_pain_point: data.is_pain_point ?? q.is_pain_point }
+          : q
+        )
+      )
+      setEditingQuestion(null)
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingQuestion(false)
+    }
+  }
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    if (!confirm('Delete this question/issue?')) return
+    setUpdatingQuestions(prev => ({ ...prev, [questionId]: true }))
+    try {
+      await deleteBuildQuestion(questionId)
+      setQuestions(prev => prev.filter(q => q.id !== questionId))
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingQuestions(prev => ({ ...prev, [questionId]: false }))
     }
   }
 
@@ -1034,104 +1069,153 @@ export default function BuildWeekPage() {
             />
           )}
 
+          {editingQuestion && (
+            <QuestionForm
+              initialData={editingQuestion}
+              saving={savingQuestion}
+              onSave={handleEditQuestion}
+              onCancel={() => setEditingQuestion(null)}
+            />
+          )}
+
           {filteredQuestions.length === 0 ? (
             <p className="text-gray-400 text-sm">No items match this filter.</p>
           ) : (
-            <div className="border-2 border-black bg-white divide-y divide-gray-100">
+            <div className="border-2 border-black bg-white overflow-x-auto">
+              {/* Table header */}
+              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 text-[11px] font-black uppercase tracking-wider bg-gray-100 border-b-2 border-black">
+                <div className="px-3 py-2">Status</div>
+                <div className="px-3 py-2">Question / Issue</div>
+                <div className="px-3 py-2 text-center">Actions</div>
+                <div className="px-3 py-2 text-center">Edit</div>
+                <div className="px-3 py-2 text-center">Delete</div>
+              </div>
+
+              {/* Table rows */}
               {filteredQuestions.map(q => (
-                <div key={q.id} className="px-4 py-3">
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex-shrink-0">
-                      {q.status === 'resolved' ? '✅' : q.status === 'deferred' ? '⏸️' : q.is_pain_point ? '🔥' : '❓'}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        'text-sm',
-                        q.status === 'resolved' && 'line-through text-gray-400'
-                      )}>
-                        {q.question}
-                        {q.is_pain_point && q.status === 'open' && (
-                          <span className="ml-1.5 text-[10px] font-bold text-red-600">PAIN POINT</span>
-                        )}
-                      </p>
+                <div key={q.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 border-b border-gray-100 last:border-b-0 items-center hover:bg-gray-50 transition-colors">
+                  {/* Status icon */}
+                  <div className="px-3 py-2.5 flex-shrink-0 text-center">
+                    {q.status === 'resolved' ? '✅' : q.status === 'deferred' ? '⏸️' : q.is_pain_point ? '🔥' : '❓'}
+                  </div>
 
-                      {q.context && (
-                        <p className="text-xs text-gray-400 mt-1">{q.context}</p>
-                      )}
-
-                      {q.resolution && (
-                        <p className="text-xs text-green-700 mt-1">→ {q.resolution}</p>
-                      )}
-
-                      {/* Action buttons — only for actionable states */}
-                      {q.status !== 'resolved' && (
-                        <div className="flex items-center gap-2 mt-2">
-                          {!showResolutionInput[q.id] ? (
-                            <>
-                              <button
-                                onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
-                                disabled={updatingQuestions[q.id]}
-                                className="px-2 py-0.5 text-[11px] font-bold border bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
-                              >
-                                Resolve
-                              </button>
-                              {q.status === 'open' && (
-                                <button
-                                  onClick={() => handleQuestionStatusChange(q.id, 'deferred')}
-                                  disabled={updatingQuestions[q.id]}
-                                  className="px-2 py-0.5 text-[11px] font-bold border bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100"
-                                >
-                                  Defer
-                                </button>
-                              )}
-                              {q.status === 'deferred' && (
-                                <button
-                                  onClick={() => handleQuestionStatusChange(q.id, 'open')}
-                                  disabled={updatingQuestions[q.id]}
-                                  className="px-2 py-0.5 text-[11px] font-bold border bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
-                                >
-                                  Reopen
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <div className="flex gap-2 w-full">
-                              <input
-                                type="text"
-                                value={resolutionInputs[q.id] || ''}
-                                onChange={e => setResolutionInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                placeholder="How was this resolved?"
-                                className="flex-1 px-2 py-1 text-sm border-2 border-black focus:outline-none"
-                              />
-                              <button
-                                onClick={() => handleQuestionStatusChange(q.id, 'resolved', resolutionInputs[q.id] || '')}
-                                disabled={updatingQuestions[q.id]}
-                                className="px-3 py-1 text-xs font-bold bg-green-500 text-white hover:bg-green-600"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: false }))}
-                                className="px-3 py-1 text-xs font-bold bg-gray-200 hover:bg-gray-300"
-                              >
-                                ✕
-                              </button>
-                            </div>
+                  {/* Question text + context + resolution */}
+                  <div className="px-3 py-2.5 min-w-0">
+                    {showResolutionInput[q.id] ? (
+                      <div className="flex gap-2 w-full">
+                        <input
+                          type="text"
+                          value={resolutionInputs[q.id] || ''}
+                          onChange={e => setResolutionInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
+                          placeholder="How was this resolved?"
+                          className="flex-1 px-2 py-1 text-sm border-2 border-black focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleQuestionStatusChange(q.id, 'resolved', resolutionInputs[q.id] || '')}
+                          disabled={updatingQuestions[q.id]}
+                          className="px-3 py-1 text-xs font-bold bg-green-500 text-white hover:bg-green-600 whitespace-nowrap"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: false }))}
+                          className="px-3 py-1 text-xs font-bold bg-gray-200 hover:bg-gray-300"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={cn(
+                          'text-sm',
+                          q.status === 'resolved' && 'line-through text-gray-400'
+                        )}>
+                          {q.question}
+                          {q.is_pain_point && q.status === 'open' && (
+                            <span className="ml-1.5 text-[10px] font-bold text-red-600">PAIN POINT</span>
                           )}
-                        </div>
-                      )}
+                        </p>
+                        {q.context && (
+                          <p className="text-xs text-gray-400 mt-0.5">{q.context}</p>
+                        )}
+                        {q.resolution && (
+                          <p className="text-xs text-green-700 mt-0.5">→ {q.resolution}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
 
-                      {/* Reopen for resolved items */}
-                      {q.status === 'resolved' && (
+                  {/* Action buttons column */}
+                  <div className="px-3 py-2.5 flex items-center gap-1.5">
+                    {q.status === 'open' && (
+                      <>
+                        <button
+                          onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
+                          disabled={updatingQuestions[q.id]}
+                          className="px-2 py-0.5 text-[11px] font-bold border bg-green-50 border-green-300 text-green-700 hover:bg-green-100 whitespace-nowrap"
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          onClick={() => handleQuestionStatusChange(q.id, 'deferred')}
+                          disabled={updatingQuestions[q.id]}
+                          className="px-2 py-0.5 text-[11px] font-bold border bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100 whitespace-nowrap"
+                        >
+                          Defer
+                        </button>
+                      </>
+                    )}
+                    {q.status === 'deferred' && (
+                      <>
+                        <button
+                          onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
+                          disabled={updatingQuestions[q.id]}
+                          className="px-2 py-0.5 text-[11px] font-bold border bg-green-50 border-green-300 text-green-700 hover:bg-green-100 whitespace-nowrap"
+                        >
+                          Resolve
+                        </button>
                         <button
                           onClick={() => handleQuestionStatusChange(q.id, 'open')}
                           disabled={updatingQuestions[q.id]}
-                          className="mt-1 px-2 py-0.5 text-[11px] font-bold border bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+                          className="px-2 py-0.5 text-[11px] font-bold border bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap"
                         >
                           Reopen
                         </button>
-                      )}
-                    </div>
+                      </>
+                    )}
+                    {q.status === 'resolved' && (
+                      <button
+                        onClick={() => handleQuestionStatusChange(q.id, 'open')}
+                        disabled={updatingQuestions[q.id]}
+                        className="px-2 py-0.5 text-[11px] font-bold border bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap"
+                      >
+                        Reopen
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Edit button */}
+                  <div className="px-3 py-2.5 text-center">
+                    <button
+                      onClick={() => setEditingQuestion(q)}
+                      className="px-2 py-0.5 text-[11px] font-bold border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+
+                  {/* Delete button */}
+                  <div className="px-3 py-2.5 text-center">
+                    <button
+                      onClick={() => handleDeleteQuestion(q.id)}
+                      disabled={updatingQuestions[q.id]}
+                      className="px-2 py-0.5 text-[11px] font-bold border bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
               ))}
@@ -2032,15 +2116,16 @@ type QuestionFormData = {
   is_pain_point?: boolean
 }
 
-function QuestionForm({ saving, onSave, onCancel }: {
+function QuestionForm({ initialData, saving, onSave, onCancel }: {
+  initialData?: { question: string; category: string; context?: string | null; is_pain_point?: boolean }
   saving: boolean
   onSave: (data: QuestionFormData) => void
   onCancel: () => void
 }) {
-  const [question, setQuestion] = useState('')
-  const [category, setCategory] = useState<string>('logistics')
-  const [context, setContext] = useState('')
-  const [isPainPoint, setIsPainPoint] = useState(false)
+  const [question, setQuestion] = useState(initialData?.question || '')
+  const [category, setCategory] = useState<string>(initialData?.category || 'logistics')
+  const [context, setContext] = useState(initialData?.context || '')
+  const [isPainPoint, setIsPainPoint] = useState(initialData?.is_pain_point || false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -2103,7 +2188,7 @@ function QuestionForm({ saving, onSave, onCancel }: {
             (saving || !question.trim()) && 'opacity-50 cursor-not-allowed'
           )}
         >
-          {saving ? 'Saving…' : 'Add'}
+          {saving ? 'Saving…' : initialData ? 'Save' : 'Add'}
         </button>
         <button
           type="button"

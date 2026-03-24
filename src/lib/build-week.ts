@@ -125,6 +125,29 @@ export async function createBuildQuestion(question: {
   return data as BuildQuestion
 }
 
+export async function updateBuildQuestion(questionId: string, updates: {
+  question?: string
+  category?: string
+  context?: string | null
+  is_pain_point?: boolean
+}) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_questions')
+    .update(updates as never)
+    .eq('id', questionId)
+  if (error) throw error
+}
+
+export async function deleteBuildQuestion(questionId: string) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_questions')
+    .delete()
+    .eq('id', questionId)
+  if (error) throw error
+}
+
 export async function updateResourceStatus(resourceId: string, status: 'have' | 'need' | 'fix' | 'discard') {
   const supabase = createClient()
   const { error } = await supabase
