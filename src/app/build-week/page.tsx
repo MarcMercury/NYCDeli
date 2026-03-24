@@ -13,6 +13,11 @@ import {
   fetchBuildQuestions,
   fetchBuildWeekBuilders,
   fetchBuildInventory,
+  fetchBuildSchedule,
+  createScheduleItem,
+  updateScheduleItem,
+  deleteScheduleItem,
+  reorderScheduleItems,
   updateGoalStatus,
   updateQuestionStatus,
   updateBuildQuestion,
@@ -29,6 +34,10 @@ import {
   CATEGORY_ICONS,
   RESOURCE_STATUS_COLORS,
   INVENTORY_CATEGORY_ICONS,
+  BUILD_SCHEDULE_DAYS,
+  BUILD_SCHEDULE_DAY_LABELS,
+  SCHEDULE_CATEGORY_ICONS,
+  SCHEDULE_CATEGORY_COLORS,
 } from '@/lib/build-week'
 import type {
   BuildStageWithGoals,
@@ -37,6 +46,9 @@ import type {
   BuildQuestion,
   BuildGoal,
   BuildInventory,
+  BuildScheduleItem,
+  BuildScheduleDay,
+  BuildScheduleCategory,
   TaskStatus,
   BuildResourceStatus,
   BuildQuestionStatus,
@@ -52,7 +64,7 @@ const tabs: Tab[] = [
   { id: 'inventory', label: 'Inventory' },
   { id: 'issues', label: "Q's & Issues" },
   { id: 'shade', label: 'Shade Guide' },
-  { id: 'info', label: 'Info' },
+  { id: 'schedule', label: 'Build Schedule' },
 ]
 
 type UnifiedItem = {
@@ -122,6 +134,13 @@ export default function BuildWeekPage() {
   const [unifiedStatusFilter, setUnifiedStatusFilter] = useState<string>('all')
   const [addItemType, setAddItemType] = useState<'resource' | 'checklist' | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+  const [scheduleItems, setScheduleItems] = useState<BuildScheduleItem[]>([])
+  const [editingScheduleItem, setEditingScheduleItem] = useState<BuildScheduleItem | null>(null)
+  const [showAddScheduleItem, setShowAddScheduleItem] = useState(false)
+  const [savingScheduleItem, setSavingScheduleItem] = useState(false)
+  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(BUILD_SCHEDULE_DAYS.map(d => [d, true]))
+  )
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))
@@ -129,7 +148,7 @@ export default function BuildWeekPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [stagesData, resourcesData, proceduresData, questionsData, buildersData, inventoryData] =
+      const [stagesData, resourcesData, proceduresData, questionsData, buildersData, inventoryData, scheduleData] =
         await Promise.all([
           fetchBuildStagesWithGoals(),
           fetchBuildResources(),
@@ -137,6 +156,7 @@ export default function BuildWeekPage() {
           fetchBuildQuestions(),
           fetchBuildWeekBuilders(),
           fetchBuildInventory(),
+          fetchBuildSchedule(),
         ])
       setStages(stagesData)
       setResources(resourcesData)
@@ -144,6 +164,7 @@ export default function BuildWeekPage() {
       setQuestions(questionsData)
       setBuilders(buildersData)
       setInventory(inventoryData)
+      setScheduleItems(scheduleData)
       // Auto-expand the first stage with incomplete goals
       const firstIncomplete = stagesData.find(s => s.goals.some(g => g.status !== 'done'))
       if (firstIncomplete) {
@@ -1556,141 +1577,161 @@ export default function BuildWeekPage() {
           </div>
         </TabPanel>
 
-        {/* ═══════════  INFO (read-only)  ═══════════ */}
-        <TabPanel tabId="info" activeTab={activeTab}>
-          <p className="text-[11px] text-gray-400 uppercase tracking-wider font-bold mb-4">
-            Reference only — nothing to action here
-          </p>
-
-          <div className="space-y-2">
-            {/* Daily Schedule */}
-            <RefSection
-              title="Daily Schedule"
-              icon="📅"
-              isOpen={!!expandedRef.schedule}
-              onToggle={() => toggleRef('schedule')}
+        {/* ═══════════  BUILD SCHEDULE  ═══════════ */}
+        <TabPanel tabId="schedule" activeTab={activeTab}>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[11px] text-gray-400 uppercase tracking-wider font-bold">
+              Day-by-day build plan — tap items to edit, drag to reorder
+            </p>
+            <button
+              onClick={() => { setEditingScheduleItem(null); setShowAddScheduleItem(true) }}
+              className="text-xs bg-black text-white px-3 py-1.5 hover:bg-gray-800 transition-colors"
             >
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-gray-200 text-center text-xs">
-                {[
-                  { time: '8:00 AM', label: 'Briefing' },
-                  { time: '8:30–12:00', label: 'Work Block 1' },
-                  { time: '12:00–2:00', label: 'Lunch / Rest' },
-                  { time: '2:00–6:00', label: 'Work Block 2' },
-                  { time: '6:30 PM', label: 'Debrief' },
-                ].map(s => (
-                  <div key={s.label} className="bg-white py-2 px-1">
-                    <p className="font-bold">{s.time}</p>
-                    <p className="text-gray-500">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-            </RefSection>
+              + Add Item
+            </button>
+          </div>
 
-            {/* Safety */}
-            <RefSection
-              title="Safety & Etiquette"
-              icon="🛡️"
-              isOpen={!!expandedRef.safety}
-              onToggle={() => toggleRef('safety')}
-            >
-              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-                <li>Hydrate constantly. Sunscreen every 2 hours.</li>
-                <li>Closed-toe shoes only. Safety glasses with power tools.</li>
-                <li>Don&apos;t know a tool? Ask. Return tools when done.</li>
-                <li>Report damaged tools immediately.</li>
-                <li>First aid at kitchen. Serious injuries → Rangers / 911.</li>
-                <li>Plan free time — don&apos;t work sunrise to sunset.</li>
-              </ul>
-            </RefSection>
+          <div className="space-y-3">
+            {BUILD_SCHEDULE_DAYS.map(day => {
+              const dayItems = scheduleItems.filter(item => item.day === day)
+              const completedCount = dayItems.filter(i => i.completed).length
+              const isExpanded = expandedScheduleDays[day] !== false
 
-            {/* Build Crew */}
-            <RefSection
-              title={`Build Crew (${builders.length})`}
-              icon="👥"
-              isOpen={!!expandedRef.crew}
-              onToggle={() => toggleRef('crew')}
-            >
-              {builders.length === 0 ? (
-                <p className="text-gray-400 text-xs">No one signed up yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {builders.map(c => (
-                    <span key={c.id} className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                      {c.playa_name || c.full_name}
-                      {c.build_week_arrival_date && (
-                        <span className="text-gray-400 ml-1">
-                          {new Date(c.build_week_arrival_date).toLocaleDateString('en-US', { weekday: 'short' })}
-                        </span>
-                      )}
+              return (
+                <div key={day} className="border border-gray-200 bg-white">
+                  <button
+                    onClick={() => setExpandedScheduleDays(prev => ({ ...prev, [day]: !isExpanded }))}
+                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="text-lg">📅</span>
+                    <span className="flex-1 font-bold text-sm">
+                      {BUILD_SCHEDULE_DAY_LABELS[day]}
                     </span>
-                  ))}
-                </div>
-              )}
-            </RefSection>
+                    {dayItems.length > 0 && (
+                      <span className="text-[10px] text-gray-400">
+                        {completedCount}/{dayItems.length} done
+                      </span>
+                    )}
+                    {dayItems.some(i => i.is_delivery) && (
+                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                        🚚 Deliveries
+                      </span>
+                    )}
+                    <span className="text-gray-300 text-xs">{isExpanded ? '▾' : '▸'}</span>
+                  </button>
 
-            {/* Tools & Vehicles */}
-            {builders.length > 0 && (
-              <RefSection
-                title="Tools & Vehicles"
-                icon="🔧"
-                isOpen={!!expandedRef.tools}
-                onToggle={() => toggleRef('tools')}
-              >
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {Array.from(new Set(builders.flatMap(c => c.tools_bringing))).length === 0 ? (
-                    <span className="text-gray-400 text-xs">No tools listed yet.</span>
-                  ) : (
-                    Array.from(new Set(builders.flatMap(c => c.tools_bringing))).map(tool => (
-                      <Badge key={tool} variant="default" className="text-[10px]">{tool}</Badge>
-                    ))
+                  {isExpanded && (
+                    <div className="border-t border-gray-100">
+                      {dayItems.length === 0 ? (
+                        <p className="px-4 py-3 text-xs text-gray-400 italic">No items scheduled</p>
+                      ) : (
+                        <div className="divide-y divide-gray-50">
+                          {dayItems.map((item, idx) => (
+                            <ScheduleItemRow
+                              key={item.id}
+                              item={item}
+                              isFirst={idx === 0}
+                              isLast={idx === dayItems.length - 1}
+                              onToggleComplete={async () => {
+                                const updated = await updateScheduleItem(item.id, { completed: !item.completed })
+                                setScheduleItems(prev => prev.map(i => i.id === item.id ? updated : i))
+                              }}
+                              onEdit={() => { setEditingScheduleItem(item); setShowAddScheduleItem(true) }}
+                              onDelete={async () => {
+                                await deleteScheduleItem(item.id)
+                                setScheduleItems(prev => prev.filter(i => i.id !== item.id))
+                              }}
+                              onMoveUp={async () => {
+                                if (idx === 0) return
+                                const prev = dayItems[idx - 1]
+                                const updates = [
+                                  { id: item.id, sort_order: prev.sort_order, day },
+                                  { id: prev.id, sort_order: item.sort_order, day },
+                                ]
+                                await reorderScheduleItems(updates)
+                                setScheduleItems(items =>
+                                  items.map(i => {
+                                    const u = updates.find(u => u.id === i.id)
+                                    return u ? { ...i, sort_order: u.sort_order } : i
+                                  }).sort((a, b) => a.sort_order - b.sort_order)
+                                )
+                              }}
+                              onMoveDown={async () => {
+                                if (idx === dayItems.length - 1) return
+                                const next = dayItems[idx + 1]
+                                const updates = [
+                                  { id: item.id, sort_order: next.sort_order, day },
+                                  { id: next.id, sort_order: item.sort_order, day },
+                                ]
+                                await reorderScheduleItems(updates)
+                                setScheduleItems(items =>
+                                  items.map(i => {
+                                    const u = updates.find(u => u.id === i.id)
+                                    return u ? { ...i, sort_order: u.sort_order } : i
+                                  }).sort((a, b) => a.sort_order - b.sort_order)
+                                )
+                              }}
+                              onMoveToDay={async (newDay: string) => {
+                                const targetDayItems = scheduleItems.filter(i => i.day === newDay)
+                                const maxSort = targetDayItems.length > 0
+                                  ? Math.max(...targetDayItems.map(i => i.sort_order))
+                                  : 0
+                                const updated = await updateScheduleItem(item.id, {
+                                  day: newDay as BuildScheduleDay,
+                                  sort_order: maxSort + 10,
+                                })
+                                setScheduleItems(prev =>
+                                  prev.map(i => i.id === item.id ? updated : i)
+                                    .sort((a, b) => a.sort_order - b.sort_order)
+                                )
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                {builders.filter(c => c.vehicle_info).map(c => (
-                  <p key={c.id} className="text-xs text-gray-500">
-                    🚗 {c.vehicle_info} ({c.playa_name || c.full_name})
-                  </p>
-                ))}
-              </RefSection>
-            )}
-
-            {/* Procedures */}
-            {procedures.map(proc => (
-              <RefSection
-                key={proc.id}
-                title={proc.title}
-                icon={CATEGORY_ICONS[proc.category] || '📋'}
-                isOpen={!!expandedRef[proc.id]}
-                onToggle={() => toggleRef(proc.id)}
-              >
-                {proc.description && (
-                  <p className="text-xs text-gray-500 mb-2">{proc.description}</p>
-                )}
-                <ol className="space-y-1.5">
-                  {proc.steps.map((step, i) => (
-                    <li key={i} className="flex gap-2 text-xs">
-                      <span className="flex-shrink-0 w-5 h-5 bg-black text-white flex items-center justify-center text-[10px] font-bold">
-                        {step.order}
-                      </span>
-                      <div>
-                        <span>{step.text}</span>
-                        {step.notes && <span className="text-gray-400 italic ml-1">— {step.notes}</span>}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-                {proc.reference_links.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
-                    {proc.reference_links.map((link, i) => (
-                      <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline block">
-                        {link.title} ↗
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </RefSection>
-            ))}
+              )
+            })}
           </div>
         </TabPanel>
+
+        {/* Schedule Item Form Modal */}
+        {showAddScheduleItem && (
+          <ScheduleItemForm
+            initial={editingScheduleItem}
+            saving={savingScheduleItem}
+            onSave={async (formData) => {
+              setSavingScheduleItem(true)
+              try {
+                if (editingScheduleItem) {
+                  const updated = await updateScheduleItem(editingScheduleItem.id, formData)
+                  setScheduleItems(prev =>
+                    prev.map(i => i.id === editingScheduleItem.id ? updated : i)
+                      .sort((a, b) => a.sort_order - b.sort_order)
+                  )
+                } else {
+                  const dayItems = scheduleItems.filter(i => i.day === formData.day)
+                  const maxSort = dayItems.length > 0
+                    ? Math.max(...dayItems.map(i => i.sort_order))
+                    : 0
+                  const created = await createScheduleItem({
+                    ...formData,
+                    sort_order: maxSort + 10,
+                    completed: false,
+                  } as Omit<BuildScheduleItem, 'id' | 'created_at' | 'updated_at'>)
+                  setScheduleItems(prev => [...prev, created].sort((a, b) => a.sort_order - b.sort_order))
+                }
+                setShowAddScheduleItem(false)
+                setEditingScheduleItem(null)
+              } finally {
+                setSavingScheduleItem(false)
+              }
+            }}
+            onCancel={() => { setShowAddScheduleItem(false); setEditingScheduleItem(null) }}
+          />
+        )}
       </div>
     </div>
   )
@@ -2199,5 +2240,335 @@ function QuestionForm({ initialData, saving, onSave, onCancel }: {
         </button>
       </div>
     </form>
+  )
+}
+
+/* ── Schedule Item Row ── */
+
+function ScheduleItemRow({
+  item,
+  isFirst,
+  isLast,
+  onToggleComplete,
+  onEdit,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  onMoveToDay,
+}: {
+  item: BuildScheduleItem
+  isFirst: boolean
+  isLast: boolean
+  onToggleComplete: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onMoveToDay: (day: string) => void
+}) {
+  const [showActions, setShowActions] = useState(false)
+  const [showMoveMenu, setShowMoveMenu] = useState(false)
+
+  return (
+    <div className={cn('px-4 py-2.5 group', item.completed && 'bg-green-50/40')}>
+      <div className="flex items-center gap-2">
+        {/* Completion toggle */}
+        <button
+          onClick={onToggleComplete}
+          className="text-lg flex-shrink-0 hover:scale-110 transition-transform"
+          title={item.completed ? 'Mark incomplete' : 'Mark complete'}
+        >
+          {item.completed ? '✅' : '⬜'}
+        </button>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              'text-sm',
+              item.completed && 'line-through text-gray-400'
+            )}>
+              {item.is_delivery && <span className="mr-1">🚚</span>}
+              {item.title}
+            </span>
+          </div>
+          {item.description && (
+            <p className="text-[11px] text-gray-400 mt-0.5 truncate">{item.description}</p>
+          )}
+        </div>
+
+        {/* Category badge */}
+        <span className={cn(
+          'hidden sm:inline text-[10px] px-1.5 py-0.5 rounded',
+          SCHEDULE_CATEGORY_COLORS[item.category] || 'bg-gray-100 text-gray-600'
+        )}>
+          {SCHEDULE_CATEGORY_ICONS[item.category]} {item.category}
+        </span>
+
+        {item.time_slot && (
+          <span className="hidden sm:inline text-[10px] text-gray-400">
+            {item.time_slot === 'morning' ? '🌅 AM' : item.time_slot === 'afternoon' ? '☀️ PM' : '📆 All day'}
+          </span>
+        )}
+
+        {item.assigned_to && (
+          <span className="hidden sm:inline text-[10px] text-gray-400">
+            👤 {item.assigned_to}
+          </span>
+        )}
+
+        {/* Actions toggle */}
+        <button
+          onClick={() => { setShowActions(p => !p); setShowMoveMenu(false) }}
+          className="text-gray-300 hover:text-gray-600 text-xs px-1"
+        >
+          ⋯
+        </button>
+      </div>
+
+      {/* Action buttons */}
+      {showActions && (
+        <div className="ml-8 mt-2 flex flex-wrap gap-1.5">
+          <button
+            onClick={onEdit}
+            className="text-[10px] px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded"
+          >
+            ✏️ Edit
+          </button>
+          {!isFirst && (
+            <button
+              onClick={onMoveUp}
+              className="text-[10px] px-2 py-1 bg-gray-50 text-gray-700 hover:bg-gray-100 rounded"
+            >
+              ↑ Up
+            </button>
+          )}
+          {!isLast && (
+            <button
+              onClick={onMoveDown}
+              className="text-[10px] px-2 py-1 bg-gray-50 text-gray-700 hover:bg-gray-100 rounded"
+            >
+              ↓ Down
+            </button>
+          )}
+          <div className="relative">
+            <button
+              onClick={() => setShowMoveMenu(p => !p)}
+              className="text-[10px] px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded"
+            >
+              📅 Move to…
+            </button>
+            {showMoveMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 shadow-lg rounded z-20 py-1 min-w-[120px]">
+                {BUILD_SCHEDULE_DAYS.filter(d => d !== item.day).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => { onMoveToDay(d); setShowMoveMenu(false); setShowActions(false) }}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                  >
+                    {BUILD_SCHEDULE_DAY_LABELS[d]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => { if (confirm('Delete this schedule item?')) onDelete() }}
+            className="text-[10px] px-2 py-1 bg-red-50 text-red-700 hover:bg-red-100 rounded"
+          >
+            🗑 Delete
+          </button>
+        </div>
+      )}
+
+      {item.notes && (
+        <p className="ml-8 mt-1 text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded">
+          {item.notes}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/* ── Schedule Item Form ── */
+
+const SCHEDULE_CATEGORIES: { value: string; label: string }[] = [
+  { value: 'delivery', label: '🚚 Delivery / Receiving' },
+  { value: 'infrastructure', label: '🏗️ Infrastructure' },
+  { value: 'shade', label: '⛱️ Shade' },
+  { value: 'kitchen', label: '🍳 Kitchen' },
+  { value: 'electrical', label: '⚡ Electrical' },
+  { value: 'plumbing', label: '🚿 Plumbing' },
+  { value: 'layout', label: '📐 Layout' },
+  { value: 'decoration', label: '🎨 Decoration' },
+  { value: 'logistics', label: '📦 Logistics' },
+  { value: 'safety', label: '🛡️ Safety' },
+  { value: 'other', label: '🏷️ Other' },
+]
+
+function ScheduleItemForm({
+  initial,
+  saving,
+  onSave,
+  onCancel,
+}: {
+  initial: BuildScheduleItem | null
+  saving: boolean
+  onSave: (data: {
+    title: string
+    description: string | null
+    day: BuildScheduleDay
+    category: BuildScheduleCategory
+    time_slot: string | null
+    is_delivery: boolean
+    assigned_to: string | null
+    notes: string | null
+  }) => void
+  onCancel: () => void
+}) {
+  const [title, setTitle] = useState(initial?.title || '')
+  const [description, setDescription] = useState(initial?.description || '')
+  const [day, setDay] = useState<string>(initial?.day || 'monday')
+  const [category, setCategory] = useState<string>(initial?.category || 'other')
+  const [timeSlot, setTimeSlot] = useState(initial?.time_slot || '')
+  const [isDelivery, setIsDelivery] = useState(initial?.is_delivery || false)
+  const [assignedTo, setAssignedTo] = useState(initial?.assigned_to || '')
+  const [notes, setNotes] = useState(initial?.notes || '')
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <form
+        onSubmit={e => {
+          e.preventDefault()
+          if (!title.trim()) return
+          onSave({
+            title: title.trim(),
+            description: description.trim() || null,
+            day: day as BuildScheduleDay,
+            category: category as BuildScheduleCategory,
+            time_slot: timeSlot || null,
+            is_delivery: isDelivery,
+            assigned_to: assignedTo.trim() || null,
+            notes: notes.trim() || null,
+          })
+        }}
+        className="bg-white p-5 w-full max-w-md space-y-3 shadow-xl max-h-[85vh] overflow-y-auto"
+      >
+        <h3 className="text-sm font-bold">
+          {initial ? 'Edit Schedule Item' : 'Add Schedule Item'}
+        </h3>
+
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Task title *"
+          required
+          className="w-full border border-gray-300 px-3 py-1.5 text-sm focus:ring-1 focus:ring-black focus:border-black"
+        />
+
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="Description (optional)"
+          rows={2}
+          className="w-full border border-gray-300 px-3 py-1.5 text-sm focus:ring-1 focus:ring-black focus:border-black"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Day</label>
+            <select
+              value={day}
+              onChange={e => setDay(e.target.value)}
+              className="w-full border border-gray-300 px-2 py-1.5 text-sm"
+            >
+              {BUILD_SCHEDULE_DAYS.map(d => (
+                <option key={d} value={d}>{BUILD_SCHEDULE_DAY_LABELS[d]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Category</label>
+            <select
+              value={category}
+              onChange={e => {
+                setCategory(e.target.value)
+                if (e.target.value === 'delivery') setIsDelivery(true)
+              }}
+              className="w-full border border-gray-300 px-2 py-1.5 text-sm"
+            >
+              {SCHEDULE_CATEGORIES.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Time Slot</label>
+            <select
+              value={timeSlot}
+              onChange={e => setTimeSlot(e.target.value)}
+              className="w-full border border-gray-300 px-2 py-1.5 text-sm"
+            >
+              <option value="">Not specified</option>
+              <option value="morning">Morning</option>
+              <option value="afternoon">Afternoon</option>
+              <option value="all_day">All Day</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Assigned To</label>
+            <input
+              value={assignedTo}
+              onChange={e => setAssignedTo(e.target.value)}
+              placeholder="Person or crew"
+              className="w-full border border-gray-300 px-2 py-1.5 text-sm"
+            />
+          </div>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={isDelivery}
+            onChange={e => setIsDelivery(e.target.checked)}
+            className="w-4 h-4"
+          />
+          🚚 This is a delivery / receiving item
+        </label>
+
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Notes (optional)"
+          rows={2}
+          className="w-full border border-gray-300 px-3 py-1.5 text-sm focus:ring-1 focus:ring-black focus:border-black"
+        />
+
+        <div className="flex gap-2 pt-2">
+          <button
+            type="submit"
+            disabled={saving || !title.trim()}
+            className={cn(
+              'px-4 py-1.5 text-sm font-bold text-white',
+              saving || !title.trim() ? 'bg-gray-400' : 'bg-black hover:bg-gray-800'
+            )}
+          >
+            {saving ? 'Saving…' : initial ? 'Update' : 'Add'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-1.5 text-sm font-bold bg-gray-200 hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
   )
 }

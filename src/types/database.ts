@@ -537,6 +537,12 @@ export interface Database {
         Update: Partial<Omit<BuildInventoryRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: []
       }
+      build_schedule_items: {
+        Row: BuildScheduleItemRow
+        Insert: Omit<BuildScheduleItemRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<BuildScheduleItemRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
       shift_drafts: {
         Row: ShiftDraftRow
         Insert: ShiftDraftInsert
@@ -1111,6 +1117,25 @@ export interface BuildInventoryRow {
   updated_at: string
 }
 
+export type BuildScheduleDay = 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+export type BuildScheduleCategory = 'delivery' | 'infrastructure' | 'shade' | 'kitchen' | 'electrical' | 'plumbing' | 'layout' | 'decoration' | 'logistics' | 'safety' | 'other'
+
+export interface BuildScheduleItemRow {
+  id: string
+  day: BuildScheduleDay
+  title: string
+  description: string | null
+  category: BuildScheduleCategory
+  time_slot: string | null
+  sort_order: number
+  is_delivery: boolean
+  completed: boolean
+  assigned_to: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Convenience types
 export type BuildStage = BuildStageRow
 export type BuildGoal = BuildGoalRow
@@ -1118,6 +1143,7 @@ export type BuildResource = BuildResourceRow
 export type BuildProcedure = BuildProcedureRow
 export type BuildQuestion = BuildQuestionRow
 export type BuildInventory = BuildInventoryRow
+export type BuildScheduleItem = BuildScheduleItemRow
 
 // Extended type for stage with its goals
 export interface BuildStageWithGoals extends BuildStageRow {

@@ -7,6 +7,7 @@ import type {
   BuildQuestion,
   BuildStageWithGoals,
   BuildInventory,
+  BuildScheduleItem,
   Camper,
 } from '@/types/database'
 
@@ -352,4 +353,110 @@ export const INVENTORY_CATEGORY_ICONS: Record<string, string> = {
   furniture: '🛋️',
   layout: '📐',
   other: '🏷️',
+}
+
+// ==========================================
+// Build Schedule
+// ==========================================
+
+export const BUILD_SCHEDULE_DAYS = [
+  'saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+] as const
+
+export const BUILD_SCHEDULE_DAY_LABELS: Record<string, string> = {
+  saturday: 'Saturday',
+  sunday: 'Sunday',
+  monday: 'Monday',
+  tuesday: 'Tuesday',
+  wednesday: 'Wednesday',
+  thursday: 'Thursday',
+  friday: 'Friday',
+}
+
+export const SCHEDULE_CATEGORY_ICONS: Record<string, string> = {
+  delivery: '🚚',
+  infrastructure: '🏗️',
+  shade: '⛱️',
+  kitchen: '🍳',
+  electrical: '⚡',
+  plumbing: '🚿',
+  layout: '📐',
+  decoration: '🎨',
+  logistics: '📦',
+  safety: '🛡️',
+  other: '🏷️',
+}
+
+export const SCHEDULE_CATEGORY_COLORS: Record<string, string> = {
+  delivery: 'bg-purple-100 text-purple-800',
+  infrastructure: 'bg-blue-100 text-blue-800',
+  shade: 'bg-amber-100 text-amber-800',
+  kitchen: 'bg-red-100 text-red-800',
+  electrical: 'bg-yellow-100 text-yellow-800',
+  plumbing: 'bg-teal-100 text-teal-800',
+  layout: 'bg-orange-100 text-orange-800',
+  decoration: 'bg-pink-100 text-pink-800',
+  logistics: 'bg-slate-100 text-slate-800',
+  safety: 'bg-green-100 text-green-800',
+  other: 'bg-gray-100 text-gray-800',
+}
+
+export async function fetchBuildSchedule(): Promise<BuildScheduleItem[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_schedule_items')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data as BuildScheduleItem[]) || []
+}
+
+export async function createScheduleItem(
+  item: Omit<BuildScheduleItem, 'id' | 'created_at' | 'updated_at'>
+): Promise<BuildScheduleItem> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_schedule_items')
+    .insert(item as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildScheduleItem
+}
+
+export async function updateScheduleItem(
+  id: string,
+  updates: Partial<Omit<BuildScheduleItem, 'id' | 'created_at' | 'updated_at'>>
+): Promise<BuildScheduleItem> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_schedule_items')
+    .update(updates as never)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildScheduleItem
+}
+
+export async function deleteScheduleItem(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_schedule_items')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function reorderScheduleItems(
+  items: { id: string; sort_order: number; day: string }[]
+): Promise<void> {
+  const supabase = createClient()
+  for (const item of items) {
+    const { error } = await supabase
+      .from('build_schedule_items')
+      .update({ sort_order: item.sort_order, day: item.day } as never)
+      .eq('id', item.id)
+    if (error) throw error
+  }
 }
