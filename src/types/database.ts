@@ -555,6 +555,12 @@ export interface Database {
         Update: ShiftDraftPickUpdate
         Relationships: []
       }
+      deli_ideas: {
+        Row: DeliIdeaRow
+        Insert: DeliIdeaInsert
+        Update: DeliIdeaUpdate
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -675,6 +681,40 @@ export interface CampReservationUpdate {
   admin_notes?: string | null
 }
 
+// Deli Idea Forum Types
+export interface DeliIdeaRow {
+  id: string
+  created_at: string
+  updated_at: string
+  user_id: string
+  author_name: string
+  author_email: string
+  category: string
+  title: string
+  body: string
+  is_read: boolean
+  read_at: string | null
+  read_by: string | null
+}
+
+export interface DeliIdeaInsert {
+  user_id: string
+  author_name: string
+  author_email: string
+  category?: string
+  title: string
+  body: string
+}
+
+export interface DeliIdeaUpdate {
+  category?: string
+  title?: string
+  body?: string
+  is_read?: boolean
+  read_at?: string | null
+  read_by?: string | null
+}
+
 // Convenience types
 export type Camper = CamperRow
 
@@ -687,6 +727,7 @@ export type CamperChecklist = Database['public']['Tables']['camper_checklists'][
 export type SystemSetting = Database['public']['Tables']['system_settings']['Row']
 export type CampSpot = CampSpotRow
 export type CampReservation = CampReservationRow
+export type DeliIdea = DeliIdeaRow
 
 // Extended type for spot with reservation info
 export interface CampSpotWithReservation extends CampSpotRow {

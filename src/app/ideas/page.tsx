@@ -150,11 +150,8 @@ export default function IdeasPage() {
                     <Select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                    >
-                      {CATEGORIES.map(cat => (
-                        <option key={cat.value} value={cat.value}>{cat.label}</option>
-                      ))}
-                    </Select>
+                      options={CATEGORIES.map(cat => ({ value: cat.value, label: cat.label }))}
+                    />
                   </div>
 
                   <div>

@@ -135,11 +135,8 @@ export default function AdminIdeasPage() {
         <Select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          {CATEGORIES.map(cat => (
-            <option key={cat.value} value={cat.value}>{cat.label}</option>
-          ))}
-        </Select>
+          options={CATEGORIES.map(cat => ({ value: cat.value, label: cat.label }))}
+        />
       </div>
 
       {/* Ideas list */}
