@@ -315,7 +315,9 @@ export default function ProfilePage() {
     setUploading(true)
     try {
       const supabase = createClient()
-      const nextOrder = photos.length + 1
+      // Find the next available display_order (accounts for gaps from deletions)
+      const usedOrders = photos.map(p => p.display_order)
+      const nextOrder = [1, 2, 3].find(n => !usedOrders.includes(n)) ?? (photos.length + 1)
 
       // Resize & compress to JPEG before upload — critical for mobile camera photos
       const resizedBlob = await resizeImage(file, 1200, 0.85)
@@ -332,11 +334,11 @@ export default function ProfilePage() {
 
       const { error: dbError } = await supabase
         .from('camper_photos')
-        .insert({
+        .upsert({
           user_id: profile.id,
           storage_path: fileName,
           display_order: nextOrder,
-        } as never)
+        } as never, { onConflict: 'user_id,display_order' })
 
       if (dbError) {
         setMessage({ type: 'error', text: dbError.message })

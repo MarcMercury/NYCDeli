@@ -386,6 +386,14 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </Link>
+          <Link href="/admin/ideas" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">💡</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Idea Forum</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Tabs */}

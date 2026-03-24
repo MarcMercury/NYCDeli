@@ -22,6 +22,7 @@ const userNavItems = [
   { href: '/map', label: 'Camp Map', icon: '🏕️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
   { href: '/build-week', label: 'Build Week', icon: '🔨' },
+  { href: '/ideas', label: 'Ideas', icon: '💡' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
