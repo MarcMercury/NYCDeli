@@ -1716,6 +1716,17 @@ const CATEGORIES: { value: BuildCategory; label: string }[] = [
   { value: 'layout', label: 'Layout' },
   { value: 'decoration', label: 'Decoration' },
   { value: 'personal', label: 'Personal' },
+  { value: 'shade_structure', label: 'Shade Structure' },
+  { value: 'tool', label: 'Tool' },
+  { value: 'large_equipment', label: 'Large Equipment/Vehicle' },
+  { value: 'container', label: 'Container' },
+  { value: 'kitchen_item', label: 'Kitchen Item' },
+  { value: 'av_equip', label: 'A/V Equip' },
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'furniture', label: 'Furniture' },
+  { value: 'other', label: 'Other' },
+  { value: 'bm_utility', label: 'BM Utility' },
 ]
 
 function ResourceForm({ resource, saving, onSave, onCancel }: {

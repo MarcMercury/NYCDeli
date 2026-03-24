@@ -279,6 +279,17 @@ export const CATEGORY_ICONS: Record<string, string> = {
   layout: '📐',
   decoration: '🎨',
   personal: '🧑',
+  shade_structure: '⛱️',
+  tool: '🔧',
+  large_equipment: '🚛',
+  container: '📦',
+  kitchen_item: '🍳',
+  av_equip: '🔊',
+  electrical: '⚡',
+  plumbing: '🚿',
+  furniture: '🛋️',
+  other: '🏷️',
+  bm_utility: '🔶',
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -290,6 +301,17 @@ export const CATEGORY_COLORS: Record<string, string> = {
   layout: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   decoration: 'bg-pink-100 text-pink-800 border-pink-300',
   personal: 'bg-gray-100 text-gray-800 border-gray-300',
+  shade_structure: 'bg-amber-100 text-amber-800 border-amber-300',
+  tool: 'bg-slate-100 text-slate-800 border-slate-300',
+  large_equipment: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+  container: 'bg-violet-100 text-violet-800 border-violet-300',
+  kitchen_item: 'bg-red-100 text-red-800 border-red-300',
+  av_equip: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  electrical: 'bg-blue-100 text-blue-800 border-blue-300',
+  plumbing: 'bg-teal-100 text-teal-800 border-teal-300',
+  furniture: 'bg-stone-100 text-stone-800 border-stone-300',
+  other: 'bg-gray-100 text-gray-800 border-gray-300',
+  bm_utility: 'bg-orange-100 text-orange-800 border-orange-300',
 }
 
 export const RESOURCE_STATUS_COLORS: Record<string, string> = {

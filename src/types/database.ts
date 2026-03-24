@@ -1001,7 +1001,7 @@ export type CampEvent = CampEventRow
 // ==========================================
 
 export type BuildStageType = 'planning' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
-export type BuildCategory = 'infrastructure' | 'shelter' | 'kitchen' | 'logistics' | 'safety' | 'layout' | 'decoration' | 'personal'
+export type BuildCategory = 'infrastructure' | 'shelter' | 'kitchen' | 'logistics' | 'safety' | 'layout' | 'decoration' | 'personal' | 'shade_structure' | 'tool' | 'large_equipment' | 'container' | 'kitchen_item' | 'av_equip' | 'electrical' | 'plumbing' | 'furniture' | 'other' | 'bm_utility'
 export type BuildResourceStatus = 'have' | 'need' | 'fix' | 'discard'
 export type BuildQuestionStatus = 'open' | 'resolved' | 'deferred'
 
