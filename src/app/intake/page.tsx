@@ -377,7 +377,7 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <div>
                         <Checkbox
-                          label="I'm arriving early (before gates open)"
+                          label="I'm not doing build week & am arriving before gates open"
                           checked={field.value}
                           onChange={field.onChange}
                         />
