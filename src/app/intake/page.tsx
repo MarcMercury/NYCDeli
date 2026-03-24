@@ -538,6 +538,9 @@ export default function IntakePage() {
               {/* Step 5: Participation */}
               {currentStep === 4 && (
                 <>
+                  <p className="text-sm text-gray-700">
+                    All campers must participate in kitchen shift duties. A shift selection process will take place closer to the burn.
+                  </p>
                   <Controller
                     name="kitchen_participation"
                     control={control}
