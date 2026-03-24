@@ -64,7 +64,7 @@ export function Navigation() {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [pathname])
 
   const navItems = (() => {
     if (!isLoggedIn || userRole === 'pending') return publicNavItems
