@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent,
   Badge, Tabs, TabPanel, Alert, Button, Input
@@ -47,7 +48,7 @@ interface ShiftCategory {
 
 const deliShiftCategories: ShiftCategory[] = [
   {
-    name: 'Deli Shifts (M\u2013Sat)',
+    name: 'Deli Shifts',
     note: 'Core daily shifts running the NYC Deli',
     positions: [
       { role: 'Kitchen Lead', description: 'Oversees all kitchen operations; makes real-time calls on prep, service flow, and staffing', note: 'as needed' },
@@ -250,6 +251,26 @@ function getUniquePositions(categories: ShiftCategory[]): ShiftPosition[] {
   return result
 }
 
+interface ConsolidatedPosition extends ShiftPosition {
+  count: number
+}
+
+/** Consolidate duplicate positions into single entries with counts */
+function consolidatePositions(positions: ShiftPosition[]): ConsolidatedPosition[] {
+  const groups: ConsolidatedPosition[] = []
+  for (const pos of positions) {
+    const existing = groups.find(
+      g => g.role === pos.role && g.description === pos.description && (g.time ?? '') === (pos.time ?? '')
+    )
+    if (existing) {
+      existing.count++
+    } else {
+      groups.push({ ...pos, count: 1 })
+    }
+  }
+  return groups
+}
+
 /** Count how many slots exist for a given role+time */
 function countSlots(categories: ShiftCategory[], role: string, time?: string): number {
   let count = 0
@@ -288,6 +309,27 @@ export default function KitchenPage() {
   // Display categories (with admin overrides applied)
   const [displayDeliCategories, setDisplayDeliCategories] = useState<ShiftCategory[]>(deliShiftCategories)
   const [displaySpecialCategories, setDisplaySpecialCategories] = useState<ShiftCategory[]>(specialShiftCategories)
+  // Collapsible state for roles tab (all collapsed by default)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+
+  const toggleSection = useCallback((id: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleCategory = useCallback((key: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
@@ -634,234 +676,350 @@ export default function KitchenPage() {
 
         {/* Roles & Descriptions Tab */}
         <TabPanel tabId="roles" activeTab={activeTab}>
-          <div className="space-y-10">
+          <div className="space-y-6">
             {/* Deli Shifts Section */}
             <section>
-              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                🥪 Deli Shifts (M\u2013Sat)
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">Daily service shifts to keep the deli running</p>
-              <div className="space-y-6">
-                {displayDeliCategories.map((category, catIdx) => (
-                  <Card key={catIdx}>
-                    <CardHeader className="pb-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <CardTitle className="text-lg">{category.name}</CardTitle>
-                        <div className="flex gap-2">
-                          {category.time && (
-                            <Badge variant="info">{category.time}</Badge>
-                          )}
-                          {category.note && (
-                            <Badge variant="default">{category.note}</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                      <div className="divide-y divide-gray-200">
-                        {category.positions.map((pos, posIdx) => (
-                          <div key={posIdx} className={cn("py-2", adminEditing && "hover:bg-yellow-50 rounded px-1")}>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 flex-1">
-                                <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
-                                  {posIdx + 1}
-                                </span>
-                                {adminEditing && editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'role' ? (
-                                  <div className="flex gap-1 items-center flex-1">
-                                    <Input
-                                      value={editValue}
-                                      onChange={(e) => setEditValue(e.target.value)}
-                                      className="text-sm py-0.5"
-                                      autoFocus
-                                      onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
-                                    />
-                                    <button className="text-xs text-green-600 font-bold" onClick={async () => {
-                                      const { updateShiftPositionAction } = await import('@/app/actions/admin')
-                                      await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { role: editValue, category: category.name })
-                                      updateDisplayPosition(catIdx, posIdx, 'role', editValue)
-                                      setAdminMessage({ type: 'success', text: `Updated role` })
-                                      setEditingCell(null)
-                                    }}>✓</button>
-                                    <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
-                                  </div>
-                                ) : (
-                                  <span
-                                    className={cn("font-medium", adminEditing && "cursor-pointer hover:underline")}
-                                    onClick={() => { if (adminEditing) { setEditingCell({ catIdx, posIdx, field: 'role' }); setEditValue(pos.role) } }}
-                                  >
-                                    {pos.role}
-                                  </span>
-                                )}
-                                {pos.note && !adminEditing && (
-                                  <span className="text-xs text-gray-500">({pos.note})</span>
-                                )}
-                              </div>
-                              <div className="flex gap-2 items-center">
-                                {adminEditing && editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'time' ? (
-                                  <div className="flex gap-1 items-center">
-                                    <Input
-                                      value={editValue}
-                                      onChange={(e) => setEditValue(e.target.value)}
-                                      className="text-xs py-0.5 w-32"
-                                      placeholder="e.g. 9:30–12:00"
-                                      autoFocus
-                                      onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
-                                    />
-                                    <button className="text-xs text-green-600 font-bold" onClick={async () => {
-                                      const { updateShiftPositionAction } = await import('@/app/actions/admin')
-                                      await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { time: editValue, category: category.name })
-                                      updateDisplayPosition(catIdx, posIdx, 'time', editValue)
-                                      setAdminMessage({ type: 'success', text: `Updated time` })
-                                      setEditingCell(null)
-                                    }}>✓</button>
-                                    <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
-                                  </div>
-                                ) : pos.time ? (
-                                  <Badge
-                                    variant="info"
-                                    className={cn(adminEditing && "cursor-pointer hover:ring-2 ring-yellow-400")}
-                                    onClick={() => { if (adminEditing) { setEditingCell({ catIdx, posIdx, field: 'time' }); setEditValue(pos.time || '') } }}
-                                  >
-                                    {pos.time}
-                                  </Badge>
-                                ) : adminEditing ? (
-                                  <button className="text-xs text-blue-500 underline" onClick={() => { setEditingCell({ catIdx, posIdx, field: 'time' }); setEditValue('') }}>+ time</button>
-                                ) : null}
-                                {pos.requiresExp && (
-                                  <Badge variant="warning">Kitchen Exp. Required</Badge>
-                                )}
-                                {pos.countsDouble && (
-                                  <Badge variant="success">Counts 2×</Badge>
-                                )}
-                              </div>
+              <button
+                className="w-full flex items-center gap-3 text-left py-2 group"
+                onClick={() => toggleSection('deli')}
+              >
+                {expandedSections.has('deli') ? (
+                  <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+                )}
+                <h2 className="text-2xl font-black uppercase tracking-wider">
+                  🥪 Deli Shifts
+                </h2>
+                <span className="text-sm text-gray-500 font-normal normal-case tracking-normal">
+                  {displayDeliCategories.reduce((sum, c) => sum + c.positions.length, 0)} positions across {displayDeliCategories.length} categories
+                </span>
+              </button>
+              {expandedSections.has('deli') && (
+                <div className="space-y-3 mt-2">
+                  {displayDeliCategories.map((category, catIdx) => {
+                    const catKey = `deli-${catIdx}`
+                    const isExpanded = expandedCategories.has(catKey)
+                    const consolidated = consolidatePositions(category.positions)
+                    return (
+                      <Card key={catIdx}>
+                        <CardHeader
+                          className="pb-2 cursor-pointer select-none"
+                          onClick={() => toggleCategory(catKey)}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              )}
+                              <CardTitle className="text-lg">{category.name}</CardTitle>
                             </div>
-                            {adminEditing && editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'description' ? (
-                              <div className="ml-8 mt-1 flex gap-1 items-start">
-                                <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5 flex-1" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
-                                <button className="text-xs text-green-600 font-bold mt-1" onClick={async () => {
-                                  const { updateShiftPositionAction } = await import('@/app/actions/admin')
-                                  await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { description: editValue, category: category.name })
-                                  updateDisplayPosition(catIdx, posIdx, 'description', editValue)
-                                  setAdminMessage({ type: 'success', text: `Updated description` })
-                                  setEditingCell(null)
-                                }}>✓</button>
-                                <button className="text-xs text-gray-400 mt-1" onClick={() => setEditingCell(null)}>✕</button>
-                              </div>
-                            ) : pos.description ? (
-                              <p
-                                className={cn("text-xs text-gray-500 ml-8 mt-0.5", adminEditing && "cursor-pointer hover:underline hover:text-gray-700")}
-                                onClick={() => { if (adminEditing) { setEditingCell({ catIdx, posIdx, field: 'description' }); setEditValue(pos.description || '') } }}
-                              >
-                                {pos.description}
-                              </p>
-                            ) : adminEditing ? (
-                              <button className="text-xs text-blue-500 underline ml-8 mt-0.5" onClick={() => { setEditingCell({ catIdx, posIdx, field: 'description' }); setEditValue('') }}>+ description</button>
-                            ) : null}
+                            <div className="flex gap-2">
+                              {category.time && <Badge variant="info">{category.time}</Badge>}
+                              <Badge variant="default">
+                                {category.positions.length} position{category.positions.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        </CardHeader>
+                        {isExpanded && (
+                          <CardContent className="pt-2">
+                            {adminEditing ? (
+                              <div className="divide-y divide-gray-200">
+                                {category.positions.map((pos, posIdx) => (
+                                  <div key={posIdx} className="py-2 hover:bg-yellow-50 rounded px-1">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
+                                          {posIdx + 1}
+                                        </span>
+                                        {editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'role' ? (
+                                          <div className="flex gap-1 items-center flex-1">
+                                            <Input
+                                              value={editValue}
+                                              onChange={(e) => setEditValue(e.target.value)}
+                                              className="text-sm py-0.5"
+                                              autoFocus
+                                              onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
+                                            />
+                                            <button className="text-xs text-green-600 font-bold" onClick={async () => {
+                                              const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                              await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { role: editValue, category: category.name })
+                                              updateDisplayPosition(catIdx, posIdx, 'role', editValue)
+                                              setAdminMessage({ type: 'success', text: `Updated role` })
+                                              setEditingCell(null)
+                                            }}>✓</button>
+                                            <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
+                                          </div>
+                                        ) : (
+                                          <span
+                                            className="font-medium cursor-pointer hover:underline"
+                                            onClick={() => { setEditingCell({ catIdx, posIdx, field: 'role' }); setEditValue(pos.role) }}
+                                          >
+                                            {pos.role}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2 items-center">
+                                        {editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'time' ? (
+                                          <div className="flex gap-1 items-center">
+                                            <Input
+                                              value={editValue}
+                                              onChange={(e) => setEditValue(e.target.value)}
+                                              className="text-xs py-0.5 w-32"
+                                              placeholder="e.g. 9:30–12:00"
+                                              autoFocus
+                                              onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
+                                            />
+                                            <button className="text-xs text-green-600 font-bold" onClick={async () => {
+                                              const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                              await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { time: editValue, category: category.name })
+                                              updateDisplayPosition(catIdx, posIdx, 'time', editValue)
+                                              setAdminMessage({ type: 'success', text: `Updated time` })
+                                              setEditingCell(null)
+                                            }}>✓</button>
+                                            <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
+                                          </div>
+                                        ) : pos.time ? (
+                                          <Badge
+                                            variant="info"
+                                            className="cursor-pointer hover:ring-2 ring-yellow-400"
+                                            onClick={() => { setEditingCell({ catIdx, posIdx, field: 'time' }); setEditValue(pos.time || '') }}
+                                          >
+                                            {pos.time}
+                                          </Badge>
+                                        ) : (
+                                          <button className="text-xs text-blue-500 underline" onClick={() => { setEditingCell({ catIdx, posIdx, field: 'time' }); setEditValue('') }}>+ time</button>
+                                        )}
+                                        {pos.requiresExp && <Badge variant="warning">Kitchen Exp. Required</Badge>}
+                                        {pos.countsDouble && <Badge variant="success">Counts 2×</Badge>}
+                                      </div>
+                                    </div>
+                                    {editingCell?.catIdx === catIdx && editingCell?.posIdx === posIdx && editingCell?.field === 'description' ? (
+                                      <div className="ml-8 mt-1 flex gap-1 items-start">
+                                        <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5 flex-1" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
+                                        <button className="text-xs text-green-600 font-bold mt-1" onClick={async () => {
+                                          const { updateShiftPositionAction } = await import('@/app/actions/admin')
+                                          await updateShiftPositionAction(`deli-${catIdx}-${posIdx}`, { description: editValue, category: category.name })
+                                          updateDisplayPosition(catIdx, posIdx, 'description', editValue)
+                                          setAdminMessage({ type: 'success', text: `Updated description` })
+                                          setEditingCell(null)
+                                        }}>✓</button>
+                                        <button className="text-xs text-gray-400 mt-1" onClick={() => setEditingCell(null)}>✕</button>
+                                      </div>
+                                    ) : pos.description ? (
+                                      <p
+                                        className="text-xs text-gray-500 ml-8 mt-0.5 cursor-pointer hover:underline hover:text-gray-700"
+                                        onClick={() => { setEditingCell({ catIdx, posIdx, field: 'description' }); setEditValue(pos.description || '') }}
+                                      >
+                                        {pos.description}
+                                      </p>
+                                    ) : (
+                                      <button className="text-xs text-blue-500 underline ml-8 mt-0.5" onClick={() => { setEditingCell({ catIdx, posIdx, field: 'description' }); setEditValue('') }}>+ description</button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-gray-200">
+                                {consolidated.map((pos, posIdx) => (
+                                  <div key={posIdx} className="py-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-semibold">{pos.role}</span>
+                                        {pos.count > 1 && (
+                                          <Badge variant="default">{pos.count} people</Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2 flex-wrap">
+                                        {pos.time && <Badge variant="info">{pos.time}</Badge>}
+                                        {pos.requiresExp && <Badge variant="warning">Kitchen Exp. Required</Badge>}
+                                        {pos.countsDouble && <Badge variant="success">Counts 2×</Badge>}
+                                      </div>
+                                    </div>
+                                    {pos.description && (
+                                      <p className="text-sm text-gray-600 mt-1">{pos.description}</p>
+                                    )}
+                                    {pos.note && (
+                                      <p className="text-xs text-gray-400 mt-0.5 italic">{pos.note}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        )}
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
             </section>
 
             {/* Special Events Section */}
             <section>
-              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                🍜 Special Event Shifts
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">One-off event support shifts</p>
-              <div className="space-y-6">
-                {displaySpecialCategories.map((category, catIdx) => (
-                  <Card key={catIdx} variant="warning">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">{category.name}</CardTitle>
-                      {category.note && (
-                        <CardDescription>{category.note}</CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                      <div className="divide-y divide-gray-200">
-                        {category.positions.map((pos, posIdx) => (
-                          <div key={posIdx} className="py-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
-                                  {posIdx + 1}
-                                </span>
-                                <span className="font-medium">{pos.role}</span>
-                              </div>
-                              <div className="flex gap-2">
-                                {pos.time && (
-                                  <Badge variant="info">{pos.time}</Badge>
-                                )}
-                                {pos.requiresExp && (
-                                  <Badge variant="warning">Kitchen Exp. Required</Badge>
-                                )}
-                              </div>
+              <button
+                className="w-full flex items-center gap-3 text-left py-2 group"
+                onClick={() => toggleSection('special')}
+              >
+                {expandedSections.has('special') ? (
+                  <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+                )}
+                <h2 className="text-2xl font-black uppercase tracking-wider">
+                  🍜 Special Event Shifts
+                </h2>
+                <span className="text-sm text-gray-500 font-normal normal-case tracking-normal">
+                  {displaySpecialCategories.reduce((sum, c) => sum + c.positions.length, 0)} positions
+                </span>
+              </button>
+              {expandedSections.has('special') && (
+                <div className="space-y-3 mt-2">
+                  {displaySpecialCategories.map((category, catIdx) => {
+                    const catKey = `special-${catIdx}`
+                    const isExpanded = expandedCategories.has(catKey)
+                    const consolidated = consolidatePositions(category.positions)
+                    return (
+                      <Card key={catIdx} variant="warning">
+                        <CardHeader
+                          className="pb-2 cursor-pointer select-none"
+                          onClick={() => toggleCategory(catKey)}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              )}
+                              <CardTitle className="text-lg">{category.name}</CardTitle>
                             </div>
-                            {pos.description && (
-                              <p className="text-xs text-gray-500 ml-8 mt-0.5">{pos.description}</p>
-                            )}
+                            <Badge variant="default">
+                              {category.positions.length} position{category.positions.length !== 1 ? 's' : ''}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          {category.note && (
+                            <CardDescription className="ml-6">{category.note}</CardDescription>
+                          )}
+                        </CardHeader>
+                        {isExpanded && (
+                          <CardContent className="pt-2">
+                            <div className="divide-y divide-gray-200">
+                              {consolidated.map((pos, posIdx) => (
+                                <div key={posIdx} className="py-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold">{pos.role}</span>
+                                      {pos.count > 1 && (
+                                        <Badge variant="default">{pos.count} people</Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {pos.time && <Badge variant="info">{pos.time}</Badge>}
+                                      {pos.requiresExp && <Badge variant="warning">Kitchen Exp. Required</Badge>}
+                                    </div>
+                                  </div>
+                                  {pos.description && (
+                                    <p className="text-sm text-gray-600 mt-1">{pos.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
             </section>
 
             {/* Strike Section */}
             <section>
-              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                🔨 Strike Shifts
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">Teardown and pack-out \u2014 everyone pitches in</p>
-              <div className="space-y-6">
-                {strikeCategories.map((category, catIdx) => (
-                  <Card key={catIdx}>
-                    <CardHeader className="pb-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <CardTitle className="text-lg">{category.name}</CardTitle>
-                        {category.note && (
-                          <Badge variant={category.note.includes('does not count') ? 'error' : 'default'}>
-                            {category.note.includes('ONLY') ? 'Sunday Departure Only' : category.note}
-                          </Badge>
-                        )}
-                      </div>
-                      {category.note && category.note.includes('ONLY') && (
-                        <Alert variant="warning" className="mt-2">
-                          <strong>Note:</strong> {category.note}
-                        </Alert>
-                      )}
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                      <div className="divide-y divide-gray-200">
-                        {category.positions.map((pos, posIdx) => (
-                          <div key={posIdx} className="py-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 text-xs font-bold rounded">
-                                  {posIdx + 1}
-                                </span>
-                                <span className="font-medium">{pos.role}</span>
-                              </div>
-                              {pos.time && (
-                                <Badge variant="info">{pos.time}</Badge>
+              <button
+                className="w-full flex items-center gap-3 text-left py-2 group"
+                onClick={() => toggleSection('strike')}
+              >
+                {expandedSections.has('strike') ? (
+                  <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+                )}
+                <h2 className="text-2xl font-black uppercase tracking-wider">
+                  🔨 Strike Shifts
+                </h2>
+                <span className="text-sm text-gray-500 font-normal normal-case tracking-normal">
+                  {strikeCategories.reduce((sum, c) => sum + c.positions.length, 0)} positions across {strikeCategories.length} crews
+                </span>
+              </button>
+              {expandedSections.has('strike') && (
+                <div className="space-y-3 mt-2">
+                  {strikeCategories.map((category, catIdx) => {
+                    const catKey = `strike-${catIdx}`
+                    const isExpanded = expandedCategories.has(catKey)
+                    const consolidated = consolidatePositions(category.positions)
+                    return (
+                      <Card key={catIdx}>
+                        <CardHeader
+                          className="pb-2 cursor-pointer select-none"
+                          onClick={() => toggleCategory(catKey)}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
                               )}
+                              <CardTitle className="text-lg">{category.name}</CardTitle>
                             </div>
-                            {pos.description && (
-                              <p className="text-xs text-gray-500 ml-8 mt-0.5">{pos.description}</p>
-                            )}
+                            <div className="flex gap-2">
+                              {category.note && (
+                                <Badge variant={category.note.includes('does not count') ? 'error' : 'default'}>
+                                  {category.note.includes('ONLY') ? 'Sunday Departure Only' : category.note}
+                                </Badge>
+                              )}
+                              <Badge variant="default">
+                                {category.positions.length} position{category.positions.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          {category.note && category.note.includes('ONLY') && (
+                            <Alert variant="warning" className="mt-2">
+                              <strong>Note:</strong> {category.note}
+                            </Alert>
+                          )}
+                        </CardHeader>
+                        {isExpanded && (
+                          <CardContent className="pt-2">
+                            <div className="divide-y divide-gray-200">
+                              {consolidated.map((pos, posIdx) => (
+                                <div key={posIdx} className="py-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold">{pos.role}</span>
+                                      {pos.count > 1 && (
+                                        <Badge variant="default">{pos.count} people</Badge>
+                                      )}
+                                    </div>
+                                    {pos.time && <Badge variant="info">{pos.time}</Badge>}
+                                  </div>
+                                  {pos.description && (
+                                    <p className="text-sm text-gray-600 mt-1">{pos.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
             </section>
           </div>
         </TabPanel>
