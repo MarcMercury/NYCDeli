@@ -1090,7 +1090,7 @@ export interface BuildQuestionRow {
   updated_at: string
 }
 
-export type InventoryCategory = 'shade_structure' | 'tool' | 'large_equipment' | 'container' | 'kitchen_item' | 'av_equip' | 'electrical' | 'plumbing' | 'furniture' | 'other' | 'bm_utility'
+export type InventoryCategory = 'shade_structure' | 'tool' | 'large_equipment' | 'container' | 'kitchen' | 'av_equip' | 'electrical' | 'plumbing' | 'furniture' | 'layout' | 'other'
 
 export interface BuildInventoryRow {
   id: string

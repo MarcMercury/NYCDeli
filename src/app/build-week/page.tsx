@@ -1709,9 +1709,9 @@ type ResourceFormData = {
 
 const CATEGORIES: { value: BuildCategory; label: string }[] = [
   { value: 'infrastructure', label: 'Infrastructure' },
-  { value: 'shelter', label: 'Shelter' },
+  { value: 'shelter', label: 'Shade Structure Materials' },
   { value: 'kitchen', label: 'Kitchen' },
-  { value: 'logistics', label: 'Logistics' },
+  { value: 'logistics', label: 'Tools' },
   { value: 'safety', label: 'Safety' },
   { value: 'layout', label: 'Layout' },
   { value: 'decoration', label: 'Decoration' },
@@ -1720,13 +1720,11 @@ const CATEGORIES: { value: BuildCategory; label: string }[] = [
   { value: 'tool', label: 'Tool' },
   { value: 'large_equipment', label: 'Large Equipment/Vehicle' },
   { value: 'container', label: 'Container' },
-  { value: 'kitchen_item', label: 'Kitchen Item' },
   { value: 'av_equip', label: 'A/V Equip' },
   { value: 'electrical', label: 'Electrical' },
   { value: 'plumbing', label: 'Plumbing' },
   { value: 'furniture', label: 'Furniture' },
   { value: 'other', label: 'Other' },
-  { value: 'bm_utility', label: 'BM Utility' },
 ]
 
 function ResourceForm({ resource, saving, onSave, onCancel }: {
@@ -1872,13 +1870,13 @@ const INVENTORY_CATEGORIES: { value: InventoryCategory; label: string }[] = [
   { value: 'tool', label: 'Tool' },
   { value: 'large_equipment', label: 'Large Equipment/Vehicle' },
   { value: 'container', label: 'Container' },
-  { value: 'kitchen_item', label: 'Kitchen Item' },
+  { value: 'kitchen', label: 'Kitchen' },
   { value: 'av_equip', label: 'A/V Equip' },
   { value: 'electrical', label: 'Electrical' },
   { value: 'plumbing', label: 'Plumbing' },
   { value: 'furniture', label: 'Furniture' },
+  { value: 'layout', label: 'Layout' },
   { value: 'other', label: 'Other' },
-  { value: 'bm_utility', label: 'BM Utility' },
 ]
 
 function InventoryForm({ item, saving, onSave, onCancel }: {
