@@ -991,9 +991,11 @@ export interface BuildResourceRow {
   name: string
   description: string | null
   quantity: string | null
+  count: number
   status: BuildResourceStatus
   priority: string | null
   stage_needed: BuildStageType | null
+  confirmed_working: boolean
   notes: string | null
   sort_order: number
   created_at: string
@@ -1050,6 +1052,7 @@ export interface BuildInventoryRow {
   verified: boolean
   verified_by: string | null
   verified_at: string | null
+  confirmed_working: boolean
   notes: string | null
   sort_order: number
   created_at: string

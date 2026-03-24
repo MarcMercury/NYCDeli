@@ -167,9 +167,11 @@ export async function updateBuildResource(resourceId: string, updates: {
   category?: string
   description?: string | null
   quantity?: string | null
+  count?: number
   status?: string
   priority?: string | null
   stage_needed?: string | null
+  confirmed_working?: boolean
   notes?: string | null
 }) {
   const supabase = createClient()
@@ -235,6 +237,7 @@ export async function updateInventoryItem(itemId: string, updates: {
   verified?: boolean
   verified_by?: string | null
   verified_at?: string | null
+  confirmed_working?: boolean
   notes?: string | null
 }) {
   const supabase = createClient()

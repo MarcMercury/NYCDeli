@@ -229,6 +229,50 @@ export default function BuildWeekPage() {
     }
   }
 
+  const handleResourceCount = async (resourceId: string, count: number) => {
+    setUpdatingResources(prev => ({ ...prev, [resourceId]: true }))
+    try {
+      await updateBuildResource(resourceId, { count })
+      setResources(prev =>
+        prev.map(r => (r.id === resourceId ? { ...r, count } : r))
+      )
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingResources(prev => ({ ...prev, [resourceId]: false }))
+    }
+  }
+
+  const handleResourceConfirmedWorking = async (resource: BuildResource) => {
+    const nowConfirmed = !resource.confirmed_working
+    setUpdatingResources(prev => ({ ...prev, [resource.id]: true }))
+    try {
+      await updateBuildResource(resource.id, { confirmed_working: nowConfirmed })
+      setResources(prev =>
+        prev.map(r => (r.id === resource.id ? { ...r, confirmed_working: nowConfirmed } : r))
+      )
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingResources(prev => ({ ...prev, [resource.id]: false }))
+    }
+  }
+
+  const handleInventoryConfirmedWorking = async (item: BuildInventory) => {
+    const nowConfirmed = !item.confirmed_working
+    setUpdatingInventory(prev => ({ ...prev, [item.id]: true }))
+    try {
+      await updateInventoryItem(item.id, { confirmed_working: nowConfirmed })
+      setInventory(prev =>
+        prev.map(i => (i.id === item.id ? { ...i, confirmed_working: nowConfirmed } : i))
+      )
+    } catch {
+      // Silently fail
+    } finally {
+      setUpdatingInventory(prev => ({ ...prev, [item.id]: false }))
+    }
+  }
+
   const handleInventoryVerify = async (item: BuildInventory) => {
     const nowVerified = !item.verified
     setUpdatingInventory(prev => ({ ...prev, [item.id]: true }))
@@ -517,6 +561,40 @@ export default function BuildWeekPage() {
                         <span className="ml-1.5 text-[10px] font-bold text-red-600">CRITICAL</span>
                       )}
                     </div>
+
+                    {/* Count */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <label className="text-[10px] text-gray-400">Count</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={resource.count}
+                        onChange={e => handleResourceCount(resource.id, Math.max(0, parseInt(e.target.value) || 0))}
+                        disabled={updatingResources[resource.id]}
+                        className={cn(
+                          'w-14 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
+                          resource.count > 0 ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500'
+                        )}
+                      />
+                    </div>
+
+                    {/* Confirmed Working */}
+                    <button
+                      onClick={() => handleResourceConfirmedWorking(resource)}
+                      disabled={updatingResources[resource.id]}
+                      className={cn(
+                        'text-xs flex items-center gap-0.5 flex-shrink-0 px-1.5 py-0.5 border-2 rounded font-bold transition-colors',
+                        resource.confirmed_working
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-gray-300 bg-gray-50 text-gray-400 hover:border-gray-400',
+                        updatingResources[resource.id] && 'opacity-40 animate-pulse'
+                      )}
+                      title={resource.confirmed_working ? 'Unmark working' : 'Mark as confirmed working'}
+                    >
+                      {resource.confirmed_working ? '✅' : '⬜'}
+                      <span className="hidden sm:inline">Working</span>
+                    </button>
+
                     <div className="flex items-center gap-1.5">
                       <select
                         value={resource.status}
@@ -672,6 +750,23 @@ export default function BuildWeekPage() {
                                 />
                                 <span className="text-xs text-gray-400">/{item.quantity_expected}</span>
                               </div>
+
+                              {/* Confirmed Working */}
+                              <button
+                                onClick={() => handleInventoryConfirmedWorking(item)}
+                                disabled={updatingInventory[item.id]}
+                                className={cn(
+                                  'text-xs flex items-center gap-0.5 flex-shrink-0 px-1.5 py-0.5 border-2 rounded font-bold transition-colors',
+                                  item.confirmed_working
+                                    ? 'border-green-500 bg-green-50 text-green-700'
+                                    : 'border-gray-300 bg-gray-50 text-gray-400 hover:border-gray-400',
+                                  updatingInventory[item.id] && 'opacity-40 animate-pulse'
+                                )}
+                                title={item.confirmed_working ? 'Unmark working' : 'Mark as confirmed working'}
+                              >
+                                {item.confirmed_working ? '✅' : '⬜'}
+                                <span className="hidden sm:inline">Working</span>
+                              </button>
 
                               {/* Actions */}
                               <div className="flex items-center gap-1">
