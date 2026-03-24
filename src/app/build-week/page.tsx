@@ -59,6 +59,8 @@ type UnifiedItem = {
   name: string
   category: string
   size: string
+  sizeW: string
+  sizeL: string
   count: number
   need: number | null
   status: string
@@ -116,6 +118,11 @@ export default function BuildWeekPage() {
   const [unifiedCategoryFilter, setUnifiedCategoryFilter] = useState<string>('all')
   const [unifiedStatusFilter, setUnifiedStatusFilter] = useState<string>('all')
   const [addItemType, setAddItemType] = useState<'resource' | 'checklist' | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))
+  }
 
   const fetchData = useCallback(async () => {
     try {
@@ -421,6 +428,8 @@ export default function BuildWeekPage() {
       name: r.name,
       category: r.category,
       size: r.quantity || '',
+      sizeW: '',
+      sizeL: '',
       count: r.count,
       need: null as number | null,
       status: r.status,
@@ -433,6 +442,8 @@ export default function BuildWeekPage() {
       name: i.name,
       category: i.category,
       size: i.description || '',
+      sizeW: i.size_w || '',
+      sizeL: i.size_l || '',
       count: i.quantity_actual,
       need: i.quantity_expected as number | null,
       status: i.verified ? 'verified' : i.confirmed_working ? 'working' : 'pending',
@@ -449,12 +460,14 @@ export default function BuildWeekPage() {
     .filter(i => unifiedStatusFilter === 'all' || i.status === unifiedStatusFilter)
 
   const handleExportInventory = () => {
-    const headers = ['Item', 'Category', 'Type', 'Size', 'Count', 'Need', 'Status', 'Question / Notes']
+    const headers = ['Item', 'Category', 'Type', 'Size', 'Size (W)', 'Size (L)', 'Count', '# Needed', 'Status', 'Question / Notes']
     const rows = filteredUnifiedItems.map(item => [
       item.name,
       item.category,
       item.source === 'resource' ? 'Material' : 'Checklist',
       item.size,
+      item.sizeW,
+      item.sizeL,
       String(item.count),
       item.need != null ? String(item.need) : '',
       item.status,
@@ -661,281 +674,307 @@ export default function BuildWeekPage() {
           {filteredUnifiedItems.length === 0 ? (
             <p className="text-gray-400 text-sm">No items match this filter.</p>
           ) : (
-            <div className="border-2 border-black bg-white">
-              {/* ── Table header ── */}
-              <div className="hidden sm:grid grid-cols-[1fr_80px_60px_60px_90px_1fr_auto] gap-2 px-4 py-2 bg-gray-100 border-b-2 border-black text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                <span>Item</span>
-                <span>Size</span>
-                <span className="text-center">Count</span>
-                <span className="text-center">Need</span>
-                <span>Status</span>
-                <span>Question</span>
-                <span className="w-16"></span>
-              </div>
+            <div className="space-y-2">
+              {allCategories
+                .filter(cat => unifiedCategoryFilter === 'all' || cat === unifiedCategoryFilter)
+                .map(cat => {
+                  const catItems = filteredUnifiedItems.filter(i => i.category === cat)
+                  if (catItems.length === 0) return null
+                  const isExpanded = !!expandedCategories[cat]
+                  const catLabel = INVENTORY_CATEGORIES.find(c => c.value === cat)?.label || cat
+                  const catIcon = INVENTORY_CATEGORY_ICONS[cat] || CATEGORY_ICONS[cat] || '📦'
+                  return (
+                    <div key={cat} className="border-2 border-black bg-white">
+                      {/* ── Category header (collapsible) ── */}
+                      <button
+                        onClick={() => toggleCategory(cat)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 transition-colors text-left"
+                      >
+                        <span className="text-sm">{catIcon}</span>
+                        <span className="font-bold text-sm uppercase tracking-wide flex-1">{catLabel}</span>
+                        <span className="text-xs font-bold text-gray-400 tabular-nums">{catItems.length} item{catItems.length !== 1 ? 's' : ''}</span>
+                        <span className="text-gray-300">{isExpanded ? '▾' : '▸'}</span>
+                      </button>
 
-              {/* ── Rows ── */}
-              <div className="divide-y divide-gray-100">
-                {filteredUnifiedItems.map(item => (
-                  <div
-                    key={`${item.source}-${item.id}`}
-                    className={cn(
-                      'px-4 py-2.5',
-                      item.status === 'verified' && 'bg-green-50/40',
-                      item.status === 'discard' && 'opacity-40',
-                    )}
-                  >
-                    {/* Desktop: grid layout */}
-                    <div className="hidden sm:grid grid-cols-[1fr_80px_60px_60px_90px_1fr_auto] gap-2 items-center">
-                      {/* Item name + category */}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm flex-shrink-0">
-                            {INVENTORY_CATEGORY_ICONS[item.category] || CATEGORY_ICONS[item.category] || '📦'}
-                          </span>
-                          <span className={cn(
-                            'text-sm truncate',
-                            item.status === 'discard' && 'line-through',
-                            item.status === 'verified' && 'line-through text-gray-400',
-                          )}>
-                            {item.name}
-                          </span>
-                          {item.source === 'resource' && item.originalResource?.priority === 'critical' && (
-                            <span className="text-[10px] font-bold text-red-600 flex-shrink-0">CRITICAL</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-gray-400 ml-5">
-                          {item.source === 'resource' ? 'Material' : 'Checklist'}
-                        </span>
-                      </div>
+                      {isExpanded && (
+                        <>
+                          {/* ── Table header ── */}
+                          <div className="hidden sm:grid grid-cols-[1fr_60px_60px_60px_60px_90px_1fr_auto] gap-2 px-4 py-2 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                            <span>Item</span>
+                            <span>Size (W)</span>
+                            <span>Size (L)</span>
+                            <span className="text-center">Count</span>
+                            <span className="text-center"># Needed</span>
+                            <span>Status</span>
+                            <span>Question</span>
+                            <span className="w-16"></span>
+                          </div>
 
-                      {/* Size */}
-                      <span className="text-xs text-gray-500 truncate">{item.size || '—'}</span>
+                          {/* ── Rows ── */}
+                          <div className="divide-y divide-gray-100">
+                            {catItems.map(item => (
+                              <div
+                                key={`${item.source}-${item.id}`}
+                                className={cn(
+                                  'px-4 py-2.5',
+                                  item.status === 'verified' && 'bg-green-50/40',
+                                  item.status === 'discard' && 'opacity-40',
+                                )}
+                              >
+                                {/* Desktop: grid layout */}
+                                <div className="hidden sm:grid grid-cols-[1fr_60px_60px_60px_60px_90px_1fr_auto] gap-2 items-center">
+                                  {/* Item name */}
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={cn(
+                                        'text-sm truncate',
+                                        item.status === 'discard' && 'line-through',
+                                        item.status === 'verified' && 'line-through text-gray-400',
+                                      )}>
+                                        {item.name}
+                                      </span>
+                                      {item.source === 'resource' && item.originalResource?.priority === 'critical' && (
+                                        <span className="text-[10px] font-bold text-red-600 flex-shrink-0">CRITICAL</span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-400">
+                                      {item.source === 'resource' ? 'Material' : 'Checklist'}
+                                    </span>
+                                  </div>
 
-                      {/* Count */}
-                      {item.source === 'resource' && item.originalResource ? (
-                        <input
-                          type="number"
-                          min={0}
-                          value={item.originalResource.count}
-                          onChange={e => handleResourceCount(item.id, Math.max(0, parseInt(e.target.value) || 0))}
-                          disabled={updatingResources[item.id]}
-                          className={cn(
-                            'w-14 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
-                            item.originalResource.count > 0 ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500'
-                          )}
-                        />
-                      ) : item.originalInventory ? (
-                        <input
-                          type="number"
-                          min={0}
-                          value={item.originalInventory.quantity_actual}
-                          onChange={e => handleInventoryQuantity(item.id, Math.max(0, parseInt(e.target.value) || 0))}
-                          disabled={updatingInventory[item.id]}
-                          className={cn(
-                            'w-14 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
-                            item.originalInventory.quantity_actual >= item.originalInventory.quantity_expected
-                              ? 'border-green-400 bg-green-50 text-green-700'
-                              : 'border-red-300 bg-red-50 text-red-700'
-                          )}
-                        />
-                      ) : (
-                        <span className="text-center text-sm">{item.count}</span>
+                                  {/* Size (W) */}
+                                  <span className="text-xs text-gray-500 truncate">{item.sizeW || '—'}</span>
+
+                                  {/* Size (L) */}
+                                  <span className="text-xs text-gray-500 truncate">{item.sizeL || '—'}</span>
+
+                                  {/* Count */}
+                                  {item.source === 'resource' && item.originalResource ? (
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={item.originalResource.count}
+                                      onChange={e => handleResourceCount(item.id, Math.max(0, parseInt(e.target.value) || 0))}
+                                      disabled={updatingResources[item.id]}
+                                      className={cn(
+                                        'w-14 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
+                                        item.originalResource.count > 0 ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-gray-50 text-gray-500'
+                                      )}
+                                    />
+                                  ) : item.originalInventory ? (
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={item.originalInventory.quantity_actual}
+                                      onChange={e => handleInventoryQuantity(item.id, Math.max(0, parseInt(e.target.value) || 0))}
+                                      disabled={updatingInventory[item.id]}
+                                      className={cn(
+                                        'w-14 text-center text-sm font-bold border-2 py-0.5 focus:outline-none',
+                                        item.originalInventory.quantity_actual >= item.originalInventory.quantity_expected
+                                          ? 'border-green-400 bg-green-50 text-green-700'
+                                          : 'border-red-300 bg-red-50 text-red-700'
+                                      )}
+                                    />
+                                  ) : (
+                                    <span className="text-center text-sm">{item.count}</span>
+                                  )}
+
+                                  {/* # Needed */}
+                                  <span className={cn(
+                                    'text-center text-sm font-bold',
+                                    item.need != null && item.count < item.need ? 'text-red-600' : 'text-gray-400'
+                                  )}>
+                                    {item.need != null ? item.need : '—'}
+                                  </span>
+
+                                  {/* Status */}
+                                  {item.source === 'resource' && item.originalResource ? (
+                                    <select
+                                      value={item.originalResource.status}
+                                      onChange={e => handleResourceStatusChange(item.id, e.target.value as BuildResourceStatus)}
+                                      disabled={updatingResources[item.id]}
+                                      className={cn(
+                                        'text-xs font-bold uppercase px-2 py-1 border-2 rounded focus:outline-none',
+                                        RESOURCE_STATUS_COLORS[item.originalResource.status],
+                                        updatingResources[item.id] && 'opacity-50'
+                                      )}
+                                    >
+                                      <option value="have">Have</option>
+                                      <option value="need">Need</option>
+                                      <option value="fix">Fix</option>
+                                      <option value="discard">Discard</option>
+                                    </select>
+                                  ) : item.originalInventory ? (
+                                    <button
+                                      onClick={() => handleInventoryVerify(item.originalInventory!)}
+                                      disabled={updatingInventory[item.id]}
+                                      className={cn(
+                                        'text-xs font-bold px-2 py-1 border-2 rounded transition-colors',
+                                        item.originalInventory.verified
+                                          ? 'border-green-500 bg-green-50 text-green-700'
+                                          : item.originalInventory.confirmed_working
+                                          ? 'border-blue-400 bg-blue-50 text-blue-700'
+                                          : 'border-gray-300 bg-gray-50 text-gray-500 hover:border-gray-400',
+                                        updatingInventory[item.id] && 'opacity-40 animate-pulse'
+                                      )}
+                                    >
+                                      {item.originalInventory.verified ? '✅ Verified' : item.originalInventory.confirmed_working ? '🔧 Working' : '⬜ Pending'}
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">{item.status}</span>
+                                  )}
+
+                                  {/* Question / Notes */}
+                                  <span className="text-xs text-gray-500 truncate" title={item.question}>
+                                    {item.question || '—'}
+                                  </span>
+
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-1 w-16 justify-end">
+                                    {item.source === 'resource' && item.originalResource && (
+                                      <>
+                                        <button
+                                          onClick={() => handleResourceConfirmedWorking(item.originalResource!)}
+                                          disabled={updatingResources[item.id]}
+                                          className={cn(
+                                            'text-xs px-1 py-0.5 border rounded',
+                                            item.originalResource.confirmed_working
+                                              ? 'border-green-500 bg-green-50 text-green-700'
+                                              : 'border-gray-300 bg-gray-50 text-gray-400',
+                                            updatingResources[item.id] && 'opacity-40'
+                                          )}
+                                          title={item.originalResource.confirmed_working ? 'Unmark working' : 'Mark working'}
+                                        >
+                                          {item.originalResource.confirmed_working ? '✅' : '⬜'}
+                                        </button>
+                                        <button
+                                          onClick={() => { setEditingResource(item.originalResource!); setShowAddResource(false) }}
+                                          className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+                                          title="Edit"
+                                        >
+                                          ✏️
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteResource(item.id)}
+                                          disabled={updatingResources[item.id]}
+                                          className={cn('p-1 text-gray-400 hover:text-red-600 text-xs', updatingResources[item.id] && 'opacity-50')}
+                                          title="Delete"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </>
+                                    )}
+                                    {item.source === 'checklist' && item.originalInventory && (
+                                      <>
+                                        <button
+                                          onClick={() => handleInventoryConfirmedWorking(item.originalInventory!)}
+                                          disabled={updatingInventory[item.id]}
+                                          className={cn(
+                                            'text-xs px-1 py-0.5 border rounded',
+                                            item.originalInventory.confirmed_working
+                                              ? 'border-green-500 bg-green-50 text-green-700'
+                                              : 'border-gray-300 bg-gray-50 text-gray-400',
+                                            updatingInventory[item.id] && 'opacity-40'
+                                          )}
+                                          title={item.originalInventory.confirmed_working ? 'Unmark working' : 'Mark working'}
+                                        >
+                                          {item.originalInventory.confirmed_working ? '✅' : '⬜'}
+                                        </button>
+                                        <button
+                                          onClick={() => { setEditingInventory(item.originalInventory!); setShowAddInventory(false) }}
+                                          className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+                                          title="Edit"
+                                        >
+                                          ✏️
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteInventory(item.id)}
+                                          disabled={updatingInventory[item.id]}
+                                          className={cn('p-1 text-gray-400 hover:text-red-600 text-xs', updatingInventory[item.id] && 'opacity-50')}
+                                          title="Delete"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Mobile: stacked layout */}
+                                <div className="sm:hidden space-y-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className={cn(
+                                      'text-sm font-bold flex-1',
+                                      item.status === 'discard' && 'line-through',
+                                      item.status === 'verified' && 'line-through text-gray-400',
+                                    )}>
+                                      {item.name}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400">
+                                      {item.source === 'resource' ? 'Material' : 'Checklist'}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-2">
+                                    {(item.sizeW || item.sizeL) && <span>W: {item.sizeW || '—'} × L: {item.sizeL || '—'}</span>}
+                                    <span>Count: <strong className={item.need != null && item.count < item.need ? 'text-red-600' : ''}>{item.count}</strong></span>
+                                    {item.need != null && <span># Needed: <strong>{item.need}</strong></span>}
+                                    <span className={cn(
+                                      'font-bold uppercase',
+                                      item.status === 'need' ? 'text-red-600' : item.status === 'have' || item.status === 'verified' ? 'text-green-600' : ''
+                                    )}>
+                                      {item.status}
+                                    </span>
+                                  </div>
+                                  {item.question && (
+                                    <p className="text-xs text-amber-600 ml-2">{item.question}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 ml-2">
+                                    {item.source === 'resource' && item.originalResource && (
+                                      <>
+                                        <select
+                                          value={item.originalResource.status}
+                                          onChange={e => handleResourceStatusChange(item.id, e.target.value as BuildResourceStatus)}
+                                          disabled={updatingResources[item.id]}
+                                          className={cn(
+                                            'text-[11px] font-bold uppercase px-1.5 py-0.5 border-2 rounded focus:outline-none',
+                                            RESOURCE_STATUS_COLORS[item.originalResource.status]
+                                          )}
+                                        >
+                                          <option value="have">Have</option>
+                                          <option value="need">Need</option>
+                                          <option value="fix">Fix</option>
+                                          <option value="discard">Discard</option>
+                                        </select>
+                                        <button onClick={() => { setEditingResource(item.originalResource!); setShowAddResource(false) }} className="p-1 text-gray-400 hover:text-gray-700 text-xs">✏️</button>
+                                        <button onClick={() => handleDeleteResource(item.id)} disabled={updatingResources[item.id]} className="p-1 text-gray-400 hover:text-red-600 text-xs">🗑️</button>
+                                      </>
+                                    )}
+                                    {item.source === 'checklist' && item.originalInventory && (
+                                      <>
+                                        <button
+                                          onClick={() => handleInventoryVerify(item.originalInventory!)}
+                                          disabled={updatingInventory[item.id]}
+                                          className={cn(
+                                            'text-[11px] font-bold px-1.5 py-0.5 border-2 rounded',
+                                            item.originalInventory.verified ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 text-gray-500'
+                                          )}
+                                        >
+                                          {item.originalInventory.verified ? '✅ Verified' : '⬜ Verify'}
+                                        </button>
+                                        <button onClick={() => { setEditingInventory(item.originalInventory!); setShowAddInventory(false) }} className="p-1 text-gray-400 hover:text-gray-700 text-xs">✏️</button>
+                                        <button onClick={() => handleDeleteInventory(item.id)} disabled={updatingInventory[item.id]} className="p-1 text-gray-400 hover:text-red-600 text-xs">🗑️</button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
                       )}
-
-                      {/* Need */}
-                      <span className={cn(
-                        'text-center text-sm font-bold',
-                        item.need != null && item.count < item.need ? 'text-red-600' : 'text-gray-400'
-                      )}>
-                        {item.need != null ? item.need : '—'}
-                      </span>
-
-                      {/* Status */}
-                      {item.source === 'resource' && item.originalResource ? (
-                        <select
-                          value={item.originalResource.status}
-                          onChange={e => handleResourceStatusChange(item.id, e.target.value as BuildResourceStatus)}
-                          disabled={updatingResources[item.id]}
-                          className={cn(
-                            'text-xs font-bold uppercase px-2 py-1 border-2 rounded focus:outline-none',
-                            RESOURCE_STATUS_COLORS[item.originalResource.status],
-                            updatingResources[item.id] && 'opacity-50'
-                          )}
-                        >
-                          <option value="have">Have</option>
-                          <option value="need">Need</option>
-                          <option value="fix">Fix</option>
-                          <option value="discard">Discard</option>
-                        </select>
-                      ) : item.originalInventory ? (
-                        <button
-                          onClick={() => handleInventoryVerify(item.originalInventory!)}
-                          disabled={updatingInventory[item.id]}
-                          className={cn(
-                            'text-xs font-bold px-2 py-1 border-2 rounded transition-colors',
-                            item.originalInventory.verified
-                              ? 'border-green-500 bg-green-50 text-green-700'
-                              : item.originalInventory.confirmed_working
-                              ? 'border-blue-400 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 bg-gray-50 text-gray-500 hover:border-gray-400',
-                            updatingInventory[item.id] && 'opacity-40 animate-pulse'
-                          )}
-                        >
-                          {item.originalInventory.verified ? '✅ Verified' : item.originalInventory.confirmed_working ? '🔧 Working' : '⬜ Pending'}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400">{item.status}</span>
-                      )}
-
-                      {/* Question / Notes */}
-                      <span className="text-xs text-gray-500 truncate" title={item.question}>
-                        {item.question || '—'}
-                      </span>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 w-16 justify-end">
-                        {item.source === 'resource' && item.originalResource && (
-                          <>
-                            <button
-                              onClick={() => handleResourceConfirmedWorking(item.originalResource!)}
-                              disabled={updatingResources[item.id]}
-                              className={cn(
-                                'text-xs px-1 py-0.5 border rounded',
-                                item.originalResource.confirmed_working
-                                  ? 'border-green-500 bg-green-50 text-green-700'
-                                  : 'border-gray-300 bg-gray-50 text-gray-400',
-                                updatingResources[item.id] && 'opacity-40'
-                              )}
-                              title={item.originalResource.confirmed_working ? 'Unmark working' : 'Mark working'}
-                            >
-                              {item.originalResource.confirmed_working ? '✅' : '⬜'}
-                            </button>
-                            <button
-                              onClick={() => { setEditingResource(item.originalResource!); setShowAddResource(false) }}
-                              className="p-1 text-gray-400 hover:text-gray-700 text-xs"
-                              title="Edit"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleDeleteResource(item.id)}
-                              disabled={updatingResources[item.id]}
-                              className={cn('p-1 text-gray-400 hover:text-red-600 text-xs', updatingResources[item.id] && 'opacity-50')}
-                              title="Delete"
-                            >
-                              🗑️
-                            </button>
-                          </>
-                        )}
-                        {item.source === 'checklist' && item.originalInventory && (
-                          <>
-                            <button
-                              onClick={() => handleInventoryConfirmedWorking(item.originalInventory!)}
-                              disabled={updatingInventory[item.id]}
-                              className={cn(
-                                'text-xs px-1 py-0.5 border rounded',
-                                item.originalInventory.confirmed_working
-                                  ? 'border-green-500 bg-green-50 text-green-700'
-                                  : 'border-gray-300 bg-gray-50 text-gray-400',
-                                updatingInventory[item.id] && 'opacity-40'
-                              )}
-                              title={item.originalInventory.confirmed_working ? 'Unmark working' : 'Mark working'}
-                            >
-                              {item.originalInventory.confirmed_working ? '✅' : '⬜'}
-                            </button>
-                            <button
-                              onClick={() => { setEditingInventory(item.originalInventory!); setShowAddInventory(false) }}
-                              className="p-1 text-gray-400 hover:text-gray-700 text-xs"
-                              title="Edit"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleDeleteInventory(item.id)}
-                              disabled={updatingInventory[item.id]}
-                              className={cn('p-1 text-gray-400 hover:text-red-600 text-xs', updatingInventory[item.id] && 'opacity-50')}
-                              title="Delete"
-                            >
-                              🗑️
-                            </button>
-                          </>
-                        )}
-                      </div>
                     </div>
-
-                    {/* Mobile: stacked layout */}
-                    <div className="sm:hidden space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">
-                          {INVENTORY_CATEGORY_ICONS[item.category] || CATEGORY_ICONS[item.category] || '📦'}
-                        </span>
-                        <span className={cn(
-                          'text-sm font-bold flex-1',
-                          item.status === 'discard' && 'line-through',
-                          item.status === 'verified' && 'line-through text-gray-400',
-                        )}>
-                          {item.name}
-                        </span>
-                        <span className="text-[10px] text-gray-400">
-                          {item.source === 'resource' ? 'Material' : 'Checklist'}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 ml-6">
-                        {item.size && <span>Size: {item.size}</span>}
-                        <span>Count: <strong className={item.need != null && item.count < item.need ? 'text-red-600' : ''}>{item.count}</strong></span>
-                        {item.need != null && <span>Need: <strong>{item.need}</strong></span>}
-                        <span className={cn(
-                          'font-bold uppercase',
-                          item.status === 'need' ? 'text-red-600' : item.status === 'have' || item.status === 'verified' ? 'text-green-600' : ''
-                        )}>
-                          {item.status}
-                        </span>
-                      </div>
-                      {item.question && (
-                        <p className="text-xs text-amber-600 ml-6">{item.question}</p>
-                      )}
-                      <div className="flex items-center gap-2 ml-6">
-                        {item.source === 'resource' && item.originalResource && (
-                          <>
-                            <select
-                              value={item.originalResource.status}
-                              onChange={e => handleResourceStatusChange(item.id, e.target.value as BuildResourceStatus)}
-                              disabled={updatingResources[item.id]}
-                              className={cn(
-                                'text-[11px] font-bold uppercase px-1.5 py-0.5 border-2 rounded focus:outline-none',
-                                RESOURCE_STATUS_COLORS[item.originalResource.status]
-                              )}
-                            >
-                              <option value="have">Have</option>
-                              <option value="need">Need</option>
-                              <option value="fix">Fix</option>
-                              <option value="discard">Discard</option>
-                            </select>
-                            <button onClick={() => { setEditingResource(item.originalResource!); setShowAddResource(false) }} className="p-1 text-gray-400 hover:text-gray-700 text-xs">✏️</button>
-                            <button onClick={() => handleDeleteResource(item.id)} disabled={updatingResources[item.id]} className="p-1 text-gray-400 hover:text-red-600 text-xs">🗑️</button>
-                          </>
-                        )}
-                        {item.source === 'checklist' && item.originalInventory && (
-                          <>
-                            <button
-                              onClick={() => handleInventoryVerify(item.originalInventory!)}
-                              disabled={updatingInventory[item.id]}
-                              className={cn(
-                                'text-[11px] font-bold px-1.5 py-0.5 border-2 rounded',
-                                item.originalInventory.verified ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 text-gray-500'
-                              )}
-                            >
-                              {item.originalInventory.verified ? '✅ Verified' : '⬜ Verify'}
-                            </button>
-                            <button onClick={() => { setEditingInventory(item.originalInventory!); setShowAddInventory(false) }} className="p-1 text-gray-400 hover:text-gray-700 text-xs">✏️</button>
-                            <button onClick={() => handleDeleteInventory(item.id)} disabled={updatingInventory[item.id]} className="p-1 text-gray-400 hover:text-red-600 text-xs">🗑️</button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  )
+                })}
             </div>
           )}
         </TabPanel>
@@ -1811,6 +1850,8 @@ type InventoryFormData = {
   name: string
   category: string
   description?: string
+  size_w?: string
+  size_l?: string
   quantity_expected: number
   notes?: string
 }
@@ -1822,7 +1863,9 @@ const INVENTORY_CATEGORIES: { value: InventoryCategory; label: string }[] = [
   { value: 'container', label: 'Container' },
   { value: 'kitchen_item', label: 'Kitchen Item' },
   { value: 'av_equip', label: 'A/V Equip' },
-  { value: 'amenity_equip', label: 'Amenity Equip' },
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'furniture', label: 'Furniture' },
   { value: 'other', label: 'Other' },
   { value: 'bm_utility', label: 'BM Utility' },
 ]
@@ -1836,6 +1879,8 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
   const [name, setName] = useState(item?.name || '')
   const [category, setCategory] = useState<string>(item?.category || 'other')
   const [description, setDescription] = useState(item?.description || '')
+  const [sizeW, setSizeW] = useState(item?.size_w || '')
+  const [sizeL, setSizeL] = useState(item?.size_l || '')
   const [quantityExpected, setQuantityExpected] = useState(item?.quantity_expected ?? 1)
   const [notes, setNotes] = useState(item?.notes || '')
 
@@ -1846,6 +1891,8 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
       name: name.trim(),
       category,
       description: description.trim() || undefined,
+      size_w: sizeW.trim() || undefined,
+      size_l: sizeL.trim() || undefined,
       quantity_expected: Math.max(1, quantityExpected),
       notes: notes.trim() || undefined,
     })
@@ -1878,9 +1925,25 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
         </select>
       </div>
 
-      {/* Row 2: Quantity expected */}
+      {/* Row 2: Size (W), Size (L), Qty needed */}
       <div className="flex gap-2 items-center">
-        <label className="text-xs font-bold text-gray-500">Qty needed:</label>
+        <label className="text-xs font-bold text-gray-500">Size (W):</label>
+        <input
+          type="text"
+          value={sizeW}
+          onChange={e => setSizeW(e.target.value)}
+          placeholder="Width"
+          className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <label className="text-xs font-bold text-gray-500">Size (L):</label>
+        <input
+          type="text"
+          value={sizeL}
+          onChange={e => setSizeL(e.target.value)}
+          placeholder="Length"
+          className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <label className="text-xs font-bold text-gray-500"># Needed:</label>
         <input
           type="number"
           min={1}

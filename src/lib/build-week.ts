@@ -208,6 +208,8 @@ export async function createInventoryItem(item: {
   name: string
   category: string
   description?: string
+  size_w?: string
+  size_l?: string
   quantity_expected: number
   notes?: string
 }): Promise<BuildInventory> {
@@ -232,6 +234,8 @@ export async function updateInventoryItem(itemId: string, updates: {
   name?: string
   category?: string
   description?: string | null
+  size_w?: string | null
+  size_l?: string | null
   quantity_expected?: number
   quantity_actual?: number
   verified?: boolean
@@ -302,7 +306,9 @@ export const INVENTORY_CATEGORY_ICONS: Record<string, string> = {
   container: '📦',
   kitchen_item: '🍳',
   av_equip: '🔊',
-  amenity_equip: '🛋️',
+  electrical: '⚡',
+  plumbing: '🚿',
+  furniture: '🛋️',
   other: '🏷️',
-  bm_utility: '⚡',
+  bm_utility: '🔶',
 }

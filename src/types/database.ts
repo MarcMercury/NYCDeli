@@ -1090,13 +1090,15 @@ export interface BuildQuestionRow {
   updated_at: string
 }
 
-export type InventoryCategory = 'shade_structure' | 'tool' | 'large_equipment' | 'container' | 'kitchen_item' | 'av_equip' | 'amenity_equip' | 'other' | 'bm_utility'
+export type InventoryCategory = 'shade_structure' | 'tool' | 'large_equipment' | 'container' | 'kitchen_item' | 'av_equip' | 'electrical' | 'plumbing' | 'furniture' | 'other' | 'bm_utility'
 
 export interface BuildInventoryRow {
   id: string
   category: InventoryCategory
   name: string
   description: string | null
+  size_w: string | null
+  size_l: string | null
   quantity_expected: number
   quantity_actual: number
   verified: boolean
