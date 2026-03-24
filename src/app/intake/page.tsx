@@ -6,11 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { 
   Button, Input, Select, Checkbox, CheckboxGroup, Textarea, 
-  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
+  Card, CardHeader, CardTitle, CardContent, CardFooter,
   Alert, Stepper
 } from '@/components/ui'
-import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, orientationPreferences, shiftTypes, skillTags } from '@/lib/validations'
-import { fieldHelp, getRandomLoadingMessage, pageCopy } from '@/lib/tone'
+import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, orientationPreferences, skillTags } from '@/lib/validations'
+import { getRandomLoadingMessage, pageCopy } from '@/lib/tone'
 import { createClient } from '@/lib/supabase/client'
 import type { Step } from '@/components/ui/stepper'
 
@@ -53,10 +53,8 @@ export default function IntakePage() {
       orientation_preference: 'any',
       power_required: false,
       power_type: 'none',
-      shade_required: false,
       special_requests: '',
       kitchen_participation: true,
-      preferred_shift_types: ['any'],
       strike_participation: true,
       build_week_attending: false,
       build_week_arrival_date: '',
@@ -64,7 +62,9 @@ export default function IntakePage() {
       vehicle_info: '',
       skills: [],
       custom_skills: '',
-      emergency_contact: '',
+      emergency_contact_name: '',
+      emergency_contact_number: '',
+      emergency_contact_relationship: '',
       medical_conditions: '',
       medications: '',
       allergies: '',
@@ -90,11 +90,11 @@ export default function IntakePage() {
       ['full_name', 'playa_name', 'email', 'phone', 'password', 'confirmPassword'],
       ['arrival_date', 'arrival_method', 'departure_date', 'early_arrival'],
       ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference'],
-      ['power_required', 'power_type', 'shade_required', 'special_requests'],
-      ['kitchen_participation', 'preferred_shift_types', 'strike_participation'],
+      ['power_required', 'power_type', 'special_requests'],
+      ['kitchen_participation', 'strike_participation'],
       ['skills', 'custom_skills'],
       ['build_week_attending', 'build_week_arrival_date', 'tools_bringing', 'vehicle_info'],
-      ['emergency_contact', 'medical_conditions', 'medications', 'allergies', 'dietary_restrictions'],
+      ['emergency_contact_name', 'emergency_contact_number', 'emergency_contact_relationship', 'medical_conditions', 'medications', 'allergies', 'dietary_restrictions'],
       ['burn_count', 'what_attracted_you', 'referral_source', 'character_references', 'first_burn_hopes', 'volunteer_commitment', 'sober_shifts', 'background_check_consent'],
     ]
     
@@ -229,17 +229,6 @@ export default function IntakePage() {
               <CardTitle>
                 Step {currentStep + 1}: {steps[currentStep].title}
               </CardTitle>
-              <CardDescription>
-                {currentStep === 0 && "Who are you? Let's get you set up with an account."}
-                {currentStep === 1 && "When are you arriving and leaving?"}
-                {currentStep === 2 && "What are you sleeping in? Measure it. Actually measure it."}
-                {currentStep === 3 && "What infrastructure do you need?"}
-                {currentStep === 4 && "Everyone participates. No exceptions."}
-                {currentStep === 5 && "What can you actually do?"}
-                {currentStep === 6 && "Are you coming early to build?"}
-                {currentStep === 7 && "Your safety matters. Answers known only to Brian."}
-                {currentStep === 8 && "Last step. Tell us about yourself and confirm the commitments."}
-              </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-6">
@@ -255,7 +244,6 @@ export default function IntakePage() {
                         placeholder="Your legal name"
                         required
                         error={errors.full_name?.message}
-                        helpText={fieldHelp.fullName}
                         {...field}
                       />
                     )}
@@ -268,7 +256,6 @@ export default function IntakePage() {
                         label="Playa Name"
                         placeholder="Optional"
                         error={errors.playa_name?.message}
-                        helpText={fieldHelp.playaName}
                         {...field}
                         value={field.value || ''}
                       />
@@ -284,7 +271,6 @@ export default function IntakePage() {
                         placeholder="your@email.com"
                         required
                         error={errors.email?.message}
-                        helpText={fieldHelp.email}
                         {...field}
                       />
                     )}
@@ -298,7 +284,6 @@ export default function IntakePage() {
                         type="tel"
                         placeholder="Optional"
                         error={errors.phone?.message}
-                        helpText={fieldHelp.phone}
                         {...field}
                         value={field.value || ''}
                       />
@@ -356,7 +341,6 @@ export default function IntakePage() {
                         type="date"
                         required
                         error={errors.arrival_date?.message}
-                        helpText={fieldHelp.arrivalDate}
                         {...field}
                       />
                     )}
@@ -366,11 +350,10 @@ export default function IntakePage() {
                     control={control}
                     render={({ field }) => (
                       <Select
-                        label="Arrival Method"
+                        label="Arrival on Playa"
                         required
                         options={arrivalMethods.map(m => ({ value: m, label: m.charAt(0).toUpperCase() + m.slice(1) }))}
                         error={errors.arrival_method?.message}
-                        helpText={fieldHelp.arrivalMethod}
                         {...field}
                       />
                     )}
@@ -384,7 +367,6 @@ export default function IntakePage() {
                         type="date"
                         required
                         error={errors.departure_date?.message}
-                        helpText={fieldHelp.departureDate}
                         {...field}
                       />
                     )}
@@ -393,12 +375,18 @@ export default function IntakePage() {
                     name="early_arrival"
                     control={control}
                     render={({ field }) => (
-                      <Checkbox
-                        label="I'm arriving early (before gates open)"
-                        checked={field.value}
-                        onChange={field.onChange}
-                        helpText={fieldHelp.earlyArrival}
-                      />
+                      <div>
+                        <Checkbox
+                          label="I'm arriving early (before gates open)"
+                          checked={field.value}
+                          onChange={field.onChange}
+                        />
+                        {!buildWeekAttending && field.value && (
+                          <p className="text-sm text-amber-700 mt-2 ml-6">
+                            If you are not on the build team, early arrival requires prior approval from camp leadership.
+                          </p>
+                        )}
+                      </div>
                     )}
                   />
                 </>
@@ -407,11 +395,6 @@ export default function IntakePage() {
               {/* Step 3: Shelter */}
               {currentStep === 2 && (
                 <>
-                  <Alert variant="warning" className="mb-4">
-                    Camp builds 10.5&apos; tall shade over every tent. Maximum footprint guidelines:
-                    Solo 10x10, Two People 10x12.5, Three People 10x15, Four People 10x17.5.
-                    Please use format: [Brand] [Model] [LxWxH] [Population]
-                  </Alert>
                   <Controller
                     name="shelter_type"
                     control={control}
@@ -421,10 +404,9 @@ export default function IntakePage() {
                         required
                         options={shelterTypes.map(t => ({ 
                           value: t, 
-                          label: t === 'shiftpod' ? 'Shiftpod' : t === 'rv' ? 'RV' : t.charAt(0).toUpperCase() + t.slice(1)
+                          label: t === 'shiftpod' ? 'Shiftpod' : t === 'rv' ? 'RV (If Approved)' : t.charAt(0).toUpperCase() + t.slice(1)
                         }))}
                         error={errors.shelter_type?.message}
-                        helpText={fieldHelp.shelterType}
                         {...field}
                       />
                     )}
@@ -442,7 +424,6 @@ export default function IntakePage() {
                           step={0.5}
                           required
                           error={errors.shelter_length_ft?.message}
-                          helpText={fieldHelp.shelterLength}
                           {...field}
                           onChange={e => field.onChange(parseFloat(e.target.value))}
                         />
@@ -460,7 +441,6 @@ export default function IntakePage() {
                           step={0.5}
                           required
                           error={errors.shelter_width_ft?.message}
-                          helpText={fieldHelp.shelterWidth}
                           {...field}
                           onChange={e => field.onChange(parseFloat(e.target.value))}
                         />
@@ -478,7 +458,6 @@ export default function IntakePage() {
                         max={15}
                         step={0.5}
                         error={errors.shelter_height_ft?.message}
-                        helpText={fieldHelp.shelterHeight}
                         {...field}
                         value={field.value || ''}
                         onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
@@ -496,7 +475,6 @@ export default function IntakePage() {
                           label: o.charAt(0).toUpperCase() + o.slice(1)
                         }))}
                         error={errors.orientation_preference?.message}
-                        helpText={fieldHelp.orientationPreference}
                         {...field}
                         value={field.value || 'any'}
                       />
@@ -516,7 +494,6 @@ export default function IntakePage() {
                         label="I need electrical power"
                         checked={field.value}
                         onChange={field.onChange}
-                        helpText={fieldHelp.powerRequired}
                       />
                     )}
                   />
@@ -536,34 +513,20 @@ export default function IntakePage() {
                                    'High (explain yourself below)'
                           }))}
                           error={errors.power_type?.message}
-                          helpText={fieldHelp.powerType}
                           {...field}
                         />
                       )}
                     />
                   )}
                   <Controller
-                    name="shade_required"
-                    control={control}
-                    render={({ field }) => (
-                      <Checkbox
-                        label="I need to be under camp shade structure"
-                        checked={field.value}
-                        onChange={field.onChange}
-                        helpText={fieldHelp.shadeRequired}
-                      />
-                    )}
-                  />
-                  <Controller
                     name="special_requests"
                     control={control}
                     render={({ field }) => (
                       <Textarea
                         label="Special Requests"
-                        placeholder="Keep it reasonable. We're not a resort."
+                        placeholder="Keep it reasonable."
                         rows={3}
                         error={errors.special_requests?.message}
-                        helpText={fieldHelp.specialRequests}
                         {...field}
                         value={field.value || ''}
                       />
@@ -575,9 +538,6 @@ export default function IntakePage() {
               {/* Step 5: Participation */}
               {currentStep === 4 && (
                 <>
-                  <Alert variant="info" className="mb-4">
-                    Everyone contributes. That&apos;s the deal. Pick your poison.
-                  </Alert>
                   <Controller
                     name="kitchen_participation"
                     control={control}
@@ -586,25 +546,6 @@ export default function IntakePage() {
                         label="I will participate in kitchen duties"
                         checked={field.value}
                         onChange={field.onChange}
-                        helpText={fieldHelp.kitchenParticipation}
-                      />
-                    )}
-                  />
-                  <Controller
-                    name="preferred_shift_types"
-                    control={control}
-                    render={({ field }) => (
-                      <CheckboxGroup
-                        label="Preferred Shift Types"
-                        required
-                        options={shiftTypes.map(s => ({ 
-                          value: s, 
-                          label: s === 'any' ? 'Any (flexible)' : s.charAt(0).toUpperCase() + s.slice(1)
-                        }))}
-                        value={field.value}
-                        onChange={field.onChange}
-                        error={errors.preferred_shift_types?.message}
-                        helpText={fieldHelp.preferredShifts}
                       />
                     )}
                   />
@@ -616,7 +557,6 @@ export default function IntakePage() {
                         label="I will stay for strike (teardown)"
                         checked={field.value}
                         onChange={field.onChange}
-                        helpText={fieldHelp.strikeParticipation}
                       />
                     )}
                   />
@@ -641,7 +581,6 @@ export default function IntakePage() {
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.skills?.message}
-                        helpText={fieldHelp.skills}
                       />
                     )}
                   />
@@ -665,9 +604,6 @@ export default function IntakePage() {
               {/* Step 7: Build Week */}
               {currentStep === 6 && (
                 <>
-                  <Alert variant="info" className="mb-4">
-                    Build week is August 23-30. Early arrival = early responsibility.
-                  </Alert>
                   <Controller
                     name="build_week_attending"
                     control={control}
@@ -676,7 +612,6 @@ export default function IntakePage() {
                         label="I'm attending build week"
                         checked={field.value}
                         onChange={field.onChange}
-                        helpText="Think carefully before saying yes."
                       />
                     )}
                   />
@@ -717,7 +652,6 @@ export default function IntakePage() {
                             label="Tools You're Bringing"
                             placeholder="One tool per line"
                             rows={3}
-                            helpText={fieldHelp.toolsBringing}
                             value={field.value?.join('\n') || ''}
                             onChange={e => field.onChange(e.target.value.split('\n').filter(Boolean))}
                           />
@@ -731,19 +665,42 @@ export default function IntakePage() {
               {/* Step 8: Safety & Medical */}
               {currentStep === 7 && (
                 <>
-                  <Alert variant="info" className="mb-4">
-                    All answers on this page are known only to Brian. There&apos;s no wrong answers.
-                  </Alert>
                   <Controller
-                    name="emergency_contact"
+                    name="emergency_contact_name"
                     control={control}
                     render={({ field }) => (
                       <Input
-                        label="Emergency Contact"
-                        placeholder="Example: Mom, 212-555-5555"
+                        label="Emergency Contact Name"
+                        placeholder="Full name of your emergency contact"
                         required
-                        error={errors.emergency_contact?.message}
-                        helpText={fieldHelp.emergencyContact}
+                        error={errors.emergency_contact_name?.message}
+                        {...field}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="emergency_contact_number"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Emergency Contact Number"
+                        type="tel"
+                        placeholder="212-555-5555"
+                        required
+                        error={errors.emergency_contact_number?.message}
+                        {...field}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="emergency_contact_relationship"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        label="Emergency Contact Relationship"
+                        placeholder="e.g. Mother, Partner, Friend"
+                        required
+                        error={errors.emergency_contact_relationship?.message}
                         {...field}
                       />
                     )}
@@ -754,10 +711,8 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Textarea
                         label="Medical Conditions"
-                        placeholder="Known only to Brian. There's no wrong answers."
                         rows={2}
                         error={errors.medical_conditions?.message}
-                        helpText={fieldHelp.medicalConditions}
                         {...field}
                         value={field.value || ''}
                       />
@@ -769,10 +724,8 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Textarea
                         label="Required Medications"
-                        placeholder="Example: Insulin. Camp keeps refrigerated meds cool at 33°."
                         rows={2}
                         error={errors.medications?.message}
-                        helpText={fieldHelp.medications}
                         {...field}
                         value={field.value || ''}
                       />
@@ -784,10 +737,8 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Textarea
                         label="Allergies"
-                        placeholder="What are they and what happens if triggered?"
                         rows={2}
                         error={errors.allergies?.message}
-                        helpText={fieldHelp.allergies}
                         {...field}
                         value={field.value || ''}
                       />
@@ -799,9 +750,7 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Input
                         label="Dietary Restrictions"
-                        placeholder="We want to feed you. Help us help you."
                         error={errors.dietary_restrictions?.message}
-                        helpText={fieldHelp.dietaryRestrictions}
                         {...field}
                         value={field.value || ''}
                       />
@@ -822,7 +771,6 @@ export default function IntakePage() {
                         placeholder="Zero is a perfectly valid answer"
                         required
                         error={errors.burn_count?.message}
-                        helpText={fieldHelp.burnCount}
                         {...field}
                       />
                     )}
@@ -833,10 +781,8 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Textarea
                         label="What attracted you to camping with NYC Deli?"
-                        placeholder="Burning Man has 1,400 theme camps..."
                         rows={2}
                         error={errors.what_attracted_you?.message}
-                        helpText={fieldHelp.whatAttractedYou}
                         {...field}
                         value={field.value || ''}
                       />
@@ -848,9 +794,7 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Input
                         label="If first time with NYC Deli, who gave you the registration link?"
-                        placeholder="Name of the person who referred you"
                         error={errors.referral_source?.message}
-                        helpText={fieldHelp.referralSource}
                         {...field}
                         value={field.value || ''}
                       />
@@ -862,10 +806,8 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Textarea
                         label="Character References (two people, with contact info)"
-                        placeholder="Ideally folks you've camped with. Include email or phone."
                         rows={3}
                         error={errors.character_references?.message}
-                        helpText={fieldHelp.characterReferences}
                         {...field}
                         value={field.value || ''}
                       />
@@ -877,10 +819,8 @@ export default function IntakePage() {
                     render={({ field }) => (
                       <Textarea
                         label="If this is your first burn with us, what do you hope to get out of it?"
-                        placeholder="Optional"
                         rows={2}
                         error={errors.first_burn_hopes?.message}
-                        helpText={fieldHelp.firstBurnHopes}
                         {...field}
                         value={field.value || ''}
                       />
@@ -899,7 +839,6 @@ export default function IntakePage() {
                               label="I will volunteer three 2.5-hour shifts during burn week"
                               checked={field.value}
                               onChange={field.onChange}
-                              helpText={fieldHelp.volunteerCommitment}
                             />
                             {errors.volunteer_commitment?.message && (
                               <p className="text-red-600 text-sm mt-1">{errors.volunteer_commitment.message}</p>
@@ -916,7 +855,6 @@ export default function IntakePage() {
                               label="I will be sober during my volunteer shifts"
                               checked={field.value}
                               onChange={field.onChange}
-                              helpText={fieldHelp.soberShifts}
                             />
                             {errors.sober_shifts?.message && (
                               <p className="text-red-600 text-sm mt-1">{errors.sober_shifts.message}</p>
@@ -933,7 +871,6 @@ export default function IntakePage() {
                               label="I consent to a background check"
                               checked={field.value}
                               onChange={field.onChange}
-                              helpText={fieldHelp.backgroundCheck}
                             />
                             {errors.background_check_consent?.message && (
                               <p className="text-red-600 text-sm mt-1">{errors.background_check_consent.message}</p>

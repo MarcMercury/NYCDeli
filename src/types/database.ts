@@ -2,7 +2,7 @@
 // These types define the schema for Supabase
 
 export type ShelterType = 'tent' | 'shiftpod' | 'rv' | 'vehicle' | 'other'
-export type ArrivalMethod = 'car' | 'bus' | 'flight' | 'other'
+export type ArrivalMethod = 'car' | 'bus' | 'other'
 export type PowerType = 'none' | 'low' | 'medium' | 'high'
 export type OrientationPreference = 'north' | 'south' | 'east' | 'west' | 'any'
 export type ShiftType = 'prep' | 'service' | 'cleanup' | 'any'
@@ -56,6 +56,9 @@ export interface CamperRow {
   skills: SkillTag[]
   custom_skills: string | null
   emergency_contact: string | null
+  emergency_contact_name: string | null
+  emergency_contact_number: string | null
+  emergency_contact_relationship: string | null
   medical_conditions: string | null
   medications: string | null
   allergies: string | null
@@ -104,6 +107,9 @@ export interface CamperInsert {
   skills?: SkillTag[]
   custom_skills?: string | null
   emergency_contact?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_number?: string | null
+  emergency_contact_relationship?: string | null
   medical_conditions?: string | null
   medications?: string | null
   allergies?: string | null
@@ -152,6 +158,9 @@ export interface CamperUpdate {
   skills?: SkillTag[]
   custom_skills?: string | null
   emergency_contact?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_number?: string | null
+  emergency_contact_relationship?: string | null
   medical_conditions?: string | null
   medications?: string | null
   allergies?: string | null

@@ -6,8 +6,8 @@ const invalidEmail = "That's not a real email address."
 const tooSmall = "That's suspiciously small. Measure again."
 const tooLarge = "That won't fit. Downsize or stay home."
 
-export const shelterTypes = ['tent', 'shiftpod', 'rv', 'vehicle', 'other'] as const
-export const arrivalMethods = ['car', 'bus', 'flight', 'other'] as const
+export const shelterTypes = ['tent', 'shiftpod', 'rv', 'other'] as const
+export const arrivalMethods = ['car', 'bus', 'other'] as const
 export const powerTypes = ['none', 'low', 'medium', 'high'] as const
 export const orientationPreferences = ['north', 'south', 'east', 'west', 'any'] as const
 export const shiftTypes = ['prep', 'service', 'cleanup', 'any'] as const
@@ -55,14 +55,12 @@ export const shelterSchema = z.object({
 export const infrastructureSchema = z.object({
   power_required: z.boolean(),
   power_type: z.enum(powerTypes),
-  shade_required: z.boolean(),
   special_requests: z.string().max(500, "Keep requests under 500 characters.").optional().nullable(),
 })
 
 // Participation Section
 export const participationSchema = z.object({
   kitchen_participation: z.boolean(),
-  preferred_shift_types: z.array(z.enum(shiftTypes)).min(1, "Pick at least one shift type."),
   strike_participation: z.boolean(),
 })
 
@@ -88,7 +86,9 @@ export const vehicleOptions = ['no_vehicle', 'want_to_discuss'] as const
 
 // Safety & Medical Section
 export const safetySchema = z.object({
-  emergency_contact: z.string().min(5, "We need a name and number. Example: Mom, 212-555-5555"),
+  emergency_contact_name: z.string().min(1, "Emergency contact name is required."),
+  emergency_contact_number: z.string().min(7, "Enter a valid phone number for your emergency contact."),
+  emergency_contact_relationship: z.string().min(1, "How is this person related to you?"),
   medical_conditions: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
   medications: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
   allergies: z.string().max(500, "Keep it under 500 characters.").optional().nullable(),
