@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { changePassword } from '@/app/actions/auth'
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
   Badge, Alert, Button, Textarea, Input, Select, Checkbox, CheckboxGroup,
@@ -42,6 +43,12 @@ export default function ProfilePage() {
 
   // Editable camper detail fields
   const [editCamper, setEditCamper] = useState<Partial<CamperRow>>({})
+
+  // Password change state
+  const [currentPwd, setCurrentPwd] = useState('')
+  const [newPwd, setNewPwd] = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [pwdSaving, setPwdSaving] = useState(false)
 
   // Schedule state
   const [allAssignments, setAllAssignments] = useState<EnrichedAssignment[]>([])
@@ -159,6 +166,29 @@ export default function ProfilePage() {
       setMessage({ type: 'success', text: 'Bio saved!' })
     }
     setSaving(false)
+  }
+
+  const handleChangePassword = async () => {
+    if (newPwd !== confirmPwd) {
+      setMessage({ type: 'error', text: 'New passwords do not match' })
+      return
+    }
+    if (newPwd.length < 8) {
+      setMessage({ type: 'error', text: 'New password must be at least 8 characters' })
+      return
+    }
+    setPwdSaving(true)
+    setMessage(null)
+    const result = await changePassword(currentPwd, newPwd)
+    if (result.success) {
+      setMessage({ type: 'success', text: 'Password changed successfully!' })
+      setCurrentPwd('')
+      setNewPwd('')
+      setConfirmPwd('')
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to change password' })
+    }
+    setPwdSaving(false)
   }
 
   const saveCamperDetails = async () => {
@@ -425,6 +455,46 @@ export default function ProfilePage() {
               }}
             />
           </CardContent>
+        </Card>
+
+        {/* Change Password Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+            <CardDescription>Update your login password.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              label="Current Password"
+              type="password"
+              value={currentPwd}
+              onChange={(e) => setCurrentPwd(e.target.value)}
+              required
+            />
+            <Input
+              label="New Password"
+              type="password"
+              value={newPwd}
+              onChange={(e) => setNewPwd(e.target.value)}
+              placeholder="Minimum 8 characters"
+              required
+            />
+            <Input
+              label="Confirm New Password"
+              type="password"
+              value={confirmPwd}
+              onChange={(e) => setConfirmPwd(e.target.value)}
+              required
+            />
+          </CardContent>
+          <CardFooter>
+            <Button
+              onClick={handleChangePassword}
+              disabled={pwdSaving || !currentPwd || newPwd.length < 8 || newPwd !== confirmPwd}
+            >
+              {pwdSaving ? 'Changing...' : 'Change Password'}
+            </Button>
+          </CardFooter>
         </Card>
       </TabPanel>
 

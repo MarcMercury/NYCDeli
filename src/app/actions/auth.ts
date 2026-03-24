@@ -103,3 +103,39 @@ export async function signOut() {
   revalidatePath('/', 'layout')
   redirect('/login')
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, error: 'New password must be at least 8 characters' }
+  }
+
+  const supabase = await createClient()
+
+  // Verify the user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !user.email) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Verify current password by attempting a sign-in
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  })
+
+  if (verifyError) {
+    return { success: false, error: 'Current password is incorrect' }
+  }
+
+  // Update the password
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}

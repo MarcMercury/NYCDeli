@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
 import type { CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
 
@@ -191,4 +192,23 @@ export async function getShiftPositionOverridesAction(): Promise<AdminActionResu
   } catch {
     return { success: true, data: {} }
   }
+}
+
+export async function adminResetPasswordAction(
+  userId: string,
+  newPassword: string
+): Promise<AdminActionResult> {
+  await requireAdmin()
+
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, error: 'Password must be at least 8 characters' }
+  }
+
+  const adminClient = createServiceClient()
+  const { error } = await adminClient.auth.admin.updateUserById(userId, {
+    password: newPassword,
+  })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
 }

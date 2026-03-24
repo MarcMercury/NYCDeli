@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-  Badge, Alert, Button, Textarea
+  Badge, Alert, Button, Textarea, Input
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { UserProfileRow, CamperRow } from '@/types/database'
+import { adminResetPasswordAction } from '@/app/actions/admin'
 
 interface ApplicantWithCamper extends UserProfileRow {
   camper: CamperRow | null
@@ -23,6 +24,8 @@ export default function ApplicantReviewPage() {
   const [denyReason, setDenyReason] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [resetPassword, setResetPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
 
   const fetchApplicants = useCallback(async () => {
     const supabase = createClient()
@@ -118,6 +121,23 @@ export default function ApplicantReviewPage() {
     setActionLoading(false)
   }
 
+  const handleResetPassword = async (applicant: ApplicantWithCamper) => {
+    if (!resetPassword || resetPassword.length < 8) {
+      setMessage({ type: 'error', text: 'Password must be at least 8 characters' })
+      return
+    }
+    setActionLoading(true)
+    const result = await adminResetPasswordAction(applicant.id, resetPassword)
+    if (result.success) {
+      setMessage({ type: 'success', text: `Password reset for ${applicant.email}` })
+      setResetPassword('')
+      setShowResetPassword(false)
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to reset password' })
+    }
+    setActionLoading(false)
+  }
+
   const getStatusBadge = (applicant: ApplicantWithCamper) => {
     if (applicant.denied_at) return <Badge variant="error">Denied</Badge>
     if (applicant.role === 'pending') return <Badge variant="warning">Pending</Badge>
@@ -181,7 +201,7 @@ export default function ApplicantReviewPage() {
             applicants.map(applicant => (
               <button
                 key={applicant.id}
-                onClick={() => setSelectedApplicant(applicant)}
+                onClick={() => { setSelectedApplicant(applicant); setShowResetPassword(false); setResetPassword('') }}
                 className={cn(
                   'w-full text-left p-4 border-2 border-black transition-all',
                   selectedApplicant?.id === applicant.id
@@ -351,6 +371,47 @@ export default function ApplicantReviewPage() {
                     )}
                   </Alert>
                 )}
+
+                {/* Password Reset */}
+                <div>
+                  <h3 className="font-bold uppercase tracking-wider text-sm mb-3 border-b-2 border-black pb-1">
+                    Password Management
+                  </h3>
+                  {showResetPassword ? (
+                    <div className="space-y-3">
+                      <Input
+                        label="New Password"
+                        type="text"
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        placeholder="Minimum 8 characters"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleResetPassword(selectedApplicant)}
+                          disabled={actionLoading || resetPassword.length < 8}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          {actionLoading ? 'Setting...' : '🔑 Set Password'}
+                        </Button>
+                        <Button
+                          onClick={() => { setShowResetPassword(false); setResetPassword('') }}
+                          variant="secondary"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => setShowResetPassword(true)}
+                      variant="secondary"
+                      className="text-sm"
+                    >
+                      🔑 Reset Password
+                    </Button>
+                  )}
+                </div>
               </CardContent>
 
               {/* Action buttons */}
