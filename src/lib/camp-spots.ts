@@ -269,6 +269,14 @@ export async function syncSpotsFromFloorplan(
   let updated = 0
   let deleted = 0
 
+  // Build a set of used (row_label, spot_number) pairs from ALL existing spots
+  const usedLabels = new Set<string>()
+  for (const s of spots) {
+    if (s.row_label && s.spot_number) {
+      usedLabels.add(`${s.row_label}-${s.spot_number}`)
+    }
+  }
+
   // Sort reservable objects for consistent labeling (top-to-bottom, left-to-right)
   const sorted = [...reservable].sort((a, b) => {
     const rowA = Math.floor(a.y / 20)
@@ -280,7 +288,6 @@ export async function syncSpotsFromFloorplan(
   // Assign row labels (A, B, C, ...) based on Y position clusters
   let currentRow = -1
   let rowLabel = 'A'
-  let spotInRow = 0
   const rowThreshold = 20
 
   for (const obj of sorted) {
@@ -290,9 +297,7 @@ export async function syncSpotsFromFloorplan(
         rowLabel = String.fromCharCode(rowLabel.charCodeAt(0) + 1)
       }
       currentRow = objRow
-      spotInRow = 0
     }
-    spotInRow++
 
     // Find existing spot linked to this object
     const existing = spots.find(
@@ -314,12 +319,19 @@ export async function syncSpotsFromFloorplan(
         .eq('id' as never, existing.id)
       updated++
     } else {
+      // Find the next available spot_number for this row_label
+      let spotNum = 1
+      while (usedLabels.has(`${rowLabel}-${spotNum}`)) {
+        spotNum++
+      }
+      usedLabels.add(`${rowLabel}-${spotNum}`)
+
       // Create new spot linked to this object
       const { error } = await supabase
         .from('camp_spots' as never)
         .insert({
           row_label: rowLabel,
-          spot_number: spotInRow,
+          spot_number: spotNum,
           floorplan_object_id: obj.id,
           x_position: obj.x,
           y_position: obj.y,
@@ -338,31 +350,6 @@ export async function syncSpotsFromFloorplan(
 
       if (error) {
         console.error('Failed to create camp spot:', error)
-        // Duplicate row_label+spot_number — bump and retry
-        if (error.code === '23505') {
-          spotInRow++
-          const { error: retryError } = await supabase
-            .from('camp_spots' as never)
-            .insert({
-              row_label: rowLabel,
-              spot_number: spotInRow,
-              floorplan_object_id: obj.id,
-              x_position: obj.x,
-              y_position: obj.y,
-              spot_width_ft: obj.width_ft,
-              spot_length_ft: obj.height_ft,
-              size_category: obj.width_ft <= 8 ? 'small' : obj.width_ft <= 12 ? 'medium' : 'large',
-              min_tent_width_ft: 4,
-              max_tent_width_ft: obj.width_ft,
-              min_tent_length_ft: 4,
-              max_tent_length_ft: obj.height_ft,
-              has_power: false,
-              has_shade: false,
-              is_accessible: false,
-              is_available: true,
-            } as never)
-          if (!retryError) created++
-        }
       } else {
         created++
       }
