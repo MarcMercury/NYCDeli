@@ -30,8 +30,8 @@ export function CampMap() {
   const [email, setEmail] = useState('')
   const [identifyLoading, setIdentifyLoading] = useState(false)
 
-  // Map interaction
-  const [scale, setScale] = useState(2.5)
+  // Map interaction — fixed zoom for stable desktop experience
+  const scale = 4.5
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
@@ -41,6 +41,12 @@ export function CampMap() {
   const [showLabels, setShowLabels] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Search / jump-to
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [hasInitialPan, setHasInitialPan] = useState(false)
 
   // Reserve Wizard
   const [wizardStep, setWizardStep] = useState<WizardStep | null>(null)
@@ -138,11 +144,50 @@ export function CampMap() {
     setIsPanning(false)
   }
 
-  function handleWheel(e: React.WheelEvent) {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? -0.25 : 0.25
-    setScale(prev => Math.max(0.5, Math.min(6, prev + delta)))
+  // Center map in viewport on initial load
+  useEffect(() => {
+    if (config && containerRef.current && !hasInitialPan) {
+      const viewportW = containerRef.current.clientWidth
+      const viewportH = containerRef.current.clientHeight
+      const mapW = config.width_ft * scale
+      const mapH = config.length_ft * scale
+      // Center horizontally, show top portion vertically (with some padding)
+      const x = (viewportW - mapW) / 2 - 32
+      const y = Math.min(0, (viewportH - mapH) / 2) - 32
+      setPanOffset({ x, y })
+      setHasInitialPan(true)
+    }
+  }, [config, scale, hasInitialPan])
+
+  // Jump to a specific object on the map
+  function jumpToObject(obj: FloorplanObjectRow) {
+    if (!containerRef.current) return
+    const viewportW = containerRef.current.clientWidth
+    const viewportH = containerRef.current.clientHeight
+    // Center the object in the viewport
+    const objCenterX = (obj.x + obj.width_ft / 2) * scale
+    const objCenterY = (obj.y + obj.height_ft / 2) * scale
+    setPanOffset({
+      x: viewportW / 2 - objCenterX - 32,
+      y: viewportH / 2 - objCenterY - 32,
+    })
+    handleObjectClick(obj)
+    setSearchQuery('')
+    setSearchOpen(false)
   }
+
+  // Filtered search results
+  const searchResults = searchQuery.trim().length > 0
+    ? objects.filter(obj => {
+        const q = searchQuery.toLowerCase()
+        const label = (obj.label || '').toLowerCase()
+        const type = obj.object_type.replace(/_/g, ' ').toLowerCase()
+        // Also match camper playa_name for reserved spots
+        const spot = obj.properties?.reservable ? findSpotForObject(obj) : null
+        const camperName = spot?.camper?.playa_name?.toLowerCase() || spot?.camper?.full_name?.toLowerCase() || ''
+        return label.includes(q) || type.includes(q) || camperName.includes(q)
+      }).slice(0, 12)
+    : []
 
   // Click on an object — always show info, attach matching spot if reservable
   function handleObjectClick(obj: FloorplanObjectRow) {
@@ -254,8 +299,17 @@ export function CampMap() {
   }
 
   function handleResetView() {
-    setPanOffset({ x: 0, y: 0 })
-    setScale(2.5)
+    if (config && containerRef.current) {
+      const viewportW = containerRef.current.clientWidth
+      const viewportH = containerRef.current.clientHeight
+      const mapW = config.width_ft * scale
+      const mapH = config.length_ft * scale
+      const x = (viewportW - mapW) / 2 - 32
+      const y = Math.min(0, (viewportH - mapH) / 2) - 32
+      setPanOffset({ x, y })
+    } else {
+      setPanOffset({ x: 0, y: 0 })
+    }
   }
 
   // Spot overlay ring colors on the map
@@ -316,30 +370,68 @@ export function CampMap() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Zoom controls */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setScale(prev => Math.max(0.5, prev - 0.5))}
-              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs font-bold"
-            >
-              −
-            </button>
-            <span className="text-xs font-mono w-10 text-center">{scale.toFixed(1)}x</span>
-            <button
-              onClick={() => setScale(prev => Math.min(6, prev + 0.5))}
-              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs font-bold"
-            >
-              +
-            </button>
+          {/* Search / Jump-to */}
+          <div className="relative">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { setSearchOpen(prev => !prev); setTimeout(() => searchInputRef.current?.focus(), 50) }}
+                className="px-3 py-1 bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-black uppercase tracking-wider"
+                title="Search map objects"
+              >
+                🔍 Find
+              </button>
+              {searchOpen && (
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery('') }
+                    if (e.key === 'Enter' && searchResults.length > 0) jumpToObject(searchResults[0])
+                  }}
+                  placeholder="Search tents, areas, names..."
+                  className="w-48 px-2 py-1 text-xs bg-gray-800 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
+                />
+              )}
+            </div>
+            {/* Search results dropdown */}
+            {searchOpen && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 w-72 bg-gray-900 border border-gray-700 shadow-xl z-[100] max-h-64 overflow-y-auto">
+                {searchResults.map(obj => {
+                  const template = getTemplateForType(obj.object_type)
+                  const spot = obj.properties?.reservable ? findSpotForObject(obj) : null
+                  return (
+                    <button
+                      key={obj.id}
+                      onClick={() => jumpToObject(obj)}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-800 flex items-center gap-2 border-b border-gray-800"
+                    >
+                      <span>{template?.icon || '📦'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-white truncate">{obj.label || obj.object_type.replace(/_/g, ' ')}</div>
+                        <div className="text-gray-400 text-[10px]">{obj.object_type.replace(/_/g, ' ')} • {obj.width_ft}×{obj.height_ft}ft</div>
+                      </div>
+                      {spot?.reservation && (
+                        <span className="text-[10px] bg-red-500/20 text-red-400 px-1 rounded">Taken</span>
+                      )}
+                      {spot && !spot.reservation && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 rounded">Open</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Reset View */}
           <button
             onClick={handleResetView}
             className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-xs font-bold uppercase"
-            title="Reset view"
+            title="Re-center map"
           >
-            ⟳ Reset
+            ⟳ Center
           </button>
 
           {/* Toggles */}
@@ -374,7 +466,6 @@ export function CampMap() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          onWheel={handleWheel}
         >
           {/* Alerts overlaid on map */}
           <div className="absolute top-2 left-2 right-2 z-50 space-y-2 pointer-events-none">
@@ -827,7 +918,7 @@ export function CampMap() {
             </CardHeader>
             <CardContent className="text-xs text-gray-600 space-y-1.5">
               <p>🖱️ <strong>Click + drag</strong> to pan around the map</p>
-              <p>🔍 <strong>Scroll wheel</strong> to zoom in/out</p>
+              <p>🔍 <strong>Find button</strong> to search &amp; jump to any area</p>
               <p>👆 <strong>Click any object</strong> to see details</p>
               <p>🟢 <strong>Green ring</strong> = available tent spot</p>
               <p>🔴 <strong>Red ring</strong> = taken by another camper</p>
