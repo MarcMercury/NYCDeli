@@ -11,7 +11,7 @@ interface ObjectPaletteProps {
 
 export function ObjectPalette({ onDragStart }: ObjectPaletteProps) {
   const categories = Object.keys(CATEGORY_LABELS) as Array<ObjectTemplate['category']>
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(categories))
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredTemplates = searchQuery
