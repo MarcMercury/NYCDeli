@@ -571,6 +571,15 @@ export function CampMap() {
                     onMouseEnter={() => setHoveredObjectId(obj.id)}
                     onMouseLeave={() => setHoveredObjectId(null)}
                   >
+                    {/* Shade structure corner posts */}
+                    {obj.object_type === 'shade_structure' && (
+                      <>
+                        <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                        <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                        <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                        <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                      </>
+                    )}
                     {/* Labels */}
                     {showLabels && obj.width_ft * scale > 20 && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px">

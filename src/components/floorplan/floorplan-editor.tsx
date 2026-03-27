@@ -219,6 +219,9 @@ export function FloorplanEditor() {
     const template = getTemplateForType(objectType as FloorplanObjectType)
     if (!template) return
 
+    // Shade structures default to background (z_index 0)
+    const defaultZIndex = template.defaultProperties?.background ? 0 : objects.length
+
     const newObj: FloorplanObjectRow = {
       id: generateId(),
       floorplan_id: config.id,
@@ -230,7 +233,7 @@ export function FloorplanEditor() {
       height_ft: template.defaultHeight,
       rotation: 0,
       color: template.defaultColor,
-      z_index: objects.length,
+      z_index: defaultZIndex,
       is_locked: false,
       parent_id: null,
       properties: template.defaultProperties as FloorplanObjectRow['properties'],
@@ -253,7 +256,7 @@ export function FloorplanEditor() {
       width_ft: template.defaultWidth,
       height_ft: template.defaultHeight,
       color: template.defaultColor,
-      z_index: objects.length,
+      z_index: defaultZIndex,
       properties: template.defaultProperties as FloorplanObjectRow['properties'],
     })
 
