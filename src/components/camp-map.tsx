@@ -10,7 +10,8 @@ import { createClient } from '@/lib/supabase/client'
 import { getTemplateForType } from '@/components/floorplan/object-templates'
 
 // ─── 3D View Helpers ───────────────────────────────────────────
-const HEIGHT_SCALE = 0.4
+// This scale converts feet of elevation to pixels of visual height
+const HEIGHT_PX_PER_FT = 4
 
 // Fallback heights when admin hasn't set elevation_ft on the object
 function getDefaultElevation(type: string): number {
@@ -52,99 +53,73 @@ function lightenHex(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
-// ─── Roof Shape Components ────────────────────────────────────
-function RoofOverlay({ roofShape, elevationPx, widthPx, heightPx, color }: {
+// ─── Roof Shape Components (rendered on the top face) ─────────
+function RoofOverlay({ roofShape, widthPx, heightPx, color }: {
   roofShape: RoofShape
-  elevationPx: number
   widthPx: number
   heightPx: number
   color: string
 }) {
-  const ridgeHeight = Math.min(elevationPx * 0.6, Math.min(widthPx, heightPx) * 0.4)
-  const roofColor = lightenHex(color, 0.15)
-  const roofDark = darkenHex(color, 0.1)
+  const roofColor = lightenHex(color, 0.2)
+  const roofDark = darkenHex(color, 0.15)
 
   if (roofShape === 'pyramid') {
-    // Pyramid: 4 triangular faces converging at center
     return (
-      <div className="absolute inset-0 pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
-        {/* Front face */}
-        <div className="absolute bottom-0 left-0 right-0" style={{
-          height: ridgeHeight,
-          background: `linear-gradient(to top, ${roofDark}dd, ${roofColor}cc)`,
-          clipPath: 'polygon(0% 100%, 100% 100%, 50% 0%)',
-          transform: `rotateX(70deg) translateZ(${ridgeHeight * 0.2}px)`,
-          transformOrigin: 'bottom center',
-        }} />
-        {/* Top gradient overlay on the roof surface */}
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }}>
         <div className="absolute inset-0" style={{
-          background: `radial-gradient(ellipse at center, ${roofColor}bb 0%, ${roofDark}99 70%, transparent 100%)`,
+          background: `radial-gradient(ellipse at 45% 40%, ${lightenHex(color, 0.4)}ee 0%, ${roofColor}cc 35%, ${roofDark}aa 75%, ${darkenHex(color, 0.25)}88 100%)`,
           clipPath: 'polygon(50% 15%, 85% 50%, 50% 85%, 15% 50%)',
         }} />
-        {/* Ridge lines */}
-        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.5 }}>
-          <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={0} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
-          <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={0} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
+        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.6 }}>
+          <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={0} stroke={darkenHex(color, 0.5)} strokeWidth="2" />
+          <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={0} stroke={darkenHex(color, 0.5)} strokeWidth="2" />
           <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={heightPx} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
           <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={heightPx} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
+          <circle cx={widthPx / 2} cy={heightPx / 2} r="3" fill={lightenHex(color, 0.5)} />
         </svg>
       </div>
     )
   }
 
   if (roofShape === 'a_frame') {
-    // A-Frame: ridge runs along the longer axis
     const isWide = widthPx >= heightPx
     return (
-      <div className="absolute inset-0 pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
-        {/* Two sloped faces */}
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }}>
         <div className="absolute inset-0" style={{
           background: isWide
-            ? `linear-gradient(to bottom, ${roofColor}cc 0%, ${roofDark}bb 48%, ${lightenHex(color, 0.3)}ee 50%, ${roofDark}bb 52%, ${roofColor}cc 100%)`
-            : `linear-gradient(to right, ${roofColor}cc 0%, ${roofDark}bb 48%, ${lightenHex(color, 0.3)}ee 50%, ${roofDark}bb 52%, ${roofColor}cc 100%)`,
+            ? `linear-gradient(to bottom, ${roofColor}dd 0%, ${roofDark}cc 46%, ${lightenHex(color, 0.45)}ff 50%, ${roofDark}cc 54%, ${roofColor}dd 100%)`
+            : `linear-gradient(to right, ${roofColor}dd 0%, ${roofDark}cc 46%, ${lightenHex(color, 0.45)}ff 50%, ${roofDark}cc 54%, ${roofColor}dd 100%)`,
         }} />
-        {/* Ridge line */}
-        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.6 }}>
+        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.7 }}>
           {isWide ? (
-            <line x1={0} y1={heightPx / 2} x2={widthPx} y2={heightPx / 2} stroke={lightenHex(color, 0.4)} strokeWidth="2" />
+            <line x1={0} y1={heightPx / 2} x2={widthPx} y2={heightPx / 2} stroke={lightenHex(color, 0.5)} strokeWidth="3" />
           ) : (
-            <line x1={widthPx / 2} y1={0} x2={widthPx / 2} y2={heightPx} stroke={lightenHex(color, 0.4)} strokeWidth="2" />
+            <line x1={widthPx / 2} y1={0} x2={widthPx / 2} y2={heightPx} stroke={lightenHex(color, 0.5)} strokeWidth="3" />
           )}
         </svg>
-        {/* Side faces (gable ends) */}
-        <div className="absolute" style={{
-          ...(isWide
-            ? { left: 0, top: 0, width: 2, height: '100%', background: `${darkenHex(color, 0.35)}` }
-            : { left: 0, top: 0, height: 2, width: '100%', background: `${darkenHex(color, 0.35)}` }),
-        }} />
-        <div className="absolute" style={{
-          ...(isWide
-            ? { right: 0, top: 0, width: 2, height: '100%', background: `${darkenHex(color, 0.35)}` }
-            : { left: 0, bottom: 0, height: 2, width: '100%', background: `${darkenHex(color, 0.35)}` }),
-        }} />
       </div>
     )
   }
 
   if (roofShape === 'dome') {
-    // Dome: radial gradient for the curved surface
     return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
-        <div className="absolute inset-0" style={{
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 3 }}>
+        <div className="absolute" style={{
+          left: '5%', top: '5%', right: '5%', bottom: '5%',
           borderRadius: '50%',
-          background: `radial-gradient(ellipse at 40% 35%, ${lightenHex(color, 0.35)}dd 0%, ${roofColor}cc 30%, ${roofDark}bb 70%, ${darkenHex(color, 0.3)}99 100%)`,
-          margin: '5%',
+          background: `radial-gradient(ellipse at 38% 32%, ${lightenHex(color, 0.45)}ee 0%, ${roofColor}dd 25%, ${roofDark}cc 60%, ${darkenHex(color, 0.3)}aa 100%)`,
+          boxShadow: `inset -3px 3px 8px ${darkenHex(color, 0.3)}88, inset 2px -2px 6px ${lightenHex(color, 0.2)}66`,
         }} />
-        {/* Highlight arc */}
-        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.3 }}>
-          <ellipse cx={widthPx * 0.45} cy={heightPx * 0.4} rx={widthPx * 0.25} ry={heightPx * 0.2}
-            fill="none" stroke={lightenHex(color, 0.5)} strokeWidth="1.5" />
+        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.25 }}>
+          <ellipse cx={widthPx * 0.42} cy={heightPx * 0.38} rx={widthPx * 0.22} ry={heightPx * 0.18}
+            fill="none" stroke={lightenHex(color, 0.6)} strokeWidth="2" />
+          <ellipse cx={widthPx * 0.5} cy={heightPx * 0.5} rx={widthPx * 0.4} ry={heightPx * 0.4}
+            fill="none" stroke={darkenHex(color, 0.2)} strokeWidth="1" strokeDasharray="4 3" />
         </svg>
       </div>
     )
   }
 
-  // flat — no overlay needed
   return null
 }
 
@@ -632,7 +607,6 @@ export function CampMap() {
             style={{
               transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
               transition: isPanning ? 'none' : 'transform 0.1s ease-out',
-              ...(viewMode === '3d' ? { perspective: '1800px', perspectiveOrigin: '50% 40%' } : {}),
             }}
             className="p-8"
           >
@@ -650,9 +624,8 @@ export function CampMap() {
                 backgroundSize: `${config.grid_size_ft * scale}px ${config.grid_size_ft * scale}px`,
                 transition: 'transform 0.6s ease',
                 ...(viewMode === '3d' ? {
-                  transform: 'rotateX(55deg) rotateZ(-2deg)',
-                  transformStyle: 'preserve-3d' as React.CSSProperties['transformStyle'],
-                  transformOrigin: 'center center',
+                  transform: 'perspective(1200px) rotateX(50deg)',
+                  transformOrigin: 'center 60%',
                 } : {}),
               }}
             >
@@ -707,38 +680,27 @@ export function CampMap() {
                 const spotOverlay = getSpotOverlayClass(obj)
                 const isReservable = obj.properties?.reservable
                 const elevationFt = getObjectElevation(obj)
-                const elevationPx = elevationFt * scale * HEIGHT_SCALE
-                const is3d = viewMode === '3d' && elevationFt > 0
+                const wallHeight = viewMode === '3d' ? elevationFt * HEIGHT_PX_PER_FT : 0
+                const is3d = viewMode === '3d' && wallHeight > 0
                 const roofShape = getObjectRoofShape(obj)
                 const objWidthPx = obj.width_ft * scale
                 const objHeightPx = obj.height_ft * scale
 
+                // In 3D mode, the top face shifts up and left to create the extrusion illusion
+                const offsetY = is3d ? -wallHeight : 0
+                const offsetX = is3d ? -wallHeight * 0.35 : 0
+
                 return (
                   <div
                     key={obj.id}
-                    className={cn(
-                      'absolute border-2 transition-all duration-150 select-none cursor-pointer',
-                      isHovered && 'shadow-[4px_4px_0px_0px_rgba(0,0,0,0.6)] z-30',
-                      isSelected && 'ring-2 ring-blue-400 ring-offset-2 z-40 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
-                      isReservable && 'hover:scale-[1.02]',
-                      spotOverlay
-                    )}
+                    className="absolute select-none cursor-pointer"
                     style={{
                       left: obj.x * scale,
                       top: obj.y * scale,
                       width: objWidthPx,
                       height: objHeightPx,
-                      backgroundColor: `${obj.color}${is3d ? 'dd' : (isHovered ? 'ee' : 'bb')}`,
-                      borderColor: obj.color,
-                      transform: [
-                        obj.rotation ? `rotate(${obj.rotation}deg)` : '',
-                        is3d ? `translateZ(${elevationPx}px)` : '',
-                      ].filter(Boolean).join(' ') || undefined,
-                      zIndex: isSelected ? 40 : isHovered ? 30 : obj.z_index,
-                      ...(is3d ? {
-                        transformStyle: 'preserve-3d' as React.CSSProperties['transformStyle'],
-                        opacity: isHovered || isSelected ? 1 : Math.max(0.65, 1 - elevationFt * 0.025),
-                      } : {}),
+                      zIndex: isSelected ? 200 : isHovered ? 150 : (is3d ? obj.z_index + Math.round(elevationFt) : obj.z_index),
+                      transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -747,93 +709,136 @@ export function CampMap() {
                     onMouseEnter={() => setHoveredObjectId(obj.id)}
                     onMouseLeave={() => setHoveredObjectId(null)}
                   >
-                    {/* Shade structure corner posts */}
-                    {obj.object_type === 'shade_structure' && (
-                      <>
-                        <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                        <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                        <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                        <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                      </>
-                    )}
-                    {/* Labels */}
-                    {showLabels && objWidthPx > 20 && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px" style={{ zIndex: 2 }}>
-                        <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
-                        <span className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px">
-                          {obj.label || template?.label || obj.object_type}
-                        </span>
-                        {/* Reservation status indicators for tents */}
-                        {isReservable && (() => {
-                          const spot = findSpotForObject(obj)
-                          if (!spot) return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
-                          if (spot.reservation && camper && spot.reservation.camper_id === camper.id) {
-                            return <span className="text-[7px] bg-yellow-500 text-black px-1 rounded-sm mt-0.5 font-bold">YOUR SPOT</span>
-                          }
-                          if (spot.reservation) {
-                            return <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">{spot.camper?.playa_name || 'Taken'}</span>
-                          }
-                          return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
-                        })()}
-                      </div>
-                    )}
-                    {/* 3D roof shape overlay */}
-                    {is3d && roofShape !== 'flat' && (
-                      <RoofOverlay
-                        roofShape={roofShape}
-                        elevationPx={elevationPx}
-                        widthPx={objWidthPx}
-                        heightPx={objHeightPx}
-                        color={obj.color}
-                      />
-                    )}
-                    {/* 3D wall faces */}
+                    {/* === 3D Extrusion: ground shadow, walls, then top face === */}
                     {is3d && (
                       <>
-                        {/* Front wall (south face — visible from tilted view) */}
-                        <div
-                          className="absolute left-0 right-0 bottom-0 pointer-events-none"
-                          style={{
-                            height: elevationPx,
-                            backgroundColor: `${darkenHex(obj.color, 0.3)}cc`,
-                            borderLeft: `1px solid ${darkenHex(obj.color, 0.5)}`,
-                            borderRight: `1px solid ${darkenHex(obj.color, 0.5)}`,
-                            borderBottom: `2px solid ${darkenHex(obj.color, 0.6)}`,
-                            transform: 'rotateX(90deg)',
-                            transformOrigin: 'bottom center',
-                            backfaceVisibility: 'hidden',
-                          }}
-                        />
-                        {/* Right wall (east face) */}
-                        <div
-                          className="absolute top-0 bottom-0 right-0 pointer-events-none"
-                          style={{
-                            width: elevationPx,
-                            backgroundColor: `${darkenHex(obj.color, 0.2)}bb`,
-                            borderTop: `1px solid ${darkenHex(obj.color, 0.4)}`,
-                            borderBottom: `1px solid ${darkenHex(obj.color, 0.4)}`,
-                            borderRight: `2px solid ${darkenHex(obj.color, 0.5)}`,
-                            transform: 'rotateY(-90deg)',
-                            transformOrigin: 'right center',
-                            backfaceVisibility: 'hidden',
-                          }}
-                        />
                         {/* Ground shadow */}
                         <div
                           className="absolute pointer-events-none"
                           style={{
-                            left: 4,
-                            top: 4,
-                            right: -6,
-                            bottom: -6,
-                            backgroundColor: 'rgba(0,0,0,0.12)',
-                            filter: 'blur(4px)',
-                            transform: `translateZ(-${elevationPx}px)`,
-                            zIndex: -1,
+                            left: 3,
+                            top: 5,
+                            width: objWidthPx,
+                            height: objHeightPx,
+                            backgroundColor: 'rgba(0,0,0,0.18)',
+                            filter: 'blur(6px)',
+                            borderRadius: 2,
+                          }}
+                        />
+
+                        {/* Right wall (east face — parallelogram) */}
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: objWidthPx + offsetX,
+                            top: offsetY,
+                            width: -offsetX,
+                            height: objHeightPx,
+                            backgroundColor: darkenHex(obj.color, 0.35),
+                            borderRight: `2px solid ${darkenHex(obj.color, 0.55)}`,
+                            borderTop: `1px solid ${darkenHex(obj.color, 0.45)}`,
+                            borderBottom: `1px solid ${darkenHex(obj.color, 0.5)}`,
+                            clipPath: `polygon(100% ${wallHeight}px, 100% calc(100% + ${wallHeight}px), 0% 100%, 0% 0%)`,
+                          }}
+                        />
+
+                        {/* Front wall (south face — parallelogram) */}
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: offsetX,
+                            top: objHeightPx + offsetY,
+                            width: objWidthPx,
+                            height: wallHeight,
+                            backgroundColor: darkenHex(obj.color, 0.25),
+                            borderBottom: `2px solid ${darkenHex(obj.color, 0.5)}`,
+                            borderLeft: `1px solid ${darkenHex(obj.color, 0.4)}`,
+                            borderRight: `1px solid ${darkenHex(obj.color, 0.4)}`,
+                            clipPath: `polygon(0% 0%, 100% 0%, calc(100% + ${-offsetX}px) 100%, ${-offsetX}px 100%)`,
+                          }}
+                        />
+
+                        {/* Corner piece (where front and right wall meet) */}
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: objWidthPx + offsetX,
+                            top: objHeightPx + offsetY,
+                            width: -offsetX,
+                            height: wallHeight,
+                            backgroundColor: darkenHex(obj.color, 0.45),
+                            clipPath: 'polygon(0% 0%, 100% 100%, 0% 100%)',
                           }}
                         />
                       </>
                     )}
+
+                    {/* Top face — the main visible object */}
+                    <div
+                      className={cn(
+                        'absolute border-2 transition-all duration-150',
+                        isHovered && !is3d && 'shadow-[4px_4px_0px_0px_rgba(0,0,0,0.6)]',
+                        isSelected && 'ring-2 ring-blue-400 ring-offset-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
+                        isReservable && 'hover:scale-[1.02]',
+                        is3d && isHovered && 'brightness-110',
+                        spotOverlay
+                      )}
+                      style={{
+                        left: offsetX,
+                        top: offsetY,
+                        width: objWidthPx,
+                        height: objHeightPx,
+                        backgroundColor: `${obj.color}${is3d ? 'ee' : (isHovered ? 'ee' : 'bb')}`,
+                        borderColor: is3d ? darkenHex(obj.color, 0.15) : obj.color,
+                        ...(is3d ? {
+                          boxShadow: `1px 1px 0 ${darkenHex(obj.color, 0.3)}, 2px 2px 0 ${darkenHex(obj.color, 0.2)}`,
+                        } : {}),
+                      }}
+                    >
+                      {/* Shade structure corner posts */}
+                      {obj.object_type === 'shade_structure' && (
+                        <>
+                          <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                          <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                          <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                          <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                        </>
+                      )}
+
+                      {/* Labels */}
+                      {showLabels && objWidthPx > 20 && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px" style={{ zIndex: 2 }}>
+                          <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
+                          <span className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px">
+                            {obj.label || template?.label || obj.object_type}
+                          </span>
+                          {is3d && objWidthPx > 35 && (
+                            <span className="text-[6px] text-black/50 font-bold">{elevationFt}ft</span>
+                          )}
+                          {isReservable && (() => {
+                            const spot = findSpotForObject(obj)
+                            if (!spot) return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
+                            if (spot.reservation && camper && spot.reservation.camper_id === camper.id) {
+                              return <span className="text-[7px] bg-yellow-500 text-black px-1 rounded-sm mt-0.5 font-bold">YOUR SPOT</span>
+                            }
+                            if (spot.reservation) {
+                              return <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">{spot.camper?.playa_name || 'Taken'}</span>
+                            }
+                            return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Roof shape overlay */}
+                      {is3d && roofShape !== 'flat' && (
+                        <RoofOverlay
+                          roofShape={roofShape}
+                          widthPx={objWidthPx}
+                          heightPx={objHeightPx}
+                          color={obj.color}
+                        />
+                      )}
+                    </div>
                   </div>
                 )
               })}
