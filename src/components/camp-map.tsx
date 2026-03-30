@@ -53,70 +53,118 @@ function lightenHex(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
-// ─── Roof Shape Components (rendered on the top face) ─────────
-function RoofOverlay({ roofShape, widthPx, heightPx, color }: {
+// ─── Roof Shape Geometry (3D shapes rising ABOVE the top face) ─────────
+function RoofGeometry({
+  roofShape, objWidthPx, objHeightPx,
+  wallDirX, wallDirY,
+  topFaceX, topFaceY,
+  color, objId,
+}: {
   roofShape: RoofShape
-  widthPx: number
-  heightPx: number
+  objWidthPx: number
+  objHeightPx: number
+  wallDirX: number
+  wallDirY: number
+  topFaceX: number
+  topFaceY: number
   color: string
+  objId: string
 }) {
-  const roofColor = lightenHex(color, 0.2)
-  const roofDark = darkenHex(color, 0.15)
+  // Roof peak height (proportional to shorter dimension)
+  const roofPeakPx = Math.min(objWidthPx, objHeightPx) * 0.4
+  const peakDx = wallDirX * roofPeakPx
+  const peakDy = wallDirY * roofPeakPx
+
+  // Top-face corners (relative to wrapper div)
+  const tl = { x: topFaceX, y: topFaceY }
+  const tr = { x: topFaceX + objWidthPx, y: topFaceY }
+  const br = { x: topFaceX + objWidthPx, y: topFaceY + objHeightPx }
+  const bl = { x: topFaceX, y: topFaceY + objHeightPx }
+
+  const pts = (arr: { x: number; y: number }[]) => arr.map(p => `${p.x},${p.y}`).join(' ')
 
   if (roofShape === 'pyramid') {
+    const peak = {
+      x: topFaceX + objWidthPx / 2 + peakDx,
+      y: topFaceY + objHeightPx / 2 + peakDy,
+    }
+    // 4 triangular faces — shade by orientation
+    const faces = [
+      { points: [tl, tr, peak], shade: 0.05 },
+      { points: [tr, br, peak], shade: 0.2 },
+      { points: [br, bl, peak], shade: -0.05 },
+      { points: [bl, tl, peak], shade: 0.12 },
+    ]
     return (
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }}>
-        <div className="absolute inset-0" style={{
-          background: `radial-gradient(ellipse at 45% 40%, ${lightenHex(color, 0.4)}ee 0%, ${roofColor}cc 35%, ${roofDark}aa 75%, ${darkenHex(color, 0.25)}88 100%)`,
-          clipPath: 'polygon(50% 15%, 85% 50%, 50% 85%, 15% 50%)',
-        }} />
-        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.6 }}>
-          <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={0} stroke={darkenHex(color, 0.5)} strokeWidth="2" />
-          <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={0} stroke={darkenHex(color, 0.5)} strokeWidth="2" />
-          <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={heightPx} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
-          <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={heightPx} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
-          <circle cx={widthPx / 2} cy={heightPx / 2} r="3" fill={lightenHex(color, 0.5)} />
-        </svg>
-      </div>
+      <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 5 }}>
+        {faces.map((face, i) => (
+          <polygon
+            key={i}
+            points={pts(face.points)}
+            fill={face.shade >= 0 ? darkenHex(color, face.shade) : lightenHex(color, -face.shade)}
+            stroke={darkenHex(color, 0.4)}
+            strokeWidth="1"
+            strokeLinejoin="round"
+            opacity="0.92"
+          />
+        ))}
+        <circle cx={peak.x} cy={peak.y} r="2.5" fill={lightenHex(color, 0.5)} />
+      </svg>
     )
   }
 
   if (roofShape === 'a_frame') {
-    const isWide = widthPx >= heightPx
+    const isWide = objWidthPx >= objHeightPx
+    let ridgeStart: { x: number; y: number }
+    let ridgeEnd: { x: number; y: number }
+    let face1: { x: number; y: number }[]
+    let face2: { x: number; y: number }[]
+
+    if (isWide) {
+      ridgeStart = { x: tl.x + peakDx, y: (tl.y + bl.y) / 2 + peakDy }
+      ridgeEnd = { x: tr.x + peakDx, y: (tr.y + br.y) / 2 + peakDy }
+      face1 = [tl, tr, ridgeEnd, ridgeStart]
+      face2 = [bl, br, ridgeEnd, ridgeStart]
+    } else {
+      ridgeStart = { x: (tl.x + tr.x) / 2 + peakDx, y: tl.y + peakDy }
+      ridgeEnd = { x: (bl.x + br.x) / 2 + peakDx, y: bl.y + peakDy }
+      face1 = [tl, ridgeStart, ridgeEnd, bl]
+      face2 = [tr, ridgeStart, ridgeEnd, br]
+    }
+
     return (
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }}>
-        <div className="absolute inset-0" style={{
-          background: isWide
-            ? `linear-gradient(to bottom, ${roofColor}dd 0%, ${roofDark}cc 46%, ${lightenHex(color, 0.45)}ff 50%, ${roofDark}cc 54%, ${roofColor}dd 100%)`
-            : `linear-gradient(to right, ${roofColor}dd 0%, ${roofDark}cc 46%, ${lightenHex(color, 0.45)}ff 50%, ${roofDark}cc 54%, ${roofColor}dd 100%)`,
-        }} />
-        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.7 }}>
-          {isWide ? (
-            <line x1={0} y1={heightPx / 2} x2={widthPx} y2={heightPx / 2} stroke={lightenHex(color, 0.5)} strokeWidth="3" />
-          ) : (
-            <line x1={widthPx / 2} y1={0} x2={widthPx / 2} y2={heightPx} stroke={lightenHex(color, 0.5)} strokeWidth="3" />
-          )}
-        </svg>
-      </div>
+      <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 5 }}>
+        <polygon points={pts(face1)} fill={lightenHex(color, 0.02)} stroke={darkenHex(color, 0.3)} strokeWidth="1" strokeLinejoin="round" opacity="0.92" />
+        <polygon points={pts(face2)} fill={darkenHex(color, 0.14)} stroke={darkenHex(color, 0.3)} strokeWidth="1" strokeLinejoin="round" opacity="0.92" />
+        <line x1={ridgeStart.x} y1={ridgeStart.y} x2={ridgeEnd.x} y2={ridgeEnd.y}
+          stroke={lightenHex(color, 0.45)} strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
     )
   }
 
   if (roofShape === 'dome') {
+    const cx = topFaceX + objWidthPx / 2 + peakDx * 0.5
+    const cy = topFaceY + objHeightPx / 2 + peakDy * 0.5
+    const rx = objWidthPx * 0.48
+    const ry = objHeightPx * 0.48
+
     return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 3 }}>
-        <div className="absolute" style={{
-          left: '5%', top: '5%', right: '5%', bottom: '5%',
-          borderRadius: '50%',
-          background: `radial-gradient(ellipse at 38% 32%, ${lightenHex(color, 0.45)}ee 0%, ${roofColor}dd 25%, ${roofDark}cc 60%, ${darkenHex(color, 0.3)}aa 100%)`,
-          boxShadow: `inset -3px 3px 8px ${darkenHex(color, 0.3)}88, inset 2px -2px 6px ${lightenHex(color, 0.2)}66`,
-        }} />
-        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.25 }}>
-          <ellipse cx={widthPx * 0.42} cy={heightPx * 0.38} rx={widthPx * 0.22} ry={heightPx * 0.18}
-            fill="none" stroke={lightenHex(color, 0.6)} strokeWidth="2" />
-          <ellipse cx={widthPx * 0.5} cy={heightPx * 0.5} rx={widthPx * 0.4} ry={heightPx * 0.4}
-            fill="none" stroke={darkenHex(color, 0.2)} strokeWidth="1" strokeDasharray="4 3" />
-        </svg>
-      </div>
+      <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 5 }}>
+        <defs>
+          <radialGradient id={`dome-${objId}`} cx="38%" cy="32%">
+            <stop offset="0%" stopColor={lightenHex(color, 0.4)} stopOpacity="0.95" />
+            <stop offset="45%" stopColor={color} stopOpacity="0.85" />
+            <stop offset="100%" stopColor={darkenHex(color, 0.3)} stopOpacity="0.75" />
+          </radialGradient>
+        </defs>
+        <ellipse cx={cx} cy={cy} rx={rx} ry={ry}
+          fill={`url(#dome-${objId})`}
+          stroke={darkenHex(color, 0.3)}
+          strokeWidth="1.5"
+        />
+        <ellipse cx={cx - rx * 0.15} cy={cy - ry * 0.2} rx={rx * 0.35} ry={ry * 0.3}
+          fill="none" stroke={lightenHex(color, 0.5)} strokeWidth="1" opacity="0.4" />
+      </svg>
     )
   }
 
@@ -938,17 +986,22 @@ export function CampMap() {
                           })()}
                         </div>
                       )}
-
-                      {/* Roof shape overlay */}
-                      {is3d && roofShape !== 'flat' && (
-                        <RoofOverlay
-                          roofShape={roofShape}
-                          widthPx={objWidthPx}
-                          heightPx={objHeightPx}
-                          color={obj.color}
-                        />
-                      )}
                     </div>
+
+                    {/* Roof geometry — rendered ABOVE top face as sibling */}
+                    {is3d && roofShape !== 'flat' && (
+                      <RoofGeometry
+                        roofShape={roofShape}
+                        objWidthPx={objWidthPx}
+                        objHeightPx={objHeightPx}
+                        wallDirX={wallDirX}
+                        wallDirY={wallDirY}
+                        topFaceX={extraLeft + offsetX}
+                        topFaceY={extraTop + offsetY}
+                        color={obj.color}
+                        objId={obj.id}
+                      />
+                    )}
                   </div>
                 )
               })}
