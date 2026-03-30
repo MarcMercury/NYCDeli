@@ -9,6 +9,31 @@ import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFi
 import { createClient } from '@/lib/supabase/client'
 import { getTemplateForType } from '@/components/floorplan/object-templates'
 
+// ─── 3D View Helpers ───────────────────────────────────────────
+const HEIGHT_SCALE = 0.4
+
+function getObjectElevation(type: string): number {
+  const heights: Record<string, number> = {
+    shade_structure: 12, tent: 7, kitchen: 10, bar: 10, stage: 8,
+    common_area: 10, refrigerated_truck: 10, shower_container: 9,
+    pc_container: 9, rv: 10, vehicle: 5, generator: 4, porta_potty: 8,
+    water_station: 3, first_aid: 8, storage: 6, prep_area: 8,
+    service_area: 8, fuel_storage: 3, propane_storage: 3,
+    fire_extinguisher: 2, fire_pit: 1, grill: 4, flame_effect: 3,
+    fence: 6, sign: 5, entrance: 8, bike_parking: 3,
+    fire_lane: 0, road: 0, path_of_travel: 0, distance_marker: 0, neighbor_zone: 0,
+  }
+  return heights[type] ?? 5
+}
+
+function darkenHex(hex: string, amount: number): string {
+  const c = hex.replace('#', '')
+  const r = Math.max(0, Math.round(parseInt(c.slice(0, 2), 16) * (1 - amount)))
+  const g = Math.max(0, Math.round(parseInt(c.slice(2, 4), 16) * (1 - amount)))
+  const b = Math.max(0, Math.round(parseInt(c.slice(4, 6), 16) * (1 - amount)))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
 type WizardStep = 'identify' | 'verify-dimensions' | 'confirm'
 
 interface SelectedObject {
@@ -54,6 +79,9 @@ export function CampMap() {
   const [wizardTentLength, setWizardTentLength] = useState('')
 
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // 3D view mode
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -453,6 +481,20 @@ export function CampMap() {
             />
             <span className="text-[10px] uppercase font-bold">Labels</span>
           </label>
+
+          {/* 3D View Toggle */}
+          <button
+            onClick={() => setViewMode(prev => prev === '2d' ? '3d' : '2d')}
+            className={cn(
+              'px-3 py-1 text-xs font-black uppercase tracking-wider transition-colors',
+              viewMode === '3d'
+                ? 'bg-yellow-400 text-black hover:bg-yellow-300'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            )}
+            title={viewMode === '2d' ? 'Switch to 3D Birds Eye View' : 'Switch to 2D Top-Down View'}
+          >
+            {viewMode === '2d' ? '🏔️ 3D View' : '📋 2D View'}
+          </button>
         </div>
       </div>
 
@@ -476,6 +518,7 @@ export function CampMap() {
             style={{
               transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
               transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+              ...(viewMode === '3d' ? { perspective: '1800px', perspectiveOrigin: '50% 40%' } : {}),
             }}
             className="p-8"
           >
@@ -491,6 +534,12 @@ export function CampMap() {
                      linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)`
                   : 'none',
                 backgroundSize: `${config.grid_size_ft * scale}px ${config.grid_size_ft * scale}px`,
+                transition: 'transform 0.6s ease',
+                ...(viewMode === '3d' ? {
+                  transform: 'rotateX(55deg) rotateZ(-2deg)',
+                  transformStyle: 'preserve-3d' as React.CSSProperties['transformStyle'],
+                  transformOrigin: 'center center',
+                } : {}),
               }}
             >
               {/* Border labels */}
@@ -543,6 +592,9 @@ export function CampMap() {
                 const isSelected = selectedObject?.object?.id === obj.id
                 const spotOverlay = getSpotOverlayClass(obj)
                 const isReservable = obj.properties?.reservable
+                const elevationFt = getObjectElevation(obj.object_type)
+                const elevationPx = elevationFt * scale * HEIGHT_SCALE
+                const is3d = viewMode === '3d' && elevationFt > 0
 
                 return (
                   <div
@@ -559,10 +611,17 @@ export function CampMap() {
                       top: obj.y * scale,
                       width: obj.width_ft * scale,
                       height: obj.height_ft * scale,
-                      backgroundColor: `${obj.color}${isHovered ? 'ee' : 'bb'}`,
+                      backgroundColor: `${obj.color}${is3d ? 'dd' : (isHovered ? 'ee' : 'bb')}`,
                       borderColor: obj.color,
-                      transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
+                      transform: [
+                        obj.rotation ? `rotate(${obj.rotation}deg)` : '',
+                        is3d ? `translateZ(${elevationPx}px)` : '',
+                      ].filter(Boolean).join(' ') || undefined,
                       zIndex: isSelected ? 40 : isHovered ? 30 : obj.z_index,
+                      ...(is3d ? {
+                        transformStyle: 'preserve-3d' as React.CSSProperties['transformStyle'],
+                        opacity: isHovered || isSelected ? 1 : Math.max(0.65, 1 - elevationFt * 0.025),
+                      } : {}),
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -600,6 +659,39 @@ export function CampMap() {
                           return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
                         })()}
                       </div>
+                    )}
+                    {/* 3D wall faces */}
+                    {is3d && (
+                      <>
+                        {/* Front wall (south face — visible from tilted view) */}
+                        <div
+                          className="absolute left-0 right-0 bottom-0 pointer-events-none"
+                          style={{
+                            height: elevationPx,
+                            backgroundColor: `${darkenHex(obj.color, 0.3)}cc`,
+                            borderLeft: `1px solid ${darkenHex(obj.color, 0.5)}`,
+                            borderRight: `1px solid ${darkenHex(obj.color, 0.5)}`,
+                            borderBottom: `2px solid ${darkenHex(obj.color, 0.6)}`,
+                            transform: 'rotateX(90deg)',
+                            transformOrigin: 'bottom center',
+                            backfaceVisibility: 'hidden',
+                          }}
+                        />
+                        {/* Right wall (east face) */}
+                        <div
+                          className="absolute top-0 bottom-0 right-0 pointer-events-none"
+                          style={{
+                            width: elevationPx,
+                            backgroundColor: `${darkenHex(obj.color, 0.2)}bb`,
+                            borderTop: `1px solid ${darkenHex(obj.color, 0.4)}`,
+                            borderBottom: `1px solid ${darkenHex(obj.color, 0.4)}`,
+                            borderRight: `2px solid ${darkenHex(obj.color, 0.5)}`,
+                            transform: 'rotateY(-90deg)',
+                            transformOrigin: 'right center',
+                            backfaceVisibility: 'hidden',
+                          }}
+                        />
+                      </>
                     )}
                   </div>
                 )

@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
-import type { CamperRow, CamperUpdate, UserRole, UserProfileRow, UserProfileUpdate } from '@/types/database'
+import type { CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
 
 export type AdminActionResult = {
   success: boolean
@@ -210,130 +210,5 @@ export async function adminResetPasswordAction(
   })
 
   if (error) return { success: false, error: error.message }
-  return { success: true }
-}
-
-export async function archiveDeniedApplicantAction(
-  profileId: string
-): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  const supabase = await createClient()
-  const adminClient = createServiceClient()
-
-  // Fetch the profile
-  const { data: profile, error: profileErr } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', profileId)
-    .single() as unknown as { data: UserProfileRow | null; error: Error | null }
-
-  if (profileErr || !profile) {
-    return { success: false, error: 'Applicant not found' }
-  }
-
-  if (!profile.denied_at) {
-    return { success: false, error: 'Only denied applicants can be archived' }
-  }
-
-  // Fetch linked camper data if any
-  let camperData = null
-  if (profile.email) {
-    const { data: camper } = await supabase
-      .from('campers')
-      .select('*')
-      .eq('email', profile.email)
-      .maybeSingle() as unknown as { data: CamperRow | null }
-    if (camper) camperData = camper
-  }
-
-  // Get current admin user
-  const { data: { user: adminUser } } = await supabase.auth.getUser()
-
-  // Insert into archived_applicants
-  const { error: archiveErr } = await adminClient
-    .from('archived_applicants')
-    .insert({
-      archived_by: adminUser?.id,
-      original_user_id: profile.id,
-      email: profile.email,
-      full_name: camperData?.full_name || null,
-      playa_name: camperData?.playa_name || null,
-      denied_at: profile.denied_at,
-      denied_reason: profile.denied_reason,
-      profile_data: profile,
-      camper_data: camperData,
-    } as never)
-
-  if (archiveErr) {
-    return { success: false, error: `Failed to archive: ${archiveErr.message}` }
-  }
-
-  // Delete camper record if exists (must happen before auth user deletion)
-  if (camperData) {
-    await adminClient
-      .from('campers')
-      .delete()
-      .eq('email', profile.email)
-  }
-
-  // Delete user_profiles record
-  await adminClient
-    .from('user_profiles')
-    .delete()
-    .eq('id', profileId)
-
-  // Delete auth user (frees up the email)
-  const { error: deleteAuthErr } = await adminClient.auth.admin.deleteUser(profileId)
-  if (deleteAuthErr) {
-    return { success: false, error: `Archived but failed to remove auth account: ${deleteAuthErr.message}` }
-  }
-
-  return { success: true }
-}
-
-export async function deleteDeniedApplicantAction(
-  profileId: string
-): Promise<AdminActionResult> {
-  await requireAdmin()
-
-  const supabase = await createClient()
-  const adminClient = createServiceClient()
-
-  // Fetch the profile
-  const { data: profile, error: profileErr } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', profileId)
-    .single() as unknown as { data: UserProfileRow | null; error: Error | null }
-
-  if (profileErr || !profile) {
-    return { success: false, error: 'Applicant not found' }
-  }
-
-  if (!profile.denied_at) {
-    return { success: false, error: 'Only denied applicants can be deleted' }
-  }
-
-  // Delete camper record if exists
-  if (profile.email) {
-    await adminClient
-      .from('campers')
-      .delete()
-      .eq('email', profile.email)
-  }
-
-  // Delete user_profiles record
-  await adminClient
-    .from('user_profiles')
-    .delete()
-    .eq('id', profileId)
-
-  // Delete auth user (frees up the email)
-  const { error: deleteAuthErr } = await adminClient.auth.admin.deleteUser(profileId)
-  if (deleteAuthErr) {
-    return { success: false, error: `Failed to remove auth account: ${deleteAuthErr.message}` }
-  }
-
   return { success: true }
 }

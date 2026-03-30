@@ -181,12 +181,23 @@ export default function HomePage() {
             </p>
             <p className="text-lg text-gray-300 mt-4 leading-relaxed">
               We also provide a public <span className="text-[#fccc0a]">70&deg; cooling center</span> in a dedicated 
-              20x60 circus tent during daylight hours, cumulatively serving several thousand more 
+              100-person circus tent during daylight hours, cumulatively serving several thousand more 
               burners during the event.
             </p>
             <p className="text-base text-gray-400 mt-6 italic">
               The playa appreciates our camp&apos;s gifts and we have fun delivering them!
             </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm">
+              <span className="px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/40">
+                5,500 meals served
+              </span>
+              <span className="px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/40">
+                Public cooling center
+              </span>
+              <span className="px-4 py-2 bg-yellow-500/10 text-[#fccc0a] border border-yellow-500/40">
+                ~70 person camp
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -213,8 +224,9 @@ export default function HomePage() {
             About Camp
           </h2>
           <p className="text-center text-gray-300 mb-12 max-w-2xl mx-auto">
-            A veteran-majority camp designed to create space on-playa for new burners 
-            in a friendly, supportive community.
+            Camp NYC Deli at Burning Man 2026 will be a ~70 person camp: 70% veteran burners and 
+            30% brand new burners. This is by design — to create space on-playa for new burners 
+            in a friendly, veteran-majority camp.
           </p>
           
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
@@ -244,7 +256,8 @@ export default function HomePage() {
             Camp Amenities
           </h2>
           <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
-            Everything our campers need for a healthy Burning Man adventure in the desert.
+            Camp NYC Deli strives to provide our campers a kind, safe and nurturing home 
+            to enable your healthy Burning Man adventure in the desert.
           </p>
           
           <div className="max-w-5xl mx-auto nyc-menu-board p-6 md:p-10 relative">
@@ -292,7 +305,8 @@ export default function HomePage() {
               <div className="text-4xl font-black text-[#fccc0a] mb-4 nyc-neon-subtle">$900</div>
               <ul className="text-sm space-y-2 text-gray-300">
                 <li>All camp amenities included</li>
-                <li>See payment schedule below for split options</li>
+                <li>Daily meal during 6 days of food service</li>
+                <li>Can be split into two payments: 5/1 and 6/1</li>
               </ul>
             </div>
 
@@ -304,9 +318,12 @@ export default function HomePage() {
               <h3 className="text-xl font-black text-white mb-1">Builder</h3>
               <p className="text-sm text-gray-400 mb-4">22 spots — come early, build camp</p>
               <div className="text-4xl font-black text-green-400 mb-4">$450</div>
-              <p className="text-sm text-gray-300">
-                50% off camp fee — includes housing, transport &amp; all amenities. Full details in the Build Week section below.
-              </p>
+              <ul className="text-sm space-y-2 text-gray-300">
+                <li>50% off camp fee</li>
+                <li>Free housing at Fernley Build House</li>
+                <li>Camp transports you, your gear &amp; food to playa</li>
+                <li>All camp amenities included</li>
+              </ul>
             </div>
           </div>
 
@@ -401,7 +418,7 @@ export default function HomePage() {
             Tent Guidelines
           </h2>
           <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
-            To conserve scarce communal shade, 
+            Camp builds 10.5&apos; tall shade over every tent. To conserve scarce communal shade, 
             here are the maximum tent footprint dimensions (width x length in feet).
           </p>
           
@@ -439,7 +456,8 @@ export default function HomePage() {
             Build Week (Optional)
           </h2>
           <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
-            Want to come early and help build the city? 22 builder spots available.
+            22 of NYC Deli&apos;s 70 campers will build camp. Half-price camp fee, free housing,
+            and camp handles your transport logistics.
           </p>
           
           <div className="max-w-3xl mx-auto">

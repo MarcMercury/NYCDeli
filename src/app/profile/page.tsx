@@ -255,45 +255,6 @@ export default function ProfilePage() {
     setSavingDetails(false)
   }
 
-  const resizeImage = (file: File, maxDim: number, quality: number): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new window.Image()
-      img.onload = () => {
-        URL.revokeObjectURL(img.src)
-        let { width, height } = img
-        if (width > maxDim || height > maxDim) {
-          const ratio = Math.min(maxDim / width, maxDim / height)
-          width = Math.round(width * ratio)
-          height = Math.round(height * ratio)
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { reject(new Error('Canvas not supported')); return }
-        ctx.drawImage(img, 0, 0, width, height)
-        canvas.toBlob(
-          (blob) => blob ? resolve(blob) : reject(new Error('Image compression failed')),
-          'image/jpeg',
-          quality
-        )
-      }
-      img.onerror = () => {
-        URL.revokeObjectURL(img.src)
-        reject(new Error('Failed to load image'))
-      }
-      img.src = URL.createObjectURL(file)
-    })
-  }
-
-  const isValidImageFile = (file: File): boolean => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
-    if (allowedTypes.includes(file.type)) return true
-    // Fallback: check extension for mobile browsers that report empty/wrong MIME type
-    const ext = file.name.split('.').pop()?.toLowerCase() || ''
-    return ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(ext)
-  }
-
   const uploadPhoto = async (file: File) => {
     if (!profile) return
     if (photos.length >= 3) {
@@ -301,31 +262,29 @@ export default function ProfilePage() {
       return
     }
 
-    const MAX_SIZE = 20 * 1024 * 1024 // 20MB raw (will be resized before upload)
+    const MAX_SIZE = 5 * 1024 * 1024 // 5MB
     if (file.size > MAX_SIZE) {
-      setMessage({ type: 'error', text: 'Photo must be under 20MB' })
+      setMessage({ type: 'error', text: 'Photo must be under 5MB' })
       return
     }
 
-    if (!isValidImageFile(file)) {
-      setMessage({ type: 'error', text: 'Only JPEG, PNG, WebP, and HEIC files are allowed' })
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setMessage({ type: 'error', text: 'Only JPEG, PNG, and WebP files are allowed' })
       return
     }
 
     setUploading(true)
     try {
       const supabase = createClient()
-      // Find the next available display_order (accounts for gaps from deletions)
-      const usedOrders = photos.map(p => p.display_order)
-      const nextOrder = [1, 2, 3].find(n => !usedOrders.includes(n)) ?? (photos.length + 1)
+      const nextOrder = photos.length + 1
 
-      // Resize & compress to JPEG before upload — critical for mobile camera photos
-      const resizedBlob = await resizeImage(file, 1200, 0.85)
-      const fileName = `${profile.id}/${nextOrder}.jpg`
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${profile.id}/${nextOrder}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('camper-photos')
-        .upload(fileName, resizedBlob, { upsert: true, contentType: 'image/jpeg' })
+        .upload(fileName, file, { upsert: true })
 
       if (uploadError) {
         setMessage({ type: 'error', text: uploadError.message })
@@ -334,11 +293,11 @@ export default function ProfilePage() {
 
       const { error: dbError } = await supabase
         .from('camper_photos')
-        .upsert({
+        .insert({
           user_id: profile.id,
           storage_path: fileName,
           display_order: nextOrder,
-        } as never, { onConflict: 'user_id,display_order' })
+        } as never)
 
       if (dbError) {
         setMessage({ type: 'error', text: dbError.message })
@@ -487,7 +446,7 @@ export default function ProfilePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0]
