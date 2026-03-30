@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Alert, Input } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow } from '@/types/database'
+import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow, RoofShape } from '@/types/database'
 import { fetchActiveFloorplan, fetchFloorplanObjects } from '@/lib/floorplan'
 import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFitSpot } from '@/lib/camp-spots'
 import { createClient } from '@/lib/supabase/client'
@@ -12,7 +12,8 @@ import { getTemplateForType } from '@/components/floorplan/object-templates'
 // ─── 3D View Helpers ───────────────────────────────────────────
 const HEIGHT_SCALE = 0.4
 
-function getObjectElevation(type: string): number {
+// Fallback heights when admin hasn't set elevation_ft on the object
+function getDefaultElevation(type: string): number {
   const heights: Record<string, number> = {
     shade_structure: 12, tent: 7, kitchen: 10, bar: 10, stage: 8,
     common_area: 10, refrigerated_truck: 10, shower_container: 9,
@@ -26,12 +27,125 @@ function getObjectElevation(type: string): number {
   return heights[type] ?? 5
 }
 
+function getObjectElevation(obj: FloorplanObjectRow): number {
+  if (typeof obj.properties?.elevation_ft === 'number') return obj.properties.elevation_ft
+  return getDefaultElevation(obj.object_type)
+}
+
+function getObjectRoofShape(obj: FloorplanObjectRow): RoofShape {
+  return obj.properties?.roof_shape || 'flat'
+}
+
 function darkenHex(hex: string, amount: number): string {
   const c = hex.replace('#', '')
   const r = Math.max(0, Math.round(parseInt(c.slice(0, 2), 16) * (1 - amount)))
   const g = Math.max(0, Math.round(parseInt(c.slice(2, 4), 16) * (1 - amount)))
   const b = Math.max(0, Math.round(parseInt(c.slice(4, 6), 16) * (1 - amount)))
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+function lightenHex(hex: string, amount: number): string {
+  const c = hex.replace('#', '')
+  const r = Math.min(255, Math.round(parseInt(c.slice(0, 2), 16) + (255 - parseInt(c.slice(0, 2), 16)) * amount))
+  const g = Math.min(255, Math.round(parseInt(c.slice(2, 4), 16) + (255 - parseInt(c.slice(2, 4), 16)) * amount))
+  const b = Math.min(255, Math.round(parseInt(c.slice(4, 6), 16) + (255 - parseInt(c.slice(4, 6), 16)) * amount))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+// ─── Roof Shape Components ────────────────────────────────────
+function RoofOverlay({ roofShape, elevationPx, widthPx, heightPx, color }: {
+  roofShape: RoofShape
+  elevationPx: number
+  widthPx: number
+  heightPx: number
+  color: string
+}) {
+  const ridgeHeight = Math.min(elevationPx * 0.6, Math.min(widthPx, heightPx) * 0.4)
+  const roofColor = lightenHex(color, 0.15)
+  const roofDark = darkenHex(color, 0.1)
+
+  if (roofShape === 'pyramid') {
+    // Pyramid: 4 triangular faces converging at center
+    return (
+      <div className="absolute inset-0 pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
+        {/* Front face */}
+        <div className="absolute bottom-0 left-0 right-0" style={{
+          height: ridgeHeight,
+          background: `linear-gradient(to top, ${roofDark}dd, ${roofColor}cc)`,
+          clipPath: 'polygon(0% 100%, 100% 100%, 50% 0%)',
+          transform: `rotateX(70deg) translateZ(${ridgeHeight * 0.2}px)`,
+          transformOrigin: 'bottom center',
+        }} />
+        {/* Top gradient overlay on the roof surface */}
+        <div className="absolute inset-0" style={{
+          background: `radial-gradient(ellipse at center, ${roofColor}bb 0%, ${roofDark}99 70%, transparent 100%)`,
+          clipPath: 'polygon(50% 15%, 85% 50%, 50% 85%, 15% 50%)',
+        }} />
+        {/* Ridge lines */}
+        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.5 }}>
+          <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={0} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
+          <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={0} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
+          <line x1={widthPx / 2} y1={heightPx / 2} x2={widthPx} y2={heightPx} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
+          <line x1={widthPx / 2} y1={heightPx / 2} x2={0} y2={heightPx} stroke={darkenHex(color, 0.4)} strokeWidth="1.5" />
+        </svg>
+      </div>
+    )
+  }
+
+  if (roofShape === 'a_frame') {
+    // A-Frame: ridge runs along the longer axis
+    const isWide = widthPx >= heightPx
+    return (
+      <div className="absolute inset-0 pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
+        {/* Two sloped faces */}
+        <div className="absolute inset-0" style={{
+          background: isWide
+            ? `linear-gradient(to bottom, ${roofColor}cc 0%, ${roofDark}bb 48%, ${lightenHex(color, 0.3)}ee 50%, ${roofDark}bb 52%, ${roofColor}cc 100%)`
+            : `linear-gradient(to right, ${roofColor}cc 0%, ${roofDark}bb 48%, ${lightenHex(color, 0.3)}ee 50%, ${roofDark}bb 52%, ${roofColor}cc 100%)`,
+        }} />
+        {/* Ridge line */}
+        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.6 }}>
+          {isWide ? (
+            <line x1={0} y1={heightPx / 2} x2={widthPx} y2={heightPx / 2} stroke={lightenHex(color, 0.4)} strokeWidth="2" />
+          ) : (
+            <line x1={widthPx / 2} y1={0} x2={widthPx / 2} y2={heightPx} stroke={lightenHex(color, 0.4)} strokeWidth="2" />
+          )}
+        </svg>
+        {/* Side faces (gable ends) */}
+        <div className="absolute" style={{
+          ...(isWide
+            ? { left: 0, top: 0, width: 2, height: '100%', background: `${darkenHex(color, 0.35)}` }
+            : { left: 0, top: 0, height: 2, width: '100%', background: `${darkenHex(color, 0.35)}` }),
+        }} />
+        <div className="absolute" style={{
+          ...(isWide
+            ? { right: 0, top: 0, width: 2, height: '100%', background: `${darkenHex(color, 0.35)}` }
+            : { left: 0, bottom: 0, height: 2, width: '100%', background: `${darkenHex(color, 0.35)}` }),
+        }} />
+      </div>
+    )
+  }
+
+  if (roofShape === 'dome') {
+    // Dome: radial gradient for the curved surface
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ transformStyle: 'preserve-3d' }}>
+        <div className="absolute inset-0" style={{
+          borderRadius: '50%',
+          background: `radial-gradient(ellipse at 40% 35%, ${lightenHex(color, 0.35)}dd 0%, ${roofColor}cc 30%, ${roofDark}bb 70%, ${darkenHex(color, 0.3)}99 100%)`,
+          margin: '5%',
+        }} />
+        {/* Highlight arc */}
+        <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${widthPx} ${heightPx}`} style={{ opacity: 0.3 }}>
+          <ellipse cx={widthPx * 0.45} cy={heightPx * 0.4} rx={widthPx * 0.25} ry={heightPx * 0.2}
+            fill="none" stroke={lightenHex(color, 0.5)} strokeWidth="1.5" />
+        </svg>
+      </div>
+    )
+  }
+
+  // flat — no overlay needed
+  return null
 }
 
 type WizardStep = 'identify' | 'verify-dimensions' | 'confirm'
@@ -592,9 +706,12 @@ export function CampMap() {
                 const isSelected = selectedObject?.object?.id === obj.id
                 const spotOverlay = getSpotOverlayClass(obj)
                 const isReservable = obj.properties?.reservable
-                const elevationFt = getObjectElevation(obj.object_type)
+                const elevationFt = getObjectElevation(obj)
                 const elevationPx = elevationFt * scale * HEIGHT_SCALE
                 const is3d = viewMode === '3d' && elevationFt > 0
+                const roofShape = getObjectRoofShape(obj)
+                const objWidthPx = obj.width_ft * scale
+                const objHeightPx = obj.height_ft * scale
 
                 return (
                   <div
@@ -609,8 +726,8 @@ export function CampMap() {
                     style={{
                       left: obj.x * scale,
                       top: obj.y * scale,
-                      width: obj.width_ft * scale,
-                      height: obj.height_ft * scale,
+                      width: objWidthPx,
+                      height: objHeightPx,
                       backgroundColor: `${obj.color}${is3d ? 'dd' : (isHovered ? 'ee' : 'bb')}`,
                       borderColor: obj.color,
                       transform: [
@@ -640,8 +757,8 @@ export function CampMap() {
                       </>
                     )}
                     {/* Labels */}
-                    {showLabels && obj.width_ft * scale > 20 && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px">
+                    {showLabels && objWidthPx > 20 && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px" style={{ zIndex: 2 }}>
                         <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
                         <span className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px">
                           {obj.label || template?.label || obj.object_type}
@@ -659,6 +776,16 @@ export function CampMap() {
                           return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
                         })()}
                       </div>
+                    )}
+                    {/* 3D roof shape overlay */}
+                    {is3d && roofShape !== 'flat' && (
+                      <RoofOverlay
+                        roofShape={roofShape}
+                        elevationPx={elevationPx}
+                        widthPx={objWidthPx}
+                        heightPx={objHeightPx}
+                        color={obj.color}
+                      />
                     )}
                     {/* 3D wall faces */}
                     {is3d && (
@@ -689,6 +816,20 @@ export function CampMap() {
                             transform: 'rotateY(-90deg)',
                             transformOrigin: 'right center',
                             backfaceVisibility: 'hidden',
+                          }}
+                        />
+                        {/* Ground shadow */}
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: 4,
+                            top: 4,
+                            right: -6,
+                            bottom: -6,
+                            backgroundColor: 'rgba(0,0,0,0.12)',
+                            filter: 'blur(4px)',
+                            transform: `translateZ(-${elevationPx}px)`,
+                            zIndex: -1,
                           }}
                         />
                       </>

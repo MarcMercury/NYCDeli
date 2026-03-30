@@ -788,6 +788,7 @@ export type FloorplanObjectType =
   | 'custom'
 
 export type FrontageSide = 'north' | 'south' | 'east' | 'west'
+export type RoofShape = 'flat' | 'pyramid' | 'a_frame' | 'dome'
 
 export interface FloorplanObjectProperties {
   reservable?: boolean
@@ -797,6 +798,9 @@ export interface FloorplanObjectProperties {
   sub_type?: string
   description?: string
   icon?: string
+  // 3D appearance
+  elevation_ft?: number
+  roof_shape?: RoofShape
   // BRC compliance properties
   fuel_type?: 'liquid' | 'propane'
   pc_number?: string

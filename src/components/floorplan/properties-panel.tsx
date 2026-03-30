@@ -186,6 +186,39 @@ export function PropertiesPanel({
           </div>
         </div>
 
+        {/* 3D Appearance */}
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
+            3D Appearance
+          </p>
+          <div className="space-y-2">
+            <Input
+              label="Elevation / Height (ft)"
+              type="number"
+              min={0}
+              step={1}
+              value={selectedObject.properties?.elevation_ft ?? ''}
+              onChange={e => updateProp('elevation_ft', e.target.value ? Number(e.target.value) : undefined)}
+              helpText="How tall the structure is above ground (used in 3D view)"
+            />
+            <Select
+              label="Roof Shape"
+              value={selectedObject.properties?.roof_shape || ''}
+              onChange={e => updateProp('roof_shape', e.target.value || undefined)}
+              options={[
+                { value: '', label: 'Default (Flat)' },
+                { value: 'flat', label: '⬜ Flat' },
+                { value: 'pyramid', label: '🔺 Pyramid' },
+                { value: 'a_frame', label: '⛺ A-Frame' },
+                { value: 'dome', label: '🔵 Dome' },
+              ]}
+            />
+            <p className="text-[9px] text-gray-500">
+              These values affect the 3D Birds Eye view on the Camp Map
+            </p>
+          </div>
+        </div>
+
         {/* Functional Properties */}
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
