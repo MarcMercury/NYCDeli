@@ -567,6 +567,12 @@ export interface Database {
         Update: DeliIdeaUpdate
         Relationships: []
       }
+      resource_edits: {
+        Row: ResourceEditRow
+        Insert: Omit<ResourceEditRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ResourceEditRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -1265,6 +1271,23 @@ export interface ShiftDraftPickUpdate {
 export type ShiftDraft = ShiftDraftRow
 export type ShiftDraftOrder = ShiftDraftOrderRow
 export type ShiftDraftPick = ShiftDraftPickRow
+
+// ==========================================
+// Resource Edits
+// ==========================================
+
+export interface ResourceEditRow {
+  id: string
+  resource_key: string
+  title: string | null
+  content: string | null
+  link: string | null
+  edited_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ResourceEdit = ResourceEditRow
 
 export interface ShiftDraftOrderWithCamper extends ShiftDraftOrderRow {
   camper: Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'email'> | null

@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import type { ResourceEditRow } from '@/types/database'
 
 /* ------------------------------------------------------------------ */
 /*  Data types                                                        */
@@ -1534,6 +1536,16 @@ Giant wooden crates (e.g. 5'×8'×4') you can pack gear into, then assemble and 
 ]
 
 /* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
+function toResourceKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/* ------------------------------------------------------------------ */
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
 export default function ResourcesPage() {
@@ -1541,6 +1553,64 @@ export default function ResourcesPage() {
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | 'all'>('all')
   const [openSlug, setOpenSlug] = useState<string | null>(null)
   const scrolledRef = useRef(false)
+
+  // Admin editing state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [edits, setEdits] = useState<Record<string, ResourceEditRow>>({})
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [editLink, setEditLink] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // Load admin status and resource edits
+  const loadEdits = useCallback(async () => {
+    const supabase = createClient()
+
+    // Check admin
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single() as unknown as { data: { role: string } | null }
+      setIsAdmin(profile?.role === 'admin')
+    }
+
+    // Load all edits
+    const { data: editRows } = await supabase
+      .from('resource_edits')
+      .select('*') as unknown as { data: ResourceEditRow[] | null }
+
+    if (editRows) {
+      const map: Record<string, ResourceEditRow> = {}
+      for (const row of editRows) {
+        map[row.resource_key] = row
+      }
+      setEdits(map)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadEdits()
+  }, [loadEdits])
+
+  // Merge static resources with DB edits
+  const mergedResources = useMemo(() => {
+    return RESOURCES.map(r => {
+      const key = toResourceKey(r.title)
+      const edit = edits[key]
+      if (!edit) return { ...r, _key: key }
+      return {
+        ...r,
+        _key: key,
+        title: edit.title ?? r.title,
+        content: edit.content ?? r.content,
+        link: edit.link ?? r.link,
+      }
+    })
+  }, [edits])
 
   // Deep link: if URL has #slug, filter to camp-amenities and open that resource
   useEffect(() => {
@@ -1568,7 +1638,7 @@ export default function ResourcesPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return RESOURCES.filter((r) => {
+    return mergedResources.filter((r) => {
       const matchesCategory = activeCategory === 'all' || r.category === activeCategory
       if (!matchesCategory) return false
       if (!q) return true
@@ -1578,7 +1648,67 @@ export default function ResourcesPage() {
         r.tags.some((t) => t.toLowerCase().includes(q))
       )
     })
-  }, [search, activeCategory])
+  }, [search, activeCategory, mergedResources])
+
+  // Start editing a resource
+  function startEditing(resource: Resource & { _key: string }) {
+    const key = resource._key
+    const edit = edits[key]
+    setEditingKey(key)
+    setEditTitle(edit?.title ?? resource.title)
+    setEditContent(edit?.content ?? resource.content)
+    setEditLink(edit?.link ?? resource.link ?? '')
+  }
+
+  // Save edit to DB
+  async function saveEdit() {
+    if (!editingKey) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const payload = {
+        resource_key: editingKey,
+        title: editTitle,
+        content: editContent,
+        link: editLink || null,
+        edited_by: user?.id || null,
+      }
+
+      // Upsert: insert if new, update if exists
+      const existing = edits[editingKey]
+      if (existing) {
+        await supabase
+          .from('resource_edits')
+          .update(payload as never)
+          .eq('id' as never, existing.id)
+      } else {
+        await supabase
+          .from('resource_edits')
+          .insert(payload as never)
+      }
+
+      await loadEdits()
+      setEditingKey(null)
+    } catch (err) {
+      console.error('Failed to save resource edit:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Revert edit (delete from DB)
+  async function revertEdit(resourceKey: string) {
+    const existing = edits[resourceKey]
+    if (!existing) return
+    const supabase = createClient()
+    await supabase
+      .from('resource_edits')
+      .delete()
+      .eq('id' as never, existing.id)
+    await loadEdits()
+  }
 
   return (
     <div className="min-h-screen">
@@ -1661,11 +1791,14 @@ export default function ResourcesPage() {
               </p>
               {filtered.map((resource, idx) => {
                 const cat = CATEGORIES[resource.category]
+                const rKey = resource._key
+                const hasEdit = !!edits[rKey]
+                const isEditing = editingKey === rKey
                 return (
                   <details
                     key={idx}
                     id={resource.slug ? `resource-${resource.slug}` : undefined}
-                    open={resource.slug === openSlug || undefined}
+                    open={resource.slug === openSlug || isEditing || undefined}
                     className="group border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] open:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
                   >
                     <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-gray-50 list-none">
@@ -1673,8 +1806,18 @@ export default function ResourcesPage() {
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-sm uppercase tracking-wide text-black truncate">
                           {resource.title}
+                          {hasEdit && <span className="ml-2 text-[9px] text-amber-600 font-normal normal-case">(edited)</span>}
                         </h3>
                       </div>
+                      {isAdmin && (
+                        <button
+                          onClick={e => { e.preventDefault(); startEditing(resource) }}
+                          className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border border-gray-300 bg-gray-50 hover:bg-yellow-100 hover:border-black rounded transition-colors"
+                          title="Edit this resource"
+                        >
+                          ✏️ Edit
+                        </button>
+                      )}
                       <span
                         className={`hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${cat.color}`}
                       >
@@ -1685,37 +1828,101 @@ export default function ResourcesPage() {
                       </span>
                     </summary>
                     <div className="px-4 pb-4 pt-2 border-t border-black/10">
-                      <div
-                        className="prose prose-sm max-w-none text-gray-700 whitespace-pre-line [&_strong]:text-black"
-                        dangerouslySetInnerHTML={{
-                          __html: resource.content
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/^(\d+)\.\s/gm, '<strong>$1.</strong> ')
-                            .trim(),
-                        }}
-                      />
-                      {resource.link && (
-                        <a
-                          href={resource.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 border-black bg-yellow-400 hover:bg-yellow-300 transition-colors shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
-                        >
-                          🔗 Visit Link
-                        </a>
-                      )}
-                      {resource.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-3">
-                          {resource.tags.map((tag) => (
+                      {isEditing ? (
+                        /* ── Inline Edit Form ── */
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider mb-1">Title</label>
+                            <input
+                              type="text"
+                              value={editTitle}
+                              onChange={e => setEditTitle(e.target.value)}
+                              className="w-full px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider mb-1">
+                              Content <span className="text-[9px] font-normal text-gray-500">(supports **bold** markdown)</span>
+                            </label>
+                            <textarea
+                              value={editContent}
+                              onChange={e => setEditContent(e.target.value)}
+                              rows={12}
+                              className="w-full px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400 font-mono resize-y"
+                            />
+                          </div>
+                          {resource.link !== undefined && (
+                            <div>
+                              <label className="block text-xs font-bold uppercase tracking-wider mb-1">Link URL</label>
+                              <input
+                                type="url"
+                                value={editLink}
+                                onChange={e => setEditLink(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                placeholder="https://..."
+                              />
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-1">
                             <button
-                              key={tag}
-                              onClick={() => setSearch(tag)}
-                              className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 rounded transition-colors cursor-pointer"
+                              onClick={saveEdit}
+                              disabled={saving}
+                              className="px-4 py-2 text-xs font-bold uppercase tracking-wider border-2 border-black bg-green-400 hover:bg-green-300 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 transition-colors"
                             >
-                              #{tag}
+                              {saving ? 'Saving...' : '💾 Save'}
                             </button>
-                          ))}
+                            <button
+                              onClick={() => setEditingKey(null)}
+                              className="px-4 py-2 text-xs font-bold uppercase tracking-wider border-2 border-black bg-gray-100 hover:bg-gray-200 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            {hasEdit && (
+                              <button
+                                onClick={async () => { await revertEdit(rKey); setEditingKey(null) }}
+                                className="px-4 py-2 text-xs font-bold uppercase tracking-wider border-2 border-red-500 text-red-600 bg-red-50 hover:bg-red-100 shadow-[2px_2px_0px_0px_rgba(220,38,38,0.3)] transition-colors ml-auto"
+                              >
+                                ↩ Revert to Original
+                              </button>
+                            )}
+                          </div>
                         </div>
+                      ) : (
+                        /* ── Normal Display ── */
+                        <>
+                          <div
+                            className="prose prose-sm max-w-none text-gray-700 whitespace-pre-line [&_strong]:text-black"
+                            dangerouslySetInnerHTML={{
+                              __html: resource.content
+                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                .replace(/^(\d+)\.\s/gm, '<strong>$1.</strong> ')
+                                .trim(),
+                            }}
+                          />
+                          {resource.link && (
+                            <a
+                              href={resource.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 border-black bg-yellow-400 hover:bg-yellow-300 transition-colors shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
+                            >
+                              🔗 Visit Link
+                            </a>
+                          )}
+                          {resource.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {resource.tags.map((tag) => (
+                                <button
+                                  key={tag}
+                                  onClick={() => setSearch(tag)}
+                                  className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 rounded transition-colors cursor-pointer"
+                                >
+                                  #{tag}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </details>

@@ -119,6 +119,18 @@ export function PropertiesPanel({
                 label: `${t.icon} ${t.label}`,
               }))}
             />
+            {/* Description — prominent placement */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1">
+                Description
+              </label>
+              <textarea
+                value={selectedObject.properties?.description || ''}
+                onChange={e => updateProp('description', e.target.value)}
+                className="w-full px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400 min-h-[60px] resize-y"
+                placeholder="Describe this object or area..."
+              />
+            </div>
             {selectedObject.is_locked && <Badge variant="warning">Locked</Badge>}
           </div>
         </div>
@@ -246,19 +258,6 @@ export function PropertiesPanel({
               onChange={e => updateProp('capacity', e.target.value ? Number(e.target.value) : undefined)}
               helpText="Max number of people"
             />
-
-            {/* Description */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-1">
-                Description
-              </label>
-              <textarea
-                value={selectedObject.properties?.description || ''}
-                onChange={e => updateProp('description', e.target.value)}
-                className="w-full px-3 py-2 text-sm border-2 border-black focus:outline-none focus:ring-2 focus:ring-yellow-400 min-h-[60px] resize-none"
-                placeholder="Describe this area..."
-              />
-            </div>
 
             {/* Linked To */}
             <Select

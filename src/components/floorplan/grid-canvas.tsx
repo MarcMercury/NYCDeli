@@ -399,7 +399,7 @@ export function GridCanvas({
           <div
             key={obj.id}
             className={cn(
-              'absolute transition-shadow select-none',
+              'absolute transition-shadow select-none group',
               isDashed ? 'border-2 border-dashed' : 'border-2',
               isSelected
                 ? 'ring-2 ring-yellow-400 ring-offset-1 z-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
@@ -534,6 +534,15 @@ export function GridCanvas({
             {/* Lock indicator */}
             {obj.is_locked && (
               <div className="absolute top-0.5 right-0.5 text-[8px]">🔒</div>
+            )}
+
+            {/* Description tooltip on hover */}
+            {obj.properties?.description && (
+              <div className="absolute left-0 top-full mt-1 z-[100] hidden group-hover:block pointer-events-none">
+                <div className="bg-black text-white text-[9px] px-2 py-1 rounded shadow-lg max-w-[200px] whitespace-pre-wrap">
+                  {obj.properties.description}
+                </div>
+              </div>
             )}
 
             {/* Resize handle (bottom-right) */}
