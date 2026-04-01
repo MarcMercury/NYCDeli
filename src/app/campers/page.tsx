@@ -178,12 +178,12 @@ export default function CampersPage() {
               {/* Contact & Info */}
               {selectedCamper.camper && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gray-500 block">Email</span>
-                    <span className="font-bold">{selectedCamper.camper.email}</span>
+                    <span className="font-bold break-all">{selectedCamper.camper.email}</span>
                   </div>
                   {selectedCamper.camper.phone && (
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-gray-500 block">Phone</span>
                       <span className="font-bold">{selectedCamper.camper.phone}</span>
                     </div>
