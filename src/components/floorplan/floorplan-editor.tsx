@@ -196,22 +196,18 @@ export function FloorplanEditor() {
     const container = canvasContainerRef.current
     if (!container) return
 
-    const originalScale = scale
-    // Use a high export scale so all labels pass the visibility threshold
-    // (labels require obj.width_ft * scale > 24, so scale 5 shows objects > 4.8ft)
-    const exportScale = Math.max(5, scale)
-
-    // Force synchronous re-render at export scale with exporting mode
-    flushSync(() => {
-      setScale(exportScale)
-      setExporting(true)
-    })
+    // Enable export mode for readable labels (no truncation, larger fonts)
+    flushSync(() => setExporting(true))
 
     try {
       const { toPng } = await import('html-to-image')
+      // Capture at current scale but high pixelRatio for crisp output
       const dataUrl = await toPng(container, {
         backgroundColor: '#ffffff',
-        pixelRatio: 3,
+        pixelRatio: 4,
+        // Capture the full scrollable content, not just the visible viewport
+        width: container.scrollWidth,
+        height: container.scrollHeight,
       })
       const link = document.createElement('a')
       const name = (campName || config?.name || 'camp_layout').replace(/\s+/g, '_').slice(0, 15)
@@ -224,11 +220,8 @@ export function FloorplanEditor() {
     } catch {
       setError('Export failed — install html-to-image package for PNG export')
     } finally {
-      // Restore original zoom level and exit export mode
-      flushSync(() => {
-        setScale(originalScale)
-        setExporting(false)
-      })
+      // Exit export mode
+      flushSync(() => setExporting(false))
     }
   }
 
