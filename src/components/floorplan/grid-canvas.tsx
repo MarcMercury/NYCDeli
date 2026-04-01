@@ -40,6 +40,7 @@ interface GridCanvasProps {
   borderLabels?: { north: string; south: string; east: string; west: string }
   frontageSides?: FrontageSide[]
   showSafetyZones?: boolean
+  exporting?: boolean
 }
 
 export function GridCanvas({
@@ -64,6 +65,7 @@ export function GridCanvas({
   borderLabels,
   frontageSides = [],
   showSafetyZones = false,
+  exporting = false,
 }: GridCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [dragState, setDragState] = useState<{
@@ -480,51 +482,78 @@ export function GridCanvas({
             )}
 
             {/* Label */}
-            {showLabels && obj.width_ft * scale > 24 && !isDistanceMarker && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none overflow-hidden p-px">
-                <span className="text-[8px] leading-none">{template?.icon || '📦'}</span>
+            {showLabels && (exporting || obj.width_ft * scale > 24) && !isDistanceMarker && (
+              <div className={cn(
+                "absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-px",
+                exporting ? "overflow-visible z-10" : "overflow-hidden"
+              )}>
+                <span className={exporting ? "text-[12px] leading-none" : "text-[8px] leading-none"}>{template?.icon || '📦'}</span>
                 <span
-                  className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px"
+                  className={cn(
+                    "font-black uppercase tracking-wider text-center leading-tight text-black/80 px-px",
+                    exporting ? "text-[11px] whitespace-nowrap drop-shadow-[0_0_2px_rgba(255,255,255,1)]" : "text-[7px] truncate max-w-full"
+                  )}
                 >
                   {obj.label || template?.label || obj.object_type}
                 </span>
                 {/* Show neighbor name for neighbor zones */}
                 {obj.object_type === 'neighbor_zone' && obj.properties?.neighbor_name && (
-                  <span className="text-[7px] text-gray-600 italic truncate max-w-full">
+                  <span className={cn(
+                    "text-gray-600 italic",
+                    exporting ? "text-[10px] whitespace-nowrap" : "text-[7px] truncate max-w-full"
+                  )}>
                     {obj.properties.neighbor_name}
                   </span>
                 )}
                 {/* Show road name */}
                 {obj.object_type === 'road' && obj.properties?.road_name && (
-                  <span className="text-[7px] text-gray-600 font-bold truncate max-w-full">
+                  <span className={cn(
+                    "text-gray-600 font-bold",
+                    exporting ? "text-[10px] whitespace-nowrap" : "text-[7px] truncate max-w-full"
+                  )}>
                     {obj.properties.road_name}
                   </span>
                 )}
                 {/* Show PC number */}
                 {obj.object_type === 'pc_container' && obj.properties?.pc_number && (
-                  <span className="text-[7px] bg-amber-700 text-white px-1 rounded-sm mt-0.5">
+                  <span className={cn(
+                    "bg-amber-700 text-white px-1 rounded-sm mt-0.5",
+                    exporting ? "text-[10px]" : "text-[7px]"
+                  )}>
                     PC#{obj.properties.pc_number}
                   </span>
                 )}
                 {/* Show sign text */}
                 {obj.object_type === 'sign' && obj.properties?.sign_text && (
-                  <span className="text-[7px] text-gray-800 font-bold truncate max-w-full">
+                  <span className={cn(
+                    "text-gray-800 font-bold",
+                    exporting ? "text-[10px] whitespace-nowrap" : "text-[7px] truncate max-w-full"
+                  )}>
                     {obj.properties.sign_text}
                   </span>
                 )}
                 {obj.properties?.reservable && (
-                  <span className="text-[7px] bg-green-500 text-white px-1 rounded-sm mt-0.5">
+                  <span className={cn(
+                    "bg-green-500 text-white px-1 rounded-sm mt-0.5",
+                    exporting ? "text-[10px]" : "text-[7px]"
+                  )}>
                     RESERVABLE
                   </span>
                 )}
                 {hasChildren && (
-                  <span className="text-[7px] bg-purple-500 text-white px-1 rounded-sm mt-0.5">
+                  <span className={cn(
+                    "bg-purple-500 text-white px-1 rounded-sm mt-0.5",
+                    exporting ? "text-[10px]" : "text-[7px]"
+                  )}>
                     HAS SUB-AREAS
                   </span>
                 )}
                 {/* Fire lane width indicator */}
                 {obj.object_type === 'fire_lane' && (
-                  <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">
+                  <span className={cn(
+                    "bg-red-500 text-white px-1 rounded-sm mt-0.5",
+                    exporting ? "text-[10px]" : "text-[7px]"
+                  )}>
                     {Math.min(obj.width_ft, obj.height_ft)}ft WIDE
                   </span>
                 )}

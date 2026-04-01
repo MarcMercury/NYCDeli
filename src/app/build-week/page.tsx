@@ -6,6 +6,7 @@ import {
   Badge, Tabs, TabPanel, ProgressBar
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import ElectricalLoadTab from './electrical-load-tab'
 import {
   fetchBuildStagesWithGoals,
   fetchBuildResources,
@@ -62,6 +63,7 @@ type Tab = { id: string; label: string }
 const tabs: Tab[] = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'inventory', label: 'Inventory' },
+  { id: 'electrical', label: 'Electrical Load' },
   { id: 'issues', label: "Q's & Issues" },
   { id: 'shade', label: 'Shade Guide' },
   { id: 'schedule', label: 'Build Schedule' },
@@ -1695,6 +1697,11 @@ export default function BuildWeekPage() {
               )
             })}
           </div>
+        </TabPanel>
+
+        {/* ═══════  ELECTRICAL LOAD  ═══════ */}
+        <TabPanel tabId="electrical" activeTab={activeTab}>
+          <ElectricalLoadTab />
         </TabPanel>
 
         {/* Schedule Item Form Modal */}

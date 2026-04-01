@@ -39,6 +39,7 @@ export function FloorplanEditor() {
   const [scale, setScale] = useState(2)
   const [showGrid, setShowGrid] = useState(true)
   const [showLabels, setShowLabels] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Utility lines
@@ -200,8 +201,11 @@ export function FloorplanEditor() {
     // (labels require obj.width_ft * scale > 24, so scale 5 shows objects > 4.8ft)
     const exportScale = Math.max(5, scale)
 
-    // Force synchronous re-render at export scale so labels are in the DOM
-    flushSync(() => setScale(exportScale))
+    // Force synchronous re-render at export scale with exporting mode
+    flushSync(() => {
+      setScale(exportScale)
+      setExporting(true)
+    })
 
     try {
       const { toPng } = await import('html-to-image')
@@ -220,8 +224,11 @@ export function FloorplanEditor() {
     } catch {
       setError('Export failed — install html-to-image package for PNG export')
     } finally {
-      // Restore original zoom level
-      setScale(originalScale)
+      // Restore original zoom level and exit export mode
+      flushSync(() => {
+        setScale(originalScale)
+        setExporting(false)
+      })
     }
   }
 
@@ -955,6 +962,7 @@ export function FloorplanEditor() {
                     }}
                     frontageSides={frontageSides}
                     showSafetyZones={showSafetyZones}
+                    exporting={exporting}
                   />
                   </div>
                 )}

@@ -573,6 +573,24 @@ export interface Database {
         Update: Partial<Omit<ResourceEditRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: []
       }
+      electrical_load_config: {
+        Row: ElectricalLoadConfigRow
+        Insert: Omit<ElectricalLoadConfigRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ElectricalLoadConfigRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
+      electrical_distro_boxes: {
+        Row: ElectricalDistroBoxRow
+        Insert: Omit<ElectricalDistroBoxRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ElectricalDistroBoxRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
+      electrical_load_items: {
+        Row: ElectricalLoadItemRow
+        Insert: Omit<ElectricalLoadItemRow, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<ElectricalLoadItemRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -1146,6 +1164,46 @@ export interface BuildScheduleItemRow {
   updated_at: string
 }
 
+// ==========================================
+// Electrical Load Types
+// ==========================================
+
+export interface ElectricalLoadConfigRow {
+  id: string
+  generator_kw: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ElectricalDistroBoxRow {
+  id: string
+  name: string
+  max_amps: number
+  voltage: number
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ElectricalLoadItemRow {
+  id: string
+  name: string
+  location: string | null
+  voltage: number
+  amperage: number
+  wattage: number
+  plug_type: string
+  quantity: number
+  total_amps: number
+  total_wattage: number
+  notes: string | null
+  distro_box_id: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
 // Convenience types
 export type BuildStage = BuildStageRow
 export type BuildGoal = BuildGoalRow
@@ -1154,6 +1212,9 @@ export type BuildProcedure = BuildProcedureRow
 export type BuildQuestion = BuildQuestionRow
 export type BuildInventory = BuildInventoryRow
 export type BuildScheduleItem = BuildScheduleItemRow
+export type ElectricalLoadConfig = ElectricalLoadConfigRow
+export type ElectricalDistroBox = ElectricalDistroBoxRow
+export type ElectricalLoadItem = ElectricalLoadItemRow
 
 // Extended type for stage with its goals
 export interface BuildStageWithGoals extends BuildStageRow {

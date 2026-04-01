@@ -8,6 +8,9 @@ import type {
   BuildStageWithGoals,
   BuildInventory,
   BuildScheduleItem,
+  ElectricalLoadConfig,
+  ElectricalDistroBox,
+  ElectricalLoadItem,
   Camper,
 } from '@/types/database'
 
@@ -459,4 +462,159 @@ export async function reorderScheduleItems(
       .eq('id', item.id)
     if (error) throw error
   }
+}
+
+// ==========================================
+// Electrical Load Calculator
+// ==========================================
+
+export async function fetchElectricalConfig(): Promise<ElectricalLoadConfig | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('electrical_load_config')
+    .select('*')
+    .limit(1)
+    .single()
+  if (error && error.code !== 'PGRST116') throw error
+  return data as ElectricalLoadConfig | null
+}
+
+export async function updateElectricalConfig(id: string, updates: { generator_kw: number }): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('electrical_load_config')
+    .update(updates as never)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchDistroBoxes(): Promise<ElectricalDistroBox[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('electrical_distro_boxes')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data as ElectricalDistroBox[]) || []
+}
+
+export async function createDistroBox(box: {
+  name: string
+  max_amps: number
+  voltage?: number
+  notes?: string
+}): Promise<ElectricalDistroBox> {
+  const supabase = createClient()
+  const { data: existing } = await supabase
+    .from('electrical_distro_boxes')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order + 1 : 0
+
+  const { data, error } = await supabase
+    .from('electrical_distro_boxes')
+    .insert({ ...box, voltage: box.voltage ?? 120, sort_order: nextOrder } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as ElectricalDistroBox
+}
+
+export async function updateDistroBox(id: string, updates: {
+  name?: string
+  max_amps?: number
+  voltage?: number
+  notes?: string | null
+}): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('electrical_distro_boxes')
+    .update(updates as never)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteDistroBox(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('electrical_distro_boxes')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchElectricalLoadItems(): Promise<ElectricalLoadItem[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('electrical_load_items')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data as ElectricalLoadItem[]) || []
+}
+
+export async function createElectricalLoadItem(item: {
+  name: string
+  location?: string
+  voltage?: number
+  amperage: number
+  wattage: number
+  plug_type?: string
+  quantity: number
+  total_amps: number
+  total_wattage: number
+  notes?: string
+  distro_box_id?: string | null
+}): Promise<ElectricalLoadItem> {
+  const supabase = createClient()
+  const { data: existing } = await supabase
+    .from('electrical_load_items')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order + 1 : 0
+
+  const { data, error } = await supabase
+    .from('electrical_load_items')
+    .insert({
+      ...item,
+      voltage: item.voltage ?? 120,
+      plug_type: item.plug_type ?? 'standard',
+      sort_order: nextOrder,
+    } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as ElectricalLoadItem
+}
+
+export async function updateElectricalLoadItem(id: string, updates: {
+  name?: string
+  location?: string | null
+  voltage?: number
+  amperage?: number
+  wattage?: number
+  plug_type?: string
+  quantity?: number
+  total_amps?: number
+  total_wattage?: number
+  notes?: string | null
+  distro_box_id?: string | null
+}): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('electrical_load_items')
+    .update(updates as never)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteElectricalLoadItem(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('electrical_load_items')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
 }
