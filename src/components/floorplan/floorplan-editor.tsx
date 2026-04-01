@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, Button, Badge, Input, Alert } from '@/components/ui'
 import { generateId, cn } from '@/lib/utils'
 import type { FloorplanConfigRow, FloorplanObjectRow, FloorplanObjectType, UtilityLineRow, UtilityLineType, UtilityLinePoint, FrontageSide } from '@/types/database'
@@ -189,15 +190,24 @@ export function FloorplanEditor() {
     setHasUnsavedChanges(true)
   }
 
-  // Export layout to PNG
+  // Export layout to high-res PNG with all labels visible
   async function handleExport() {
     const container = canvasContainerRef.current
     if (!container) return
+
+    const originalScale = scale
+    // Use a high export scale so all labels pass the visibility threshold
+    // (labels require obj.width_ft * scale > 24, so scale 5 shows objects > 4.8ft)
+    const exportScale = Math.max(5, scale)
+
+    // Force synchronous re-render at export scale so labels are in the DOM
+    flushSync(() => setScale(exportScale))
+
     try {
       const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(container, {
         backgroundColor: '#ffffff',
-        pixelRatio: 2,
+        pixelRatio: 3,
       })
       const link = document.createElement('a')
       const name = (campName || config?.name || 'camp_layout').replace(/\s+/g, '_').slice(0, 15)
@@ -208,8 +218,10 @@ export function FloorplanEditor() {
       link.href = dataUrl
       link.click()
     } catch {
-      // html-to-image not installed — fall back to native canvas
       setError('Export failed — install html-to-image package for PNG export')
+    } finally {
+      // Restore original zoom level
+      setScale(originalScale)
     }
   }
 
