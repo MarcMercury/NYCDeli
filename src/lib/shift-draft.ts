@@ -173,6 +173,95 @@ export function getAllDraftPositions(): DraftShiftPosition[] {
 }
 
 // ==========================================
+// Override types & helpers
+// ==========================================
+
+export interface ShiftPositionOverride {
+  role?: string
+  time?: string
+  description?: string
+  category?: string
+  deleted?: boolean
+}
+
+export type ShiftOverrides = Record<string, unknown>
+
+/** Check if a category is marked as deleted in overrides */
+export function isCategoryDeleted(overrides: ShiftOverrides, categoryKey: string): boolean {
+  return overrides[`_cat_deleted:${categoryKey}`] === true
+}
+
+/** Get position override (returns null if no override exists) */
+export function getPositionOverride(overrides: ShiftOverrides, positionKey: string): ShiftPositionOverride | null {
+  const ov = overrides[positionKey]
+  if (!ov || typeof ov !== 'object') return null
+  return ov as ShiftPositionOverride
+}
+
+/** Apply overrides (edits + deletions) to draft shift categories.
+ *  Returns new arrays with overrides applied and deleted items removed. */
+export function applyDraftOverrides(
+  categories: DraftShiftCategory[],
+  overrides: ShiftOverrides,
+  prefix: string = 'deli'
+): DraftShiftCategory[] {
+  return categories
+    .filter((_, catIdx) => !isCategoryDeleted(overrides, `${prefix}-${catIdx}`))
+    .map((cat) => {
+      const catIdx = categories.indexOf(cat)
+      return {
+        ...cat,
+        positions: cat.positions
+          .map((pos, posIdx) => {
+            const key = `${prefix}-${catIdx}-${posIdx}`
+            const ov = getPositionOverride(overrides, key)
+            if (!ov) return pos
+            if (ov.deleted) return null
+            return {
+              ...pos,
+              ...(ov.role && { role: ov.role }),
+              ...(ov.time && { time: ov.time }),
+              ...(ov.description && { description: ov.description }),
+            }
+          })
+          .filter((p): p is DraftShiftPosition => p !== null),
+      }
+    })
+    .filter(cat => cat.positions.length > 0)
+}
+
+/** Apply overrides to plain ShiftCategory arrays (kitchen page format) */
+export function applyShiftCategoryOverrides<T extends { positions: P[] }, P extends { role: string; time?: string; description?: string }>(
+  categories: T[],
+  overrides: ShiftOverrides,
+  prefix: string
+): T[] {
+  return categories
+    .filter((_, catIdx) => !isCategoryDeleted(overrides, `${prefix}-${catIdx}`))
+    .map((cat) => {
+      const catIdx = categories.indexOf(cat)
+      return {
+        ...cat,
+        positions: cat.positions
+          .map((pos, posIdx) => {
+            const key = `${prefix}-${catIdx}-${posIdx}`
+            const ov = getPositionOverride(overrides, key)
+            if (!ov) return pos
+            if (ov.deleted) return null
+            return {
+              ...pos,
+              ...(ov.role && { role: ov.role }),
+              ...(ov.time && { time: ov.time }),
+              ...(ov.description && { description: ov.description }),
+            }
+          })
+          .filter((p): p is P => p !== null),
+      }
+    })
+    .filter(cat => cat.positions.length > 0)
+}
+
+// ==========================================
 // Data fetching
 // ==========================================
 

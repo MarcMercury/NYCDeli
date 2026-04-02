@@ -30,6 +30,8 @@ export default function IdeasPage() {
   const [category, setCategory] = useState('general')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [enhancing, setEnhancing] = useState(false)
+  const [enhanced, setEnhanced] = useState<string | null>(null)
 
   const fetchMyIdeas = useCallback(async () => {
     const supabase = createClient()
@@ -72,6 +74,31 @@ export default function IdeasPage() {
 
   const getCategoryLabel = (value: string) =>
     CATEGORIES.find(c => c.value === value)?.label || value
+
+  const enhanceWithAi = async () => {
+    if (!title.trim() || !body.trim()) {
+      setMessage({ type: 'error', text: 'Write your title and description first, then enhance!' })
+      return
+    }
+    setEnhancing(true)
+    setEnhanced(null)
+    try {
+      const res = await fetch('/api/ai/enhance-idea', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body, category }),
+      })
+      const data = await res.json()
+      if (res.ok && data.enhanced) {
+        setEnhanced(data.enhanced)
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to enhance idea' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error' })
+    }
+    setEnhancing(false)
+  }
 
   const getCategoryColor = (value: string) => {
     const colors: Record<string, string> = {
@@ -180,6 +207,26 @@ export default function IdeasPage() {
                       required
                     />
                     <p className="text-xs text-gray-400 mt-1">{body.length}/5000</p>
+                  </div>
+
+                  {/* AI Enhance */}
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Button
+                        type="button"
+                        onClick={enhanceWithAi}
+                        disabled={enhancing || !title.trim() || !body.trim()}
+                        className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1"
+                      >
+                        {enhancing ? '⏳ Thinking...' : '✨ AI Enhance My Idea'}
+                      </Button>
+                      <span className="text-xs text-gray-400">Get suggestions to flesh out your idea</span>
+                    </div>
+                    {enhanced && (
+                      <div className="mt-3 bg-white border border-purple-100 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        {enhanced}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter className="flex gap-2">

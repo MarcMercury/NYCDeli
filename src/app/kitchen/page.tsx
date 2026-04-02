@@ -16,6 +16,7 @@ import {
   fetchDraftPicks,
   makePick,
   getAllDraftShiftCategories,
+  applyShiftCategoryOverrides,
   type DraftShiftPosition,
 } from '@/lib/shift-draft'
 
@@ -309,6 +310,7 @@ export default function KitchenPage() {
   // Display categories (with admin overrides applied)
   const [displayDeliCategories, setDisplayDeliCategories] = useState<ShiftCategory[]>(deliShiftCategories)
   const [displaySpecialCategories, setDisplaySpecialCategories] = useState<ShiftCategory[]>(specialShiftCategories)
+  const [displayStrikeCategories, setDisplayStrikeCategories] = useState<ShiftCategory[]>(strikeCategories)
   // Collapsible state for roles tab (all collapsed by default)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -395,23 +397,10 @@ export default function KitchenPage() {
 
       if (overrideSetting) {
         try {
-          const overrides = JSON.parse(overrideSetting.value) as Record<string, { role?: string; time?: string; description?: string }>
-          const applyOverrides = (cats: ShiftCategory[], prefix: string): ShiftCategory[] =>
-            cats.map((cat, catIdx) => ({
-              ...cat,
-              positions: cat.positions.map((pos, posIdx) => {
-                const ov = overrides[`${prefix}-${catIdx}-${posIdx}`]
-                if (!ov) return pos
-                return {
-                  ...pos,
-                  ...(ov.role && { role: ov.role }),
-                  ...(ov.time && { time: ov.time }),
-                  ...(ov.description && { description: ov.description }),
-                }
-              }),
-            }))
-          setDisplayDeliCategories(applyOverrides(deliShiftCategories, 'deli'))
-          setDisplaySpecialCategories(applyOverrides(specialShiftCategories, 'special'))
+          const overrides = JSON.parse(overrideSetting.value) as Record<string, unknown>
+          setDisplayDeliCategories(applyShiftCategoryOverrides(deliShiftCategories, overrides, 'deli'))
+          setDisplaySpecialCategories(applyShiftCategoryOverrides(specialShiftCategories, overrides, 'special'))
+          setDisplayStrikeCategories(applyShiftCategoryOverrides(strikeCategories, overrides, 'strike'))
         } catch { /* ignore malformed */ }
       }
 
@@ -952,12 +941,12 @@ export default function KitchenPage() {
                   🔨 Strike Shifts
                 </h2>
                 <span className="text-sm text-gray-500 font-normal normal-case tracking-normal">
-                  {strikeCategories.reduce((sum, c) => sum + c.positions.length, 0)} positions across {strikeCategories.length} crews
+                  {displayStrikeCategories.reduce((sum, c) => sum + c.positions.length, 0)} positions across {displayStrikeCategories.length} crews
                 </span>
               </button>
               {expandedSections.has('strike') && (
                 <div className="space-y-3 mt-2">
-                  {strikeCategories.map((category, catIdx) => {
+                  {displayStrikeCategories.map((category, catIdx) => {
                     const catKey = `strike-${catIdx}`
                     const isExpanded = expandedCategories.has(catKey)
                     const consolidated = consolidatePositions(category.positions)
@@ -1417,7 +1406,7 @@ export default function KitchenPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {strikeCategories.map((category, catIdx) => {
+                    {displayStrikeCategories.map((category, catIdx) => {
                       const uniquePositions = getUniquePositions([category])
                       return (
                         <React.Fragment key={`scat-${catIdx}`}>

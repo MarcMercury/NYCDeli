@@ -26,6 +26,8 @@ export default function ApplicantReviewPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [resetPassword, setResetPassword] = useState('')
   const [showResetPassword, setShowResetPassword] = useState(false)
+  const [aiSummary, setAiSummary] = useState<string | null>(null)
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false)
 
   const fetchApplicants = useCallback(async () => {
     const supabase = createClient()
@@ -138,6 +140,28 @@ export default function ApplicantReviewPage() {
     setActionLoading(false)
   }
 
+  const generateAiSummary = async (applicant: ApplicantWithCamper) => {
+    if (!applicant.camper) return
+    setAiSummaryLoading(true)
+    setAiSummary(null)
+    try {
+      const res = await fetch('/api/ai/applicant-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camper: applicant.camper }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAiSummary(data.summary)
+      } else {
+        setAiSummary(`Error: ${data.error}`)
+      }
+    } catch {
+      setAiSummary('Failed to generate summary')
+    }
+    setAiSummaryLoading(false)
+  }
+
   const getStatusBadge = (applicant: ApplicantWithCamper) => {
     if (applicant.denied_at) return <Badge variant="error">Denied</Badge>
     if (applicant.role === 'pending') return <Badge variant="warning">Pending</Badge>
@@ -201,7 +225,7 @@ export default function ApplicantReviewPage() {
             applicants.map(applicant => (
               <button
                 key={applicant.id}
-                onClick={() => { setSelectedApplicant(applicant); setShowResetPassword(false); setResetPassword('') }}
+                onClick={() => { setSelectedApplicant(applicant); setShowResetPassword(false); setResetPassword(''); setAiSummary(null) }}
                 className={cn(
                   'w-full text-left p-4 border-2 border-black transition-all',
                   selectedApplicant?.id === applicant.id
@@ -254,6 +278,28 @@ export default function ApplicantReviewPage() {
               <CardContent className="space-y-6">
                 {selectedApplicant.camper ? (
                   <>
+                    {/* AI Summary */}
+                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold uppercase tracking-wider text-sm text-purple-800">
+                          🤖 AI Summary
+                        </h3>
+                        <Button
+                          onClick={() => generateAiSummary(selectedApplicant)}
+                          disabled={aiSummaryLoading}
+                          className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1"
+                        >
+                          {aiSummaryLoading ? '⏳ Analyzing...' : aiSummary ? '🔄 Refresh' : '✨ Generate'}
+                        </Button>
+                      </div>
+                      {aiSummary && (
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+                      )}
+                      {!aiSummary && !aiSummaryLoading && (
+                        <p className="text-xs text-gray-400 italic">Click Generate for an AI-powered applicant overview</p>
+                      )}
+                    </div>
+
                     {/* Registration Info */}
                     <div>
                       <h3 className="font-bold uppercase tracking-wider text-sm mb-3 border-b-2 border-black pb-1">

@@ -28,6 +28,9 @@ import {
   fetchDraftPicks,
   getAllDraftShiftCategories,
   getAllDraftPositions,
+  applyDraftOverrides,
+  type DraftShiftCategory,
+  type ShiftOverrides,
 } from '@/lib/shift-draft'
 
 type ViewMode = 'list' | 'wizard' | 'setup' | 'live'
@@ -42,6 +45,7 @@ export default function AdminShiftDraftPage() {
   const [campers, setCampers] = useState<Camper[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [filteredCategories, setFilteredCategories] = useState<DraftShiftCategory[]>([])
 
   // Create form
   const [draftName, setDraftName] = useState('Shift Draft 2026')
@@ -67,6 +71,19 @@ export default function AdminShiftDraftPage() {
         .select('*')
         .order('full_name')
       setCampers(camperData || [])
+
+      // Load shift overrides to filter deleted categories/positions
+      const { data: overrideSetting } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'shift_position_overrides')
+        .single() as unknown as { data: { value: string } | null }
+      
+      let overrides: ShiftOverrides = {}
+      if (overrideSetting) {
+        try { overrides = JSON.parse(overrideSetting.value) as ShiftOverrides } catch { /* */ }
+      }
+      setFilteredCategories(applyDraftOverrides(getAllDraftShiftCategories(), overrides, 'deli'))
 
       const activeDraft = await fetchActiveDraft()
       if (activeDraft) {
@@ -359,7 +376,7 @@ export default function AdminShiftDraftPage() {
       .map(p => `${p.shift_category}|${p.shift_role}|${p.shift_time ?? ''}`)
   )
 
-  const categories = getAllDraftShiftCategories()
+  const categories = filteredCategories.length > 0 ? filteredCategories : getAllDraftShiftCategories()
 
   const filteredCampers = campers.filter(c =>
     !orderList.includes(c.id) && (

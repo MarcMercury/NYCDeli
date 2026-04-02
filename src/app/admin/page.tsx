@@ -9,7 +9,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
 import { updateCamperAction, deleteCamperAction, updateTaskStatusAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction } from '@/app/actions/admin'
-import { getAllDraftShiftCategories, type DraftShiftCategory, type DraftShiftPosition } from '@/lib/shift-draft'
+import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
 import type { Camper, BuildTask, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
 
 type Tab = { id: string; label: string }
@@ -43,6 +43,9 @@ export default function AdminPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // Kitchen shift editor state
   const [shiftCategories, setShiftCategories] = useState<DraftShiftCategory[]>([])
+  const [rawCategories, setRawCategories] = useState<DraftShiftCategory[]>([])
+  const [shiftOverrides, setShiftOverrides] = useState<ShiftOverrides>({})
+  const [showDeleted, setShowDeleted] = useState(false)
   const [editingPosition, setEditingPosition] = useState<{ pos: DraftShiftPosition; catIdx: number; posIdx: number } | null>(null)
   const [editForm, setEditForm] = useState<{ role: string; time: string; description: string }>({ role: '', time: '', description: '' })
 
@@ -106,25 +109,16 @@ export default function AdminPage() {
 
     // Load shift categories with any admin overrides applied
     const baseCategories = getAllDraftShiftCategories()
+    setRawCategories(baseCategories)
     const overrideSetting = allSettings.find(s => s.key === 'shift_position_overrides')
+    let parsedOverrides: ShiftOverrides = {}
     if (overrideSetting) {
       try {
-        const overrides = JSON.parse(overrideSetting.value) as Record<string, { role?: string; time?: string; description?: string }>
-        for (const cat of baseCategories) {
-          for (let posIdx = 0; posIdx < cat.positions.length; posIdx++) {
-            const catIdx = baseCategories.indexOf(cat)
-            const key = `deli-${catIdx}-${posIdx}`
-            const ov = overrides[key]
-            if (ov) {
-              if (ov.role) cat.positions[posIdx].role = ov.role
-              if (ov.time) cat.positions[posIdx].time = ov.time
-              if (ov.description) cat.positions[posIdx].description = ov.description
-            }
-          }
-        }
+        parsedOverrides = JSON.parse(overrideSetting.value) as ShiftOverrides
       } catch { /* ignore malformed overrides */ }
     }
-    setShiftCategories(baseCategories)
+    setShiftOverrides(parsedOverrides)
+    setShiftCategories(applyDraftOverrides(baseCategories, parsedOverrides, 'deli'))
     setFetchErrors(errors)
     setLastRefreshed(new Date())
     setLoading(false)
@@ -803,9 +797,20 @@ export default function AdminPage() {
                   View and edit all kitchen shift positions, times, and roles. Changes here affect the draft board.
                 </p>
               </div>
-              <Link href="/admin/shift-draft">
-                <Button>🎯 Go to Shift Draft</Button>
-              </Link>
+              <div className="flex gap-2 items-center">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showDeleted}
+                    onChange={(e) => setShowDeleted(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-gray-500">Show Deleted</span>
+                </label>
+                <Link href="/admin/shift-draft">
+                  <Button>🎯 Go to Shift Draft</Button>
+                </Link>
+              </div>
             </div>
 
             {/* Position Editor Modal */}
@@ -876,15 +881,60 @@ export default function AdminPage() {
             )}
 
             {/* Shift Categories Grid */}
-            {shiftCategories.map((cat, catIdx) => (
-              <Card key={catIdx}>
+            {(showDeleted ? rawCategories : shiftCategories).map((cat, displayIdx) => {
+              // Find the original index in rawCategories for override keys
+              const rawCatIdx = rawCategories.indexOf(cat) !== -1 ? rawCategories.indexOf(cat) : displayIdx
+              const catIsDeleted = isCategoryDeleted(shiftOverrides, `deli-${rawCatIdx}`)
+              
+              // Skip deleted categories when not showing deleted
+              if (catIsDeleted && !showDeleted) return null
+
+              return (
+              <Card key={rawCatIdx} className={catIsDeleted ? 'opacity-50 border-red-300 border-2' : ''}>
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-lg">{cat.name}</CardTitle>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{cat.name}</CardTitle>
+                      {catIsDeleted && <Badge variant="error">DELETED</Badge>}
+                    </div>
+                    <div className="flex gap-2 items-center">
                       {cat.time && <Badge variant="info">{cat.time}</Badge>}
                       {cat.note && <Badge variant="default">{cat.note}</Badge>}
                       <Badge variant="success">{cat.positions.length} positions</Badge>
+                      {catIsDeleted ? (
+                        <button
+                          className="text-xs text-green-600 hover:text-green-800 underline font-bold"
+                          onClick={async () => {
+                            const { restoreShiftCategoryAction } = await import('@/app/actions/admin')
+                            const result = await restoreShiftCategoryAction(`deli-${rawCatIdx}`)
+                            if (result.success) {
+                              setMessage({ type: 'success', text: `Restored category: ${cat.name}` })
+                              fetchData()
+                            } else {
+                              setMessage({ type: 'error', text: result.error || 'Restore failed' })
+                            }
+                          }}
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          className="text-xs text-red-600 hover:text-red-800 underline font-bold"
+                          onClick={async () => {
+                            if (!confirm(`Delete the entire "${cat.name}" section? This will remove all ${cat.positions.length} positions from the kitchen, draft, and schedule pages.`)) return
+                            const { deleteShiftCategoryAction } = await import('@/app/actions/admin')
+                            const result = await deleteShiftCategoryAction(`deli-${rawCatIdx}`)
+                            if (result.success) {
+                              setMessage({ type: 'success', text: `Deleted section: ${cat.name}` })
+                              fetchData()
+                            } else {
+                              setMessage({ type: 'error', text: result.error || 'Delete failed' })
+                            }
+                          }}
+                        >
+                          Delete Section
+                        </button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -898,45 +948,96 @@ export default function AdminPage() {
                           <th className="text-left p-2 font-bold uppercase tracking-wider text-xs">Time</th>
                           <th className="text-left p-2 font-bold uppercase tracking-wider text-xs hidden md:table-cell">Description</th>
                           <th className="text-left p-2 font-bold uppercase tracking-wider text-xs">Tags</th>
-                          <th className="text-left p-2 pr-4 font-bold uppercase tracking-wider text-xs">Edit</th>
+                          <th className="text-left p-2 pr-4 font-bold uppercase tracking-wider text-xs">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {cat.positions.map((pos, posIdx) => (
-                          <tr key={pos.id} className="border-b border-gray-100 hover:bg-yellow-50">
+                        {cat.positions.map((pos, posIdx) => {
+                          const posKey = `deli-${rawCatIdx}-${posIdx}`
+                          const posOverride = getPositionOverride(shiftOverrides, posKey)
+                          const posIsDeleted = posOverride?.deleted === true
+                          
+                          if (posIsDeleted && !showDeleted) return null
+
+                          return (
+                          <tr key={pos.id} className={cn(
+                            "border-b border-gray-100",
+                            posIsDeleted ? "bg-red-50 opacity-60" : "hover:bg-yellow-50"
+                          )}>
                             <td className="p-2 pl-4 text-gray-400 font-mono text-xs">{posIdx + 1}</td>
-                            <td className="p-2 font-medium">{pos.role}</td>
+                            <td className={cn("p-2 font-medium", posIsDeleted && "line-through")}>{pos.role}</td>
                             <td className="p-2 text-gray-600 text-xs whitespace-nowrap">{pos.time || cat.time || '—'}</td>
                             <td className="p-2 text-gray-500 text-xs hidden md:table-cell max-w-xs truncate">{pos.description || '—'}</td>
                             <td className="p-2">
                               <div className="flex gap-1">
                                 {pos.requiresExp && <Badge variant="warning" className="text-[10px] py-0 px-1">EXP</Badge>}
                                 {pos.countsDouble && <Badge variant="info" className="text-[10px] py-0 px-1">2×</Badge>}
+                                {posIsDeleted && <Badge variant="error" className="text-[10px] py-0 px-1">DELETED</Badge>}
                               </div>
                             </td>
                             <td className="p-2 pr-4">
-                              <button
-                                className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
-                                onClick={() => {
-                                  setEditingPosition({ pos, catIdx, posIdx })
-                                  setEditForm({
-                                    role: pos.role,
-                                    time: pos.time || '',
-                                    description: pos.description || '',
-                                  })
-                                }}
-                              >
-                                Edit
-                              </button>
+                              <div className="flex gap-2">
+                                {posIsDeleted ? (
+                                  <button
+                                    className="text-xs text-green-600 hover:text-green-800 underline font-medium"
+                                    onClick={async () => {
+                                      const { restoreShiftPositionAction } = await import('@/app/actions/admin')
+                                      const result = await restoreShiftPositionAction(posKey)
+                                      if (result.success) {
+                                        setMessage({ type: 'success', text: `Restored: ${pos.role}` })
+                                        fetchData()
+                                      } else {
+                                        setMessage({ type: 'error', text: result.error || 'Restore failed' })
+                                      }
+                                    }}
+                                  >
+                                    Restore
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                      onClick={() => {
+                                        setEditingPosition({ pos, catIdx: rawCatIdx, posIdx })
+                                        setEditForm({
+                                          role: pos.role,
+                                          time: pos.time || '',
+                                          description: pos.description || '',
+                                        })
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      className="text-xs text-red-600 hover:text-red-800 underline font-medium"
+                                      onClick={async () => {
+                                        if (!confirm(`Delete "${pos.role}" position? It will be removed from all shift pages.`)) return
+                                        const { deleteShiftPositionAction } = await import('@/app/actions/admin')
+                                        const result = await deleteShiftPositionAction(posKey)
+                                        if (result.success) {
+                                          setMessage({ type: 'success', text: `Deleted: ${pos.role}` })
+                                          fetchData()
+                                        } else {
+                                          setMessage({ type: 'error', text: result.error || 'Delete failed' })
+                                        }
+                                      }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              )
+            })}
 
             {/* Current DB Shifts */}
             <Card>

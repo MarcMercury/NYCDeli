@@ -207,6 +207,10 @@ export function CampMap() {
   const [actionLoading, setActionLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // AI spot recommendations
+  const [aiRecs, setAiRecs] = useState<Array<{ spot_id: string; label: string; reason: string }>>([])
+  const [aiRecsLoading, setAiRecsLoading] = useState(false)
+
   // 3D camera angles
   const [tiltX, setTiltX] = useState(50) // rotateX — 0 = top-down, 80 = nearly side-on
   const [rotateZ, setRotateZ] = useState(0) // bearing / compass rotation
@@ -492,8 +496,31 @@ export function CampMap() {
     }
   }
 
+  async function getAiSpotRecommendations() {
+    if (!camper || spots.length === 0) return
+    setAiRecsLoading(true)
+    setAiRecs([])
+    try {
+      const res = await fetch('/api/ai/spot-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camper, spots }),
+      })
+      const data = await res.json()
+      if (res.ok && data.recommendations) {
+        setAiRecs(data.recommendations)
+      } else {
+        setError(data.error || 'Failed to get recommendations')
+      }
+    } catch {
+      setError('Network error getting spot recommendations')
+    }
+    setAiRecsLoading(false)
+  }
+
   function handleResetView() {
     setScale(DEFAULT_SCALE)
+
     setTiltX(50)
     setRotateZ(0)
     if (config && containerRef.current) {
@@ -1407,6 +1434,61 @@ export function CampMap() {
               <p className="font-bold uppercase text-sm">Click any object on the map</p>
               <p className="text-xs mt-1">See details and reserve available tent spots</p>
             </div>
+          )}
+
+          {/* AI Spot Recommendations */}
+          {camper && !selectedObject && (
+            <Card className="border-2 border-purple-200 mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">🤖 AI Spot Finder</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {aiRecs.length > 0 ? (
+                  <>
+                    <p className="text-xs text-gray-500 mb-2">Top picks for your {camper.shelter_type} ({camper.shelter_width_ft}×{camper.shelter_length_ft}ft):</p>
+                    {aiRecs.map((rec, i) => (
+                      <button
+                        key={rec.spot_id}
+                        onClick={() => {
+                          const spot = spots.find(s => s.id === rec.spot_id)
+                          if (spot) {
+                            // Find the floorplan object linked to this spot
+                            const obj = objects.find(o => o.id === spot.floorplan_object_id) ||
+                              objects.find(o => {
+                                const dx = Math.abs((spot.x_position || 0) - o.x)
+                                const dy = Math.abs((spot.y_position || 0) - o.y)
+                                return dx < 5 && dy < 5
+                              })
+                            if (obj) {
+                              setSelectedObject({ object: obj, spot })
+                              setSidebarOpen(true)
+                            }
+                          }
+                        }}
+                        className="w-full text-left p-2 border border-purple-100 rounded hover:bg-purple-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-purple-700">#{i + 1}</span>
+                          <span className="font-bold text-sm">{rec.label}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">{rec.reason}</p>
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    {aiRecsLoading ? '⏳ Finding your perfect spot...' : 'Get AI-powered spot suggestions based on your setup.'}
+                  </p>
+                )}
+                <Button
+                  onClick={getAiSpotRecommendations}
+                  disabled={aiRecsLoading}
+                  className="w-full text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {aiRecsLoading ? '⏳ Analyzing...' : aiRecs.length > 0 ? '🔄 Refresh' : '✨ Find My Best Spots'}
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* Tips */}

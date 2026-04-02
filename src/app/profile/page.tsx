@@ -50,6 +50,13 @@ export default function ProfilePage() {
   const [confirmPwd, setConfirmPwd] = useState('')
   const [pwdSaving, setPwdSaving] = useState(false)
 
+  // AI bio state
+  const [bioGenerating, setBioGenerating] = useState(false)
+
+  // AI packing list state
+  const [packingList, setPackingList] = useState<string | null>(null)
+  const [packingLoading, setPackingLoading] = useState(false)
+
   // Schedule state
   const [allAssignments, setAllAssignments] = useState<EnrichedAssignment[]>([])
   const [myAssignments, setMyAssignments] = useState<EnrichedAssignment[]>([])
@@ -166,6 +173,50 @@ export default function ProfilePage() {
       setMessage({ type: 'success', text: 'Bio saved!' })
     }
     setSaving(false)
+  }
+
+  const generateAiBio = async () => {
+    if (!camper) return
+    setBioGenerating(true)
+    try {
+      const res = await fetch('/api/ai/generate-bio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camper }),
+      })
+      const data = await res.json()
+      if (res.ok && data.bio) {
+        setBio(data.bio)
+        setMessage({ type: 'success', text: 'AI bio generated! Edit it and hit Save.' })
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to generate bio' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error generating bio' })
+    }
+    setBioGenerating(false)
+  }
+
+  const generatePackingList = async () => {
+    if (!camper) return
+    setPackingLoading(true)
+    setPackingList(null)
+    try {
+      const res = await fetch('/api/ai/packing-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camper }),
+      })
+      const data = await res.json()
+      if (res.ok && data.packingList) {
+        setPackingList(data.packingList)
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to generate packing list' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Network error generating packing list' })
+    }
+    setPackingLoading(false)
   }
 
   const handleChangePassword = async () => {
@@ -396,10 +447,20 @@ export default function ProfilePage() {
             />
             <p className="text-xs text-gray-400 mt-1">{bio.length}/500</p>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex gap-2">
             <Button onClick={saveBio} disabled={saving}>
               {saving ? 'Saving...' : 'Save Bio'}
             </Button>
+            {camper && (
+              <Button
+                onClick={generateAiBio}
+                disabled={bioGenerating}
+                variant="secondary"
+                className="bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300"
+              >
+                {bioGenerating ? '⏳ Writing...' : '✨ AI Write My Bio'}
+              </Button>
+            )}
           </CardFooter>
         </Card>
 
@@ -496,6 +557,38 @@ export default function ProfilePage() {
             </Button>
           </CardFooter>
         </Card>
+
+        {/* AI Packing List */}
+        {camper && (
+          <Card className="mb-6 border-2 border-purple-200">
+            <CardHeader>
+              <CardTitle>🎒 AI Packing List</CardTitle>
+              <CardDescription>
+                Get a personalized packing list based on your shelter type, skills, and camp duties.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {packingList ? (
+                <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{ __html: packingList.replace(/^### (.*$)/gm, '<h3 class="font-bold text-base mt-4 mb-2">$1</h3>').replace(/^## (.*$)/gm, '<h2 class="font-bold text-lg mt-4 mb-2">$1</h2>').replace(/^- (.*$)/gm, '<div class="flex items-start gap-2 ml-2"><span>•</span><span>$1</span></div>') }}
+                />
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  {packingLoading ? '⏳ Generating your personalized list...' : 'Click below to generate a packing list tailored to your burn setup.'}
+                </p>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button
+                onClick={generatePackingList}
+                disabled={packingLoading}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {packingLoading ? '⏳ Generating...' : packingList ? '🔄 Regenerate' : '✨ Generate My Packing List'}
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
       </TabPanel>
 
       {/* ───── TAB 2: Camper Details (private — owner + admins only) ───── */}

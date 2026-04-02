@@ -825,6 +825,10 @@ export interface FloorplanObjectProperties {
   // 3D appearance
   elevation_ft?: number
   roof_shape?: RoofShape
+  // Meshy 3D model
+  meshy_task_id?: string
+  meshy_model_url?: string
+  meshy_thumbnail_url?: string
   // BRC compliance properties
   fuel_type?: 'liquid' | 'propane'
   pc_number?: string

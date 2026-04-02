@@ -194,6 +194,88 @@ export async function getShiftPositionOverridesAction(): Promise<AdminActionResu
   }
 }
 
+/** Helper to load and save shift overrides JSON */
+async function loadShiftOverrides(): Promise<{ overrides: Record<string, unknown>; exists: boolean }> {
+  const supabase = await createClient()
+  const { data: existing } = await supabase
+    .from('system_settings')
+    .select('*')
+    .eq('key', 'shift_position_overrides')
+    .single()
+
+  let overrides: Record<string, unknown> = {}
+  if (existing) {
+    try { overrides = JSON.parse((existing as { value: string }).value) } catch { /* fresh */ }
+  }
+  return { overrides, exists: !!existing }
+}
+
+async function saveShiftOverrides(overrides: Record<string, unknown>, exists: boolean): Promise<AdminActionResult> {
+  const supabase = await createClient()
+  const settingKey = 'shift_position_overrides'
+
+  if (exists) {
+    const { error } = await supabase
+      .from('system_settings')
+      .update({ value: JSON.stringify(overrides), updated_at: new Date().toISOString() } as never)
+      .eq('key', settingKey)
+    if (error) return { success: false, error: error.message }
+  } else {
+    const { error } = await supabase
+      .from('system_settings')
+      .insert({ key: settingKey, value: JSON.stringify(overrides) } as never)
+    if (error) return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+/** Delete (soft) a single shift position by marking it deleted in overrides */
+export async function deleteShiftPositionAction(
+  positionKey: string
+): Promise<AdminActionResult> {
+  await requireAdmin()
+  const { overrides, exists } = await loadShiftOverrides()
+  overrides[positionKey] = { ...(overrides[positionKey] as Record<string, unknown> || {}), deleted: true }
+  return saveShiftOverrides(overrides, exists)
+}
+
+/** Restore a previously deleted shift position */
+export async function restoreShiftPositionAction(
+  positionKey: string
+): Promise<AdminActionResult> {
+  await requireAdmin()
+  const { overrides, exists } = await loadShiftOverrides()
+  const posOverride = overrides[positionKey] as Record<string, unknown> | undefined
+  if (posOverride) {
+    delete posOverride.deleted
+    // If no other overrides remain, remove the key entirely
+    if (Object.keys(posOverride).length === 0) {
+      delete overrides[positionKey]
+    }
+  }
+  return saveShiftOverrides(overrides, exists)
+}
+
+/** Delete (soft) an entire shift category */
+export async function deleteShiftCategoryAction(
+  categoryKey: string
+): Promise<AdminActionResult> {
+  await requireAdmin()
+  const { overrides, exists } = await loadShiftOverrides()
+  overrides[`_cat_deleted:${categoryKey}`] = true
+  return saveShiftOverrides(overrides, exists)
+}
+
+/** Restore a previously deleted shift category */
+export async function restoreShiftCategoryAction(
+  categoryKey: string
+): Promise<AdminActionResult> {
+  await requireAdmin()
+  const { overrides, exists } = await loadShiftOverrides()
+  delete overrides[`_cat_deleted:${categoryKey}`]
+  return saveShiftOverrides(overrides, exists)
+}
+
 export async function adminResetPasswordAction(
   userId: string,
   newPassword: string
