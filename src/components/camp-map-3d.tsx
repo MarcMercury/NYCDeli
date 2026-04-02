@@ -170,6 +170,7 @@ function MapObject3D({
   originZ,
   isSelected,
   isHovered,
+  showLabels,
   onSelect,
   onHover,
   spots,
@@ -181,6 +182,7 @@ function MapObject3D({
   originZ: number
   isSelected: boolean
   isHovered: boolean
+  showLabels: boolean
   onSelect: (obj: FloorplanObjectRow) => void
   onHover: (id: string | null) => void
   spots: CampSpotWithReservation[]
@@ -270,26 +272,28 @@ function MapObject3D({
       </Suspense>
 
       {/* Floating label */}
-      <Html
-        position={[0, heightM + 0.5, 0]}
-        center
-        distanceFactor={15}
-        style={{
-          background: isSelected ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.75)',
-          color: 'white',
-          padding: '2px 6px',
-          fontSize: '10px',
-          fontWeight: 'bold',
-          borderRadius: '3px',
-          pointerEvents: 'none',
-          whiteSpace: 'nowrap',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}
-      >
-        {obj.label || obj.object_type.replace(/_/g, ' ')}
-        {spot?.reservation?.camper_id === camper?.id && ' ⭐'}
-      </Html>
+      {showLabels && (
+        <Html
+          position={[0, heightM + 0.5, 0]}
+          center
+          distanceFactor={15}
+          style={{
+            background: isSelected ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.75)',
+            color: 'white',
+            padding: '2px 6px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            borderRadius: '3px',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}
+        >
+          {obj.label || obj.object_type.replace(/_/g, ' ')}
+          {spot?.reservation?.camper_id === camper?.id && ' ⭐'}
+        </Html>
+      )}
     </group>
   )
 }
@@ -340,6 +344,7 @@ export interface CampMap3DProps {
   camper: CamperRow | null
   selectedObjectId: string | null
   hoveredObjectId: string | null
+  showLabels?: boolean
   onSelectObject: (obj: FloorplanObjectRow) => void
   onHoverObject: (id: string | null) => void
   onGenerate3DModel: (obj: FloorplanObjectRow) => void
@@ -352,6 +357,7 @@ export function CampMap3D({
   camper,
   selectedObjectId,
   hoveredObjectId,
+  showLabels = true,
   onSelectObject,
   onHoverObject,
 }: CampMap3DProps) {
@@ -450,6 +456,7 @@ export function CampMap3D({
             originZ={originZ}
             isSelected={selectedObjectId === obj.id}
             isHovered={hoveredObjectId === obj.id}
+            showLabels={showLabels}
             onSelect={onSelectObject}
             onHover={onHoverObject}
             spots={spots}

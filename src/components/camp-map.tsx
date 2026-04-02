@@ -821,6 +821,7 @@ export function CampMap() {
                 camper={camper}
                 selectedObjectId={selectedObject?.object?.id || null}
                 hoveredObjectId={hoveredObjectId}
+                showLabels={showLabels}
                 onSelectObject={(obj) => {
                   if (!obj) { setSelectedObject(null); return }
                   setSidebarOpen(true)
