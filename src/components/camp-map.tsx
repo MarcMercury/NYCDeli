@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Alert, Input } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow, RoofShape } from '@/types/database'
@@ -8,6 +8,9 @@ import { fetchActiveFloorplan, fetchFloorplanObjects } from '@/lib/floorplan'
 import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFitSpot } from '@/lib/camp-spots'
 import { createClient } from '@/lib/supabase/client'
 import { getTemplateForType } from '@/components/floorplan/object-templates'
+
+// Lazy-load the heavy Three.js 3D component
+const CampMap3D = lazy(() => import('@/components/camp-map-3d').then(m => ({ default: m.CampMap3D })))
 
 // ─── 3D View Helpers ───────────────────────────────────────────
 // This scale converts feet of elevation to pixels of visual height
@@ -229,7 +232,11 @@ export function CampMap() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 3D view mode
-  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
+  const [viewMode, setViewMode] = useState<'2d' | '3d' | '3d-webgl'>('2d')
+
+  // 3D model generation state
+  const [generating3D, setGenerating3D] = useState<string | null>(null) // object ID being generated
+  const [modelGenProgress, setModelGenProgress] = useState<string | null>(null)
 
   // Load all data
   const loadData = useCallback(async () => {
@@ -536,6 +543,87 @@ export function CampMap() {
     }
   }
 
+  // ─── 3D Model Generation (OpenAI + Meshy) ────────────────────
+  async function handleGenerate3DModel(obj: FloorplanObjectRow) {
+    setGenerating3D(obj.id)
+    setModelGenProgress('Generating 3D description with AI...')
+    setError(null)
+
+    try {
+      // Step 1: Call our API route which uses OpenAI to create prompt + Meshy to start generation
+      const startRes = await fetch('/api/generate-3d-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          object_type: obj.object_type,
+          label: obj.label,
+          width_ft: obj.width_ft,
+          height_ft: obj.height_ft,
+          color: obj.color,
+          properties: obj.properties,
+        }),
+      })
+
+      if (!startRes.ok) {
+        const err = await startRes.json()
+        throw new Error(err.error || 'Failed to start 3D generation')
+      }
+
+      const { task_id, prompt_used } = await startRes.json()
+      setModelGenProgress(`3D model generating... (AI prompt: "${prompt_used.slice(0, 80)}...")`)
+
+      // Step 2: Poll for completion
+      let attempts = 0
+      const maxAttempts = 60 // ~5 minutes at 5s intervals
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 5000))
+        attempts++
+
+        const statusRes = await fetch(`/api/check-3d-model?task_id=${encodeURIComponent(task_id)}`)
+        if (!statusRes.ok) continue
+
+        const status = await statusRes.json()
+        setModelGenProgress(`3D model: ${status.status} (${status.progress}%)`)
+
+        if (status.status === 'SUCCEEDED') {
+          // Save the model URL to the floorplan object properties
+          const supabase = createClient()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
+            .from('floorplan_objects')
+            .update({
+              properties: {
+                ...obj.properties,
+                meshy_task_id: task_id,
+                meshy_model_url: status.model_urls?.glb,
+                meshy_thumbnail_url: status.thumbnail_url,
+              },
+            })
+            .eq('id', obj.id)
+
+          setSuccess(`3D model generated for ${obj.label}! 🎉`)
+          setModelGenProgress(null)
+          await loadData() // Refresh to pick up new model URL
+          break
+        }
+
+        if (status.status === 'FAILED') {
+          throw new Error(status.error || '3D generation failed')
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        setModelGenProgress(null)
+        setError('3D generation timed out. The model may still be processing — try refreshing later.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate 3D model')
+      setModelGenProgress(null)
+    } finally {
+      setGenerating3D(null)
+    }
+  }
+
   // Compute wall offset direction based on rotation for 2.5D extrusion
   const rotRad = (rotateZ * Math.PI) / 180
   const wallDirX = -Math.cos(rotRad + Math.PI / 4) * 0.7  // ~upper-left by default
@@ -696,11 +784,71 @@ export function CampMap() {
           >
             {viewMode === '2d' ? '🏔️ 3D View' : '📋 2D View'}
           </button>
+
+          {/* Full 3D WebGL View */}
+          <button
+            onClick={() => setViewMode(prev => prev === '3d-webgl' ? '2d' : '3d-webgl')}
+            className={cn(
+              'px-3 py-1 text-xs font-black uppercase tracking-wider transition-colors',
+              viewMode === '3d-webgl'
+                ? 'bg-purple-500 text-white hover:bg-purple-400'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            )}
+            title="Switch to full 3D WebGL view with Meshy AI models"
+          >
+            {viewMode === '3d-webgl' ? '🎮 Exit 3D' : '🎮 3D Engine'}
+          </button>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row relative" style={{ height: 'calc(100vh - 120px)' }}>
-        {/* Map Canvas */}
+        {/* 3D WebGL View */}
+        {viewMode === '3d-webgl' && config && (
+          <div className="flex-1 relative" style={{ height: '100%' }}>
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full bg-gradient-to-b from-sky-300 to-amber-200">
+                <div className="text-center">
+                  <div className="animate-spin text-5xl mb-4">🎮</div>
+                  <p className="font-black uppercase tracking-wider text-lg">Loading 3D Engine...</p>
+                  <p className="text-sm text-gray-600">Preparing WebGL renderer</p>
+                </div>
+              </div>
+            }>
+              <CampMap3D
+                config={config}
+                objects={objects}
+                spots={spots}
+                camper={camper}
+                selectedObjectId={selectedObject?.object?.id || null}
+                hoveredObjectId={hoveredObjectId}
+                onSelectObject={(obj) => {
+                  if (!obj) { setSelectedObject(null); return }
+                  setSidebarOpen(true)
+                  const spot = obj.properties?.reservable ? findSpotForObject(obj) : null
+                  setSelectedObject({ object: obj, spot })
+                }}
+                onHoverObject={setHoveredObjectId}
+                onGenerate3DModel={handleGenerate3DModel}
+              />
+            </Suspense>
+
+            {/* 3D model generation progress overlay */}
+            {modelGenProgress && (
+              <div className="absolute bottom-4 left-4 right-4 z-50">
+                <div className="bg-black/80 text-white px-4 py-3 rounded-lg flex items-center gap-3">
+                  <div className="animate-spin text-xl">🎨</div>
+                  <div>
+                    <p className="font-bold text-sm">Generating 3D Model</p>
+                    <p className="text-xs text-gray-300">{modelGenProgress}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Original 2D/CSS-3D Map Canvas */}
+        {viewMode !== '3d-webgl' && (
         <div
           ref={containerRef}
           className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing relative"
