@@ -328,26 +328,32 @@ export function CampMap() {
   }
 
   // Scroll wheel zoom (zoom towards cursor position)
-  function handleWheel(e: React.WheelEvent) {
-    e.preventDefault()
+  // Attached as native event with { passive: false } so preventDefault actually stops page scroll
+  useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
-    const rect = container.getBoundingClientRect()
-    const cursorX = e.clientX - rect.left
-    const cursorY = e.clientY - rect.top
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault()
+      const rect = container!.getBoundingClientRect()
+      const cursorX = e.clientX - rect.left
+      const cursorY = e.clientY - rect.top
 
-    const zoomFactor = e.deltaY < 0 ? 1.12 : 1 / 1.12
-    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * zoomFactor))
-    const scaleRatio = newScale / scale
+      const zoomFactor = e.deltaY < 0 ? 1.12 : 1 / 1.12
+      setScale(prev => {
+        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev * zoomFactor))
+        const scaleRatio = newScale / prev
+        setPanOffset(po => ({
+          x: cursorX - (cursorX - po.x) * scaleRatio,
+          y: cursorY - (cursorY - po.y) * scaleRatio,
+        }))
+        return newScale
+      })
+    }
 
-    // Adjust pan so the point under the cursor stays fixed
-    setPanOffset(prev => ({
-      x: cursorX - (cursorX - prev.x) * scaleRatio,
-      y: cursorY - (cursorY - prev.y) * scaleRatio,
-    }))
-    setScale(newScale)
-  }
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheel)
+  }, []) // stable — MIN_SCALE / MAX_SCALE are constants
 
   // Center map in viewport on initial load
   useEffect(() => {
@@ -858,7 +864,6 @@ export function CampMap() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          onWheel={handleWheel}
         >
           {/* Alerts overlaid on map */}
           <div className="absolute top-2 left-2 right-2 z-50 space-y-2 pointer-events-none">
