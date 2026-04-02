@@ -134,12 +134,63 @@ function ProceduralObject({
         </mesh>
       )}
 
-      {roofShape === 'a_frame' && (
-        <mesh castShadow position={[0, heightM, 0]} rotation={[0, 0, 0]}>
-          <boxGeometry args={[widthM * 1.05, Math.min(widthM, depthM) * 0.3, depthM * 1.05]} />
-          <meshStandardMaterial color={darkerColor} roughness={0.7} />
-        </mesh>
-      )}
+      {roofShape === 'a_frame' && (() => {
+        const isWide = widthM >= depthM
+        const ridgeHeight = Math.min(widthM, depthM) * 0.4
+        const hw = (widthM * 1.05) / 2
+        const hd = (depthM * 1.05) / 2
+
+        // Build a triangular prism: ridge runs along the longer axis
+        const verts = isWide
+          ? new Float32Array([
+              // Left triangle
+              -hw, 0, -hd,  -hw, 0, hd,  -hw, ridgeHeight, 0,
+              // Right triangle
+              hw, 0, -hd,  hw, 0, hd,  hw, ridgeHeight, 0,
+              // Front slope
+              -hw, 0, -hd,  hw, 0, -hd,  hw, ridgeHeight, 0,  -hw, ridgeHeight, 0,
+              // Back slope
+              -hw, 0, hd,  hw, 0, hd,  hw, ridgeHeight, 0,  -hw, ridgeHeight, 0,
+              // Bottom
+              -hw, 0, -hd,  hw, 0, -hd,  hw, 0, hd,  -hw, 0, hd,
+            ])
+          : new Float32Array([
+              // Front triangle
+              -hw, 0, -hd,  hw, 0, -hd,  0, ridgeHeight, -hd,
+              // Back triangle
+              -hw, 0, hd,  hw, 0, hd,  0, ridgeHeight, hd,
+              // Left slope
+              -hw, 0, -hd,  -hw, 0, hd,  0, ridgeHeight, hd,  0, ridgeHeight, -hd,
+              // Right slope
+              hw, 0, -hd,  hw, 0, hd,  0, ridgeHeight, hd,  0, ridgeHeight, -hd,
+              // Bottom
+              -hw, 0, -hd,  hw, 0, -hd,  hw, 0, hd,  -hw, 0, hd,
+            ])
+
+        const indices = new Uint16Array([
+          // Left/Front triangle
+          0, 1, 2,
+          // Right/Back triangle
+          3, 5, 4,
+          // Front/Left slope (2 tris)
+          6, 7, 8,  6, 8, 9,
+          // Back/Right slope (2 tris)
+          10, 12, 11,  10, 13, 12,
+          // Bottom (2 tris)
+          14, 15, 16,  14, 16, 17,
+        ])
+
+        const geo = new THREE.BufferGeometry()
+        geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
+        geo.setIndex(new THREE.BufferAttribute(indices, 1))
+        geo.computeVertexNormals()
+
+        return (
+          <mesh castShadow geometry={geo} position={[0, heightM, 0]}>
+            <meshStandardMaterial color={darkerColor} roughness={0.7} side={THREE.DoubleSide} />
+          </mesh>
+        )
+      })()}
 
       {roofShape === 'dome' && (
         <mesh castShadow position={[0, heightM, 0]}>

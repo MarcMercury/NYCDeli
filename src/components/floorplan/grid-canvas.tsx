@@ -420,10 +420,9 @@ export function GridCanvas({
               backgroundColor: isShade ? `${obj.color}25` : isInfra ? `${obj.color}55` : `${obj.color}cc`,
               borderColor: obj.color,
               transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
-              zIndex: isSelected ? 50 : isShadeBackground ? -1 : obj.z_index,
-              pointerEvents: isShadeBackground ? 'none' : undefined,
+              zIndex: isSelected ? 50 : isShadeBackground ? 0 : obj.z_index,
             }}
-            onPointerDown={e => handleObjectPointerDown(e, obj)}
+            onPointerDown={e => !isShadeBackground && handleObjectPointerDown(e, obj)}
           >
             {/* Distance marker rendering */}
             {isDistanceMarker && (
@@ -473,14 +472,17 @@ export function GridCanvas({
               </div>
             )}
 
-            {/* Shade structure corner poles */}
+            {/* Shade structure corner poles — clickable to select the shade */}
             {obj.object_type === 'shade_structure' && (
               <>
-                {/* Round poles at each corner */}
-                <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                {[['top-0 left-0', '-top-1 -left-1'], ['top-0 right-0', '-top-1 -right-1'], ['bottom-0 left-0', '-bottom-1 -left-1'], ['bottom-0 right-0', '-bottom-1 -right-1']].map(([pos, offset], i) => (
+                  <div
+                    key={i}
+                    className={cn('absolute bg-gray-700 border-2 border-gray-900 rounded-full cursor-move z-10', pos)}
+                    style={{ width: Math.max(1.5 * scale, 8), height: Math.max(1.5 * scale, 8), pointerEvents: 'auto' }}
+                    onPointerDown={e => handleObjectPointerDown(e, obj)}
+                  />
+                ))}
               </>
             )}
 
