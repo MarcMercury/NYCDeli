@@ -782,7 +782,7 @@ export function CampMap() {
             )}
             title={viewMode === '2d' ? 'Switch to 3D Birds Eye View' : 'Switch to 2D Top-Down View'}
           >
-            {viewMode === '2d' ? '🏔️ 3D View' : '📋 2D View'}
+            {viewMode === '2d' ? '🏔️ Birdseye View' : '📋 2D View'}
           </button>
 
           {/* Full 3D WebGL View */}
@@ -796,7 +796,7 @@ export function CampMap() {
             )}
             title="Switch to full 3D WebGL view with Meshy AI models"
           >
-            {viewMode === '3d-webgl' ? '🎮 Exit 3D' : '🎮 3D Engine'}
+            {viewMode === '3d-webgl' ? '🎮 Exit 3D' : '🎮 3D View'}
           </button>
         </div>
       </div>
@@ -809,7 +809,7 @@ export function CampMap() {
               <div className="flex items-center justify-center h-full bg-gradient-to-b from-sky-300 to-amber-200">
                 <div className="text-center">
                   <div className="animate-spin text-5xl mb-4">🎮</div>
-                  <p className="font-black uppercase tracking-wider text-lg">Loading 3D Engine...</p>
+                  <p className="font-black uppercase tracking-wider text-lg">Loading 3D View...</p>
                   <p className="text-sm text-gray-600">Preparing WebGL renderer</p>
                 </div>
               </div>
@@ -962,16 +962,25 @@ export function CampMap() {
                 const showBottomWall = offsetY < -2
                 const showTopWall = offsetY > 2
 
+                const isShade = obj.object_type === 'shade_structure'
+                // In 2D mode, shades are background items so items underneath are selectable
+                const isShadeBackground = isShade && !is3d && !isSelected
+
                 return (
                   <div
                     key={obj.id}
-                    className="absolute select-none cursor-pointer"
+                    className={cn(
+                      'absolute select-none',
+                      isShadeBackground ? 'pointer-events-none' : 'cursor-pointer'
+                    )}
                     style={{
                       left: obj.x * scale - extraLeft,
                       top: obj.y * scale - extraTop,
                       width: objWidthPx + extraLeft + extraRight,
                       height: objHeightPx + extraTop + extraBottom,
-                      zIndex: isSelected ? 200 : isHovered ? 150 : (is3d ? obj.z_index + Math.round(elevationFt) : obj.z_index),
+                      zIndex: isShadeBackground
+                        ? -1
+                        : isSelected ? 200 : isHovered ? 150 : (is3d ? obj.z_index + Math.round(elevationFt) : obj.z_index),
                       transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
                     }}
                     onClick={(e) => {
@@ -1121,20 +1130,23 @@ export function CampMap() {
                         top: extraTop + offsetY,
                         width: objWidthPx,
                         height: objHeightPx,
-                        backgroundColor: `${obj.color}${is3d ? 'ee' : (isHovered ? 'ee' : 'bb')}`,
+                        backgroundColor: isShadeBackground
+                          ? `${obj.color}30`
+                          : `${obj.color}${is3d ? 'ee' : (isHovered ? 'ee' : 'bb')}`,
                         borderColor: is3d ? darkenHex(obj.color, 0.15) : obj.color,
+                        borderStyle: isShadeBackground ? 'dashed' : 'solid',
                         ...(is3d ? {
                           boxShadow: `1px 1px 0 ${darkenHex(obj.color, 0.3)}, 2px 2px 0 ${darkenHex(obj.color, 0.2)}`,
                         } : {}),
                       }}
                     >
-                      {/* Shade structure corner posts */}
+                      {/* Shade structure corner posts + open interior */}
                       {obj.object_type === 'shade_structure' && (
                         <>
-                          <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                          <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                          <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
-                          <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 pointer-events-none" style={{ width: 1 * scale, height: 1 * scale }} />
+                          <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                          <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                          <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                          <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
                         </>
                       )}
 

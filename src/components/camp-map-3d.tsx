@@ -76,6 +76,48 @@ function ProceduralObject({
     )
   }
 
+  // Shade structures: open canopy with 4 corner poles (no solid box body)
+  if (obj.object_type === 'shade_structure') {
+    const postRadius = 0.04
+    return (
+      <group>
+        {/* 4 corner poles */}
+        {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+          <mesh key={i} castShadow position={[sx * widthM * 0.47, heightM / 2, sz * depthM * 0.47]}>
+            <cylinderGeometry args={[postRadius, postRadius, heightM, 8]} />
+            <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
+          </mesh>
+        ))}
+        {/* Thin translucent canopy on top */}
+        <mesh castShadow receiveShadow position={[0, heightM, 0]}>
+          <boxGeometry args={[widthM, 0.05, depthM]} />
+          <meshStandardMaterial color={threeColor} roughness={0.6} metalness={0.0} transparent opacity={0.45} />
+        </mesh>
+        {/* Top edge beams connecting poles */}
+        {/* Front beam */}
+        <mesh position={[0, heightM, -depthM * 0.47]}>
+          <boxGeometry args={[widthM * 0.94, 0.04, 0.04]} />
+          <meshStandardMaterial color="#555555" metalness={0.8} roughness={0.3} />
+        </mesh>
+        {/* Back beam */}
+        <mesh position={[0, heightM, depthM * 0.47]}>
+          <boxGeometry args={[widthM * 0.94, 0.04, 0.04]} />
+          <meshStandardMaterial color="#555555" metalness={0.8} roughness={0.3} />
+        </mesh>
+        {/* Left beam */}
+        <mesh position={[-widthM * 0.47, heightM, 0]}>
+          <boxGeometry args={[0.04, 0.04, depthM * 0.94]} />
+          <meshStandardMaterial color="#555555" metalness={0.8} roughness={0.3} />
+        </mesh>
+        {/* Right beam */}
+        <mesh position={[widthM * 0.47, heightM, 0]}>
+          <boxGeometry args={[0.04, 0.04, depthM * 0.94]} />
+          <meshStandardMaterial color="#555555" metalness={0.8} roughness={0.3} />
+        </mesh>
+      </group>
+    )
+  }
+
   return (
     <group>
       {/* Main body */}
@@ -104,18 +146,6 @@ function ProceduralObject({
           <sphereGeometry args={[Math.max(widthM, depthM) * 0.5, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial color={lighterColor} roughness={0.5} metalness={0.1} />
         </mesh>
-      )}
-
-      {/* Shade structure posts */}
-      {obj.object_type === 'shade_structure' && (
-        <>
-          {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-            <mesh key={i} castShadow position={[sx * widthM * 0.45, heightM / 2, sz * depthM * 0.45]}>
-              <cylinderGeometry args={[0.05, 0.05, heightM, 8]} />
-              <meshStandardMaterial color="#444444" metalness={0.8} roughness={0.3} />
-            </mesh>
-          ))}
-        </>
       )}
 
       {/* Fire pit glow */}

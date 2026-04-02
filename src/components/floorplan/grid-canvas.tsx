@@ -396,16 +396,18 @@ export function GridCanvas({
         const isInfra = INFRASTRUCTURE_TYPES.has(obj.object_type)
         const isDashed = DASHED_BORDER_TYPES.has(obj.object_type)
         const isDistanceMarker = obj.object_type === 'distance_marker'
+        const isShade = obj.object_type === 'shade_structure'
+        const isShadeBackground = isShade && !isSelected
 
         return (
           <div
             key={obj.id}
             className={cn(
               'absolute transition-shadow select-none group',
-              isDashed ? 'border-2 border-dashed' : 'border-2',
+              isDashed || isShade ? 'border-2 border-dashed' : 'border-2',
               isSelected
                 ? 'ring-2 ring-yellow-400 ring-offset-1 z-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
-                : 'hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.5)]',
+                : !isShadeBackground && 'hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.5)]',
               obj.is_locked ? 'cursor-not-allowed opacity-75' : 'cursor-move',
               isDragging && 'opacity-80 z-50',
               isResizing && 'z-50'
@@ -415,10 +417,11 @@ export function GridCanvas({
               top: obj.y * scale,
               width: obj.width_ft * scale,
               height: obj.height_ft * scale,
-              backgroundColor: isInfra ? `${obj.color}55` : `${obj.color}cc`,
+              backgroundColor: isShade ? `${obj.color}25` : isInfra ? `${obj.color}55` : `${obj.color}cc`,
               borderColor: obj.color,
               transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
-              zIndex: isSelected ? 50 : obj.z_index,
+              zIndex: isSelected ? 50 : isShadeBackground ? -1 : obj.z_index,
+              pointerEvents: isShadeBackground ? 'none' : undefined,
             }}
             onPointerDown={e => handleObjectPointerDown(e, obj)}
           >
@@ -470,14 +473,14 @@ export function GridCanvas({
               </div>
             )}
 
-            {/* Shade structure corner posts */}
+            {/* Shade structure corner poles */}
             {obj.object_type === 'shade_structure' && (
               <>
-                {/* 1ft x 1ft posts at each corner */}
-                <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900" style={{ width: 1 * scale, height: 1 * scale }} />
-                <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900" style={{ width: 1 * scale, height: 1 * scale }} />
-                <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900" style={{ width: 1 * scale, height: 1 * scale }} />
-                <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900" style={{ width: 1 * scale, height: 1 * scale }} />
+                {/* Round poles at each corner */}
+                <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
+                <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
               </>
             )}
 
