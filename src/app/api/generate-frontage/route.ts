@@ -162,6 +162,7 @@ function buildPrompt(data: FrontageRequest): string {
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
+  const projectId = process.env.OPENAI_PROJECT_ID
   if (!apiKey) {
     return Response.json(
       { error: 'OPENAI_API_KEY is not configured. Add it to your .env.local file.' },
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
   const prompt = buildPrompt(body)
 
   try {
-    const openai = new OpenAI({ apiKey })
+    const openai = new OpenAI({ apiKey, project: projectId })
 
     const response = await openai.images.generate({
       model: 'dall-e-3',
