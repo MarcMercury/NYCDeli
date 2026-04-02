@@ -1190,6 +1190,7 @@ export function CampMap() {
             </div>
           </div>
         </div>
+        )} {/* End viewMode !== '3d-webgl' */}
 
         {/* === Compass + Zoom Controls (Google Maps style) === */}
         <div
