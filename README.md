@@ -137,9 +137,9 @@ Or use Vercel nameservers for automatic DNS.
 | Date | Event |
 |------|-------|
 | Aug 1, 2026 | Registration Deadline |
-| Aug 23, 2026 | Build Week Starts |
+| Aug 24, 2026 | Build Week Starts |
 | Aug 30, 2026 | Burn Starts |
-| Sep 7, 2026 | Exodus |
+| Sep 7, 2026 | Exodus Monday |
 
 ## System Lifecycle
 

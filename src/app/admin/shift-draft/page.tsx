@@ -27,7 +27,6 @@ import {
   fetchDraftOrder,
   fetchDraftPicks,
   getAllDraftShiftCategories,
-  getAllDraftPositions,
   applyDraftOverrides,
   type DraftShiftCategory,
   type ShiftOverrides,
@@ -877,7 +876,7 @@ export default function AdminShiftDraftPage() {
                 {/* Available Shifts Preview */}
                 <Card className="border-2 border-black">
                   <CardHeader>
-                    <CardTitle>Available Shift Positions ({getAllDraftPositions().length} total)</CardTitle>
+                    <CardTitle>Available Shift Positions ({categories.flatMap(c => c.positions).length} total)</CardTitle>
                     <CardDescription>These shifts will be available for picking during the draft</CardDescription>
                   </CardHeader>
                   <CardContent>

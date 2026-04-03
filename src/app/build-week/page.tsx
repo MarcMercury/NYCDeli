@@ -564,7 +564,7 @@ export default function BuildWeekPage() {
         {/* ── Header ── */}
         <div>
           <h1 className="text-2xl font-black uppercase tracking-wider">Build Week</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Aug 23 – 28, 2026</p>
+          <p className="text-xs text-gray-500 mt-0.5">Aug 24 – 29, 2026</p>
         </div>
 
         {/* ── Progress summary — one glanceable strip ── */}

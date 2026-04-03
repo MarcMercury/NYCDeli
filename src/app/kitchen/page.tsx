@@ -16,8 +16,10 @@ import {
   fetchDraftPicks,
   makePick,
   getAllDraftShiftCategories,
+  applyDraftOverrides,
   applyShiftCategoryOverrides,
   type DraftShiftPosition,
+  type ShiftOverrides,
 } from '@/lib/shift-draft'
 
 type Tab = { id: string; label: string; icon?: React.ReactNode }
@@ -156,7 +158,7 @@ const deliShiftCategories: ShiftCategory[] = [
 
 const specialShiftCategories: ShiftCategory[] = [
   {
-    name: 'Friday 8/29 Deep Playa Food Service',
+    name: 'Friday 9/4 Deep Playa Food Service',
     note: 'Soup for 1,000 \u2013 Supporting food service in Deep Playa',
     positions: [
       { role: 'Kitchen Lead', description: 'Leads kitchen operations for the deep playa soup service', time: '3PM\u20136:30PM' },
@@ -175,7 +177,7 @@ const specialShiftCategories: ShiftCategory[] = [
 const strikeCategories: ShiftCategory[] = [
   {
     name: 'Strike Deco + Public Chill Tent',
-    note: 'Sunday 8/31',
+    note: 'Sunday 9/6',
     positions: [
       { role: 'Striker \u2013 Deco + Chill Tent', description: 'Tears down decorations and disassembles the public chill tent', time: '8:30AM\u201311AM' },
       { role: 'Striker \u2013 Deco + Chill Tent', description: 'Tears down decorations and disassembles the public chill tent', time: '8:30AM\u201311AM' },
@@ -185,7 +187,7 @@ const strikeCategories: ShiftCategory[] = [
   },
   {
     name: 'Strike Service Kitchen',
-    note: 'Sunday 8/31',
+    note: 'Sunday 9/6',
     positions: [
       { role: 'Striker \u2013 Service Kitchen', description: 'Breaks down the service kitchen \u2014 packs equipment, cleans, and loads out', time: '8:30AM\u201311AM' },
       { role: 'Striker \u2013 Service Kitchen', description: 'Breaks down the service kitchen \u2014 packs equipment, cleans, and loads out', time: '8:30AM\u201311AM' },
@@ -194,7 +196,7 @@ const strikeCategories: ShiftCategory[] = [
   },
   {
     name: 'Strike Plumbing + Shower Container',
-    note: 'Sunday 8/31',
+    note: 'Sunday 9/6',
     positions: [
       { role: 'Striker \u2013 Plumbing/Shower', description: 'Disconnects plumbing, drains lines, and disassembles the shower container', time: '8:30AM\u201311AM' },
       { role: 'Striker \u2013 Plumbing/Shower', description: 'Disconnects plumbing, drains lines, and disassembles the shower container', time: '8:30AM\u201311AM' },
@@ -204,7 +206,7 @@ const strikeCategories: ShiftCategory[] = [
   },
   {
     name: 'Strike Power',
-    note: 'Sunday 8/31',
+    note: 'Sunday 9/6',
     positions: [
       { role: 'Striker \u2013 Power', description: 'Disconnects electrical systems, coils cabling, and packs generators', time: '8:30AM\u201311AM' },
       { role: 'Striker \u2013 Power', description: 'Disconnects electrical systems, coils cabling, and packs generators', time: '8:30AM\u201311AM' },
@@ -214,7 +216,7 @@ const strikeCategories: ShiftCategory[] = [
   },
   {
     name: 'Strike Lighting + Shade Squares + Evap Coolers + Bike Racks',
-    note: 'Sunday 8/31 \u2013 ONLY for campers who must depart Sunday afternoon. This is their Exodus Monday strike commitment and does not count as a shift.',
+    note: 'Sunday 9/6 \u2013 ONLY for campers who must depart Sunday afternoon. This is their Exodus Monday strike commitment and does not count as a shift.',
     positions: [
       { role: 'Striker \u2013 Lighting/Shade/Bikes', description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks', time: '8:30AM\u201311AM' },
       { role: 'Striker \u2013 Lighting/Shade/Bikes', description: 'Removes lighting rigs, shade squares, evap coolers, and bike racks', time: '8:30AM\u201311AM' },
@@ -310,6 +312,7 @@ export default function KitchenPage() {
   const [displayDeliCategories, setDisplayDeliCategories] = useState<ShiftCategory[]>(deliShiftCategories)
   const [displaySpecialCategories, setDisplaySpecialCategories] = useState<ShiftCategory[]>(specialShiftCategories)
   const [displayStrikeCategories, setDisplayStrikeCategories] = useState<ShiftCategory[]>(strikeCategories)
+  const [shiftOverrides, setShiftOverrides] = useState<ShiftOverrides>({})
   // Collapsible state for roles tab (all collapsed by default)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -397,6 +400,7 @@ export default function KitchenPage() {
       if (overrideSetting) {
         try {
           const overrides = JSON.parse(overrideSetting.value) as Record<string, unknown>
+          setShiftOverrides(overrides)
           setDisplayDeliCategories(applyShiftCategoryOverrides(deliShiftCategories, overrides, 'deli'))
           setDisplaySpecialCategories(applyShiftCategoryOverrides(specialShiftCategories, overrides, 'special'))
           setDisplayStrikeCategories(applyShiftCategoryOverrides(strikeCategories, overrides, 'strike'))
@@ -532,7 +536,7 @@ export default function KitchenPage() {
       .map(p => `${p.shift_category}|${p.shift_role}|${p.shift_time ?? ''}`)
   )
 
-  const draftCategories = getAllDraftShiftCategories()
+  const draftCategories = applyDraftOverrides(getAllDraftShiftCategories(), shiftOverrides, 'deli')
 
   // Calculate % full for deli shifts (all categories except Strike and Deep Playa)
   const deliDraftPositions = draftCategories
@@ -1429,7 +1433,7 @@ export default function KitchenPage() {
                 {strikePercentFull}% Full
               </div>
               <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                🔨 Strike Shifts (Sun 8/31)
+                🔨 Strike Shifts (Sun 9/6)
               </h2>
               <p className="text-sm text-gray-600 mb-4">Teardown and pack-out — everyone pitches in</p>
               <div className="overflow-x-auto">

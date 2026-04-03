@@ -119,7 +119,7 @@ export function getAllDraftShiftCategories(): DraftShiftCategory[] {
       positions: [pos('Music & DJs', 'DJ', '9:30–12:30', { description: 'Provides the soundtrack for deli service \u2014 sets the vibe and keeps energy high' })],
     },
     {
-      name: 'Deep Playa Food Service (Fri 8/29)',
+      name: 'Deep Playa Food Service (Fri 9/4)',
       note: 'Soup for 1,000',
       positions: [
         pos('Deep Playa', 'Kitchen Lead', '3PM–6:30PM', { description: 'Leads kitchen operations for the deep playa soup service' }),
@@ -134,7 +134,7 @@ export function getAllDraftShiftCategories(): DraftShiftCategory[] {
       ],
     },
     {
-      name: 'Strike (Sun 8/31)',
+      name: 'Strike (Sun 9/6)',
       note: 'Teardown shifts',
       positions: [
         pos('Strike', 'Striker \u2013 Deco + Chill Tent', '8:30AM–11AM', { description: 'Tears down decorations and disassembles the public chill tent' }),

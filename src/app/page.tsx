@@ -558,7 +558,7 @@ export default function HomePage() {
             {[
               { date: 'May 1', label: 'Camp Fees Due', desc: 'First payment', line: 'nyc-line-yellow' },
               { date: 'Jul 1', label: 'Refund Deadline', desc: 'No refunds after this', line: 'nyc-line-red' },
-              { date: 'Aug 23', label: 'Build Week Starts', desc: 'Early arrivals only', line: 'nyc-line-green' },
+              { date: 'Aug 24', label: 'Build Week Starts', desc: 'Early arrivals only', line: 'nyc-line-green' },
               { date: 'Aug 30', label: 'Burn Starts', desc: 'Gates open', line: 'nyc-line-orange' },
               { date: 'Sep 7', label: 'Exodus Monday', desc: 'Stay through 2pm', line: 'nyc-line-purple' },
             ].map((item) => (

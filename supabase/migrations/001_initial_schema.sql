@@ -387,6 +387,6 @@ INSERT INTO system_settings (key, value) VALUES
 ('camp_length_ft', '300'),
 ('min_tent_spacing_ft', '3'),
 ('burn_start_date', '2026-08-30'),
-('burn_end_date', '2026-09-07'),
-('build_week_start', '2026-08-23'),
+('burn_end_date', '2026-09-06'),
+('build_week_start', '2026-08-24'),
 ('registration_deadline', '2026-08-01');
