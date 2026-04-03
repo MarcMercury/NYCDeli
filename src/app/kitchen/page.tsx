@@ -27,7 +27,6 @@ const DELI_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 const tabs: Tab[] = [
   { id: 'roles', label: 'Roles & Descriptions' },
   { id: 'signup', label: 'Sign-Up Sheet & Draft' },
-  { id: 'coverage', label: 'Coverage' },
 ]
 
 interface ShiftPosition {
@@ -1499,77 +1498,7 @@ export default function KitchenPage() {
           </div>
         </TabPanel>
 
-        {/* Coverage Tab */}
-        <TabPanel tabId="coverage" activeTab={activeTab}>
-          <div className="space-y-6">
-            <Alert variant="info">
-              This view shows overall shift coverage. Green = good. Red = someone needs to step up.
-            </Alert>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Coverage Summary</CardTitle>
-                <CardDescription>
-                  Are we staffed? Let&apos;s find out.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {roles.map(role => {
-                    const roleShifts = shifts.filter(s => s.role_id === role.id)
-                    const totalShifts = roleShifts.length
-                    const fullyStaffed = roleShifts.filter(s => 
-                      (s.assignments?.length || 0) >= s.min_coverage
-                    ).length
-                    const percentage = totalShifts > 0 ? Math.round((fullyStaffed / totalShifts) * 100) : 0
-
-                    return (
-                      <div key={role.id} className="border-2 border-black p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-bold">{role.name}</span>
-                          <Badge variant={percentage >= 80 ? 'success' : percentage >= 50 ? 'warning' : 'error'}>
-                            {fullyStaffed} / {totalShifts} shifts covered
-                          </Badge>
-                        </div>
-                        <div className="h-4 bg-gray-200 border border-black">
-                          <div 
-                            className={cn(
-                              "h-full transition-all",
-                              percentage >= 80 && "bg-green-500",
-                              percentage >= 50 && percentage < 80 && "bg-yellow-500",
-                              percentage < 50 && "bg-red-500",
-                            )}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {percentage}% of shifts have minimum coverage
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {roles.length === 0 && (
-                  <p className="text-center text-gray-500">No roles to show coverage for.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Call to Action */}
-            <Card variant="warning">
-              <CardContent className="py-6 text-center">
-                <h3 className="font-bold text-xl mb-2">Need Help?</h3>
-                <p className="mb-4">
-                  If you see red, we need you. Check your schedule and sign up for shifts.
-                </p>
-                <Button onClick={() => setActiveTab('shifts')}>
-                  View Open Shifts
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabPanel>
       </div>
     </div>
   )

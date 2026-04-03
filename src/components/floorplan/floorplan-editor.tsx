@@ -77,12 +77,6 @@ export function FloorplanEditor() {
   // Export
   const canvasContainerRef = useRef<HTMLDivElement>(null)
 
-  // Frontage AI image generation
-  const [generatingFrontage, setGeneratingFrontage] = useState(false)
-  const [frontageImageUrl, setFrontageImageUrl] = useState<string | null>(null)
-  const [frontageError, setFrontageError] = useState<string | null>(null)
-  const [showFrontageModal, setShowFrontageModal] = useState(false)
-
   const selectedObject = objects.find(o => o.id === selectedObjectId) || null
 
   // Load floorplan
@@ -228,53 +222,6 @@ export function FloorplanEditor() {
     } finally {
       // Exit export mode
       flushSync(() => setExporting(false))
-    }
-  }
-
-  // Generate AI frontage image
-  async function handleGenerateFrontage() {
-    if (!config) return
-    setGeneratingFrontage(true)
-    setFrontageError(null)
-    setFrontageImageUrl(null)
-    setShowFrontageModal(true)
-
-    try {
-      const res = await fetch('/api/generate-frontage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          objects: objects.map(o => ({
-            object_type: o.object_type,
-            label: o.label,
-            x: o.x,
-            y: o.y,
-            width_ft: o.width_ft,
-            height_ft: o.height_ft,
-            rotation: o.rotation,
-            color: o.color,
-            properties: o.properties,
-          })),
-          config: {
-            width_ft: config.width_ft,
-            length_ft: config.length_ft,
-            camp_name: campName || config.camp_name || config.name,
-            frontage_sides: frontageSides,
-            border_label_south: config.border_label_south,
-          },
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        setFrontageError(data.error || 'Failed to generate image')
-      } else {
-        setFrontageImageUrl(data.imageUrl)
-      }
-    } catch (err) {
-      setFrontageError(err instanceof Error ? err.message : 'Network error')
-    } finally {
-      setGeneratingFrontage(false)
     }
   }
 
@@ -958,15 +905,6 @@ export function FloorplanEditor() {
                   >
                     📷 Export
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleGenerateFrontage}
-                    disabled={generatingFrontage || objects.length === 0}
-                    className="text-[10px] px-2 py-0.5"
-                  >
-                    {generatingFrontage ? '⏳ Generating…' : '🎨 Frontage AI'}
-                  </Button>
                   {/* Zoom */}
                   <div className="flex items-center gap-1 ml-2">
                     <Button
@@ -1064,66 +1002,6 @@ export function FloorplanEditor() {
               <span><kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 font-mono">Ctrl+S</kbd> Save layout</span>
             </div>
           </div>
-
-          {/* Frontage AI Image Modal */}
-          {showFrontageModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => !generatingFrontage && setShowFrontageModal(false)}>
-              <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between p-4 border-b">
-                  <h2 className="text-lg font-bold">🎨 AI Frontage View — South Looking North</h2>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setShowFrontageModal(false)}
-                    disabled={generatingFrontage}
-                  >
-                    ✕
-                  </Button>
-                </div>
-                <div className="p-4">
-                  {generatingFrontage && (
-                    <div className="flex flex-col items-center justify-center py-16 gap-4">
-                      <div className="w-12 h-12 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-sm text-gray-600">Generating your camp frontage image with DALL·E 3…</p>
-                      <p className="text-xs text-gray-400">This may take 15–30 seconds</p>
-                    </div>
-                  )}
-                  {frontageError && (
-                    <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700 text-sm">
-                      <strong>Error:</strong> {frontageError}
-                    </div>
-                  )}
-                  {frontageImageUrl && (
-                    <div className="space-y-3">
-                      <img
-                        src={frontageImageUrl}
-                        alt="AI-generated camp frontage view"
-                        className="w-full rounded-lg shadow-md"
-                      />
-                      <div className="flex gap-2">
-                        <a
-                          href={frontageImageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                        >
-                          Open Full Size ↗
-                        </a>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={handleGenerateFrontage}
-                          disabled={generatingFrontage}
-                        >
-                          🔄 Regenerate
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* RIGHT: Properties Panel */}
           <div className="xl:max-h-[calc(100vh-200px)] xl:overflow-y-auto space-y-4">
