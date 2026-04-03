@@ -534,6 +534,28 @@ export default function KitchenPage() {
 
   const draftCategories = getAllDraftShiftCategories()
 
+  // Calculate % full for deli shifts (all categories except Strike and Deep Playa)
+  const deliDraftPositions = draftCategories
+    .filter(c => !c.name.startsWith('Strike') && !c.name.startsWith('Deep Playa'))
+    .flatMap(c => c.positions)
+  const deliTotalSlots = deliDraftPositions.length
+  const deliFilledSlots = deliDraftPositions.filter(pos => {
+    const posKey = `${pos.category}|${pos.role}|${pos.time ?? ''}`
+    return pickedPositionIds.has(posKey)
+  }).length
+  const deliPercentFull = deliTotalSlots > 0 ? Math.round((deliFilledSlots / deliTotalSlots) * 100) : 0
+
+  // Calculate % full for strike shifts
+  const strikeDraftPositions = draftCategories
+    .filter(c => c.name.startsWith('Strike'))
+    .flatMap(c => c.positions)
+  const strikeTotalSlots = strikeDraftPositions.length
+  const strikeFilledSlots = strikeDraftPositions.filter(pos => {
+    const posKey = `${pos.category}|${pos.role}|${pos.time ?? ''}`
+    return pickedPositionIds.has(posKey)
+  }).length
+  const strikePercentFull = strikeTotalSlots > 0 ? Math.round((strikeFilledSlots / strikeTotalSlots) * 100) : 0
+
   const getCamperById = (id: string) => allCampers.find(c => c.id === id)
 
   // Optimistic update helper for admin position edits
@@ -1166,6 +1188,14 @@ export default function KitchenPage() {
 
                 {/* Deli Shifts Grid */}
                 <section className="mb-10">
+                  <div className={cn(
+                    "inline-flex items-center gap-2 mb-1 px-3 py-1 rounded-full text-sm font-black",
+                    deliPercentFull >= 80 ? "bg-green-100 text-green-800" :
+                    deliPercentFull >= 50 ? "bg-yellow-100 text-yellow-800" :
+                    "bg-red-100 text-red-800"
+                  )}>
+                    {deliPercentFull}% Full
+                  </div>
                   <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
                     🥪 Deli Shifts (Mon–Sat)
                   </h2>
@@ -1390,6 +1420,14 @@ export default function KitchenPage() {
 
             {/* Strike Grid */}
             <section>
+              <div className={cn(
+                "inline-flex items-center gap-2 mb-1 px-3 py-1 rounded-full text-sm font-black",
+                strikePercentFull >= 80 ? "bg-green-100 text-green-800" :
+                strikePercentFull >= 50 ? "bg-yellow-100 text-yellow-800" :
+                "bg-red-100 text-red-800"
+              )}>
+                {strikePercentFull}% Full
+              </div>
               <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
                 🔨 Strike Shifts (Sun 8/31)
               </h2>
