@@ -652,6 +652,25 @@ export default function AdminPage() {
                           />
                         </div>
                       </div>
+                      <div className="grid md:grid-cols-4 gap-4 mt-4">
+                        <div className="md:col-span-2">
+                          <label className="text-xs font-bold uppercase">Sharing Tent With</label>
+                          <Select
+                            placeholder="None"
+                            options={[
+                              { value: '', label: 'None' },
+                              ...campers
+                                .filter(c => c.id !== selectedCamper.id)
+                                .map(c => ({
+                                  value: c.id,
+                                  label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                                }))
+                            ]}
+                            value={selectedCamper.sharing_tent_with || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, sharing_tent_with: e.target.value || null})}
+                          />
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -1018,6 +1037,7 @@ export default function AdminPage() {
                         <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Role</th>
                         <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Status</th>
                         <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Shelter</th>
+                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Sharing Tent With</th>
                         <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Arrival</th>
                         <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Last Login</th>
                         <th className="text-left p-3 font-bold uppercase tracking-wider">Actions</th>
@@ -1058,6 +1078,13 @@ export default function AdminPage() {
                             {user.camper?.shelter_type || '—'}
                           </td>
                           <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
+                            {user.camper?.sharing_tent_with
+                              ? (campers.find(c => c.id === user.camper?.sharing_tent_with)?.playa_name
+                                || campers.find(c => c.id === user.camper?.sharing_tent_with)?.full_name
+                                || '—')
+                              : '—'}
+                          </td>
+                          <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
                             {user.camper?.arrival_date || '—'}
                           </td>
                           <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
@@ -1080,7 +1107,7 @@ export default function AdminPage() {
                       ))}
                       {filteredUsers.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="p-8 text-center text-gray-500">
+                          <td colSpan={8} className="p-8 text-center text-gray-500">
                             No users matching your filters.
                           </td>
                         </tr>
