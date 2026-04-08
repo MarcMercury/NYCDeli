@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
 import { chatCompletion } from '@/lib/openai'
+import { requireAuthAPI } from '@/lib/auth'
+import { rateLimit, getClientKey } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are the admin assistant for NYC Deli Rats, a ~70-person Burning Man theme camp. 
 You help camp leadership quickly evaluate applicants by summarizing their registration data into a concise, actionable overview.
@@ -14,6 +16,12 @@ Use a direct, no-BS New York tone. Be honest but not cruel. Flag missing/concern
 Do NOT include medical details — just note if they have medical considerations listed (yes/no).`
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuthAPI()
+  if (authResult instanceof Response) return authResult
+
+  const rl = rateLimit(`ai:applicant-summary:${authResult.user.id}`, 10, 60_000)
+  if (!rl.success) return rl.response!
+
   let body: { camper: Record<string, unknown> }
   try {
     body = await request.json()

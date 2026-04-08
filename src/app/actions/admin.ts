@@ -485,12 +485,13 @@ export async function importCampersFromCSVAction(
     }
 
     try {
-      // 1. Create auth user
+      // 1. Create auth user with default password + force password change on first login
       let userId: string
       const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
         email: camper.email,
         password: defaultPassword,
         email_confirm: true,
+        user_metadata: { must_change_password: true },
       })
 
       if (authError) {

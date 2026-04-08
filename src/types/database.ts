@@ -594,6 +594,12 @@ export interface Database {
         Update: Partial<Omit<ElectricalLoadItemRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: []
       }
+      archived_applicants: {
+        Row: ArchivedApplicantRow
+        Insert: ArchivedApplicantInsert
+        Update: ArchivedApplicantUpdate
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -1371,6 +1377,40 @@ export interface ResourceEditRow {
 }
 
 export type ResourceEdit = ResourceEditRow
+
+// Archived Applicants
+export interface ArchivedApplicantRow {
+  id: string
+  archived_at: string
+  archived_by: string | null
+  original_user_id: string
+  email: string
+  full_name: string | null
+  playa_name: string | null
+  denied_at: string | null
+  denied_reason: string | null
+  profile_data: Record<string, unknown>
+  camper_data: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface ArchivedApplicantInsert {
+  archived_by?: string | null
+  original_user_id: string
+  email: string
+  full_name?: string | null
+  playa_name?: string | null
+  denied_at?: string | null
+  denied_reason?: string | null
+  profile_data: Record<string, unknown>
+  camper_data?: Record<string, unknown> | null
+}
+
+export interface ArchivedApplicantUpdate {
+  denied_reason?: string | null
+  profile_data?: Record<string, unknown>
+  camper_data?: Record<string, unknown> | null
+}
 
 export interface ShiftDraftOrderWithCamper extends ShiftDraftOrderRow {
   camper: Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'email'> | null

@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
 import { chatCompletion } from '@/lib/openai'
+import { requireAuthAPI } from '@/lib/auth'
+import { rateLimit, getClientKey } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are a fun, witty bio writer for NYC Deli Rats, a Burning Man theme camp.
 Given a camper's registration data, write a short, engaging camp bio (2-4 sentences, max 400 chars).
@@ -9,6 +11,12 @@ Keep the tone playful and warm — we're a community. Don't be generic.
 Never mention medical info, emergency contacts, or anything sensitive.`
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuthAPI()
+  if (authResult instanceof Response) return authResult
+
+  const rl = rateLimit(`ai:generate-bio:${authResult.user.id}`, 10, 60_000)
+  if (!rl.success) return rl.response!
+
   let body: { camper: Record<string, unknown> }
   try {
     body = await request.json()

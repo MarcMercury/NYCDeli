@@ -91,6 +91,12 @@ export async function signIn(_prevState: AuthState, formData: FormData): Promise
       revalidatePath('/', 'layout')
       redirect('/pending')
     }
+
+    // Force password change for CSV-imported users on first login
+    if (user.user_metadata?.must_change_password) {
+      revalidatePath('/', 'layout')
+      redirect('/profile?change_password=1')
+    }
   }
 
   revalidatePath('/', 'layout')
@@ -131,7 +137,10 @@ export async function changePassword(
   }
 
   // Update the password
-  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+    data: { must_change_password: false },
+  })
 
   if (error) {
     return { success: false, error: error.message }

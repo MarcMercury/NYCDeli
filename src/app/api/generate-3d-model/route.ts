@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { chatCompletion } from '@/lib/openai'
 import { createTextTo3DTask } from '@/lib/meshy'
+import { requireAuthAPI } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 
 interface GenerateRequest {
   object_type: string
@@ -13,6 +15,12 @@ interface GenerateRequest {
 
 // Use OpenAI to create a rich 3D-optimized prompt, then send to Meshy for generation
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuthAPI()
+  if (authResult instanceof Response) return authResult
+
+  const rl = rateLimit(`3d-model:${authResult.user.id}`, 5, 60_000)
+  if (!rl.success) return rl.response!
+
   try {
     const body = (await request.json()) as GenerateRequest
     const { object_type, label, width_ft, height_ft, color, properties } = body

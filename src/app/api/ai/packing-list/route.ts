@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
 import { chatCompletion } from '@/lib/openai'
+import { requireAuthAPI } from '@/lib/auth'
+import { rateLimit, getClientKey } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are a packing advisor for NYC Deli Rats, a Burning Man theme camp in Black Rock City, Nevada.
 Given a camper's specific details (shelter type, skills, roles, dietary needs, arrival method, etc.), generate a personalized packing list.
@@ -17,6 +19,12 @@ Keep the total list to ~30-40 items max. Don't repeat items across categories.
 Never mention specific medical items — just remind them to bring prescribed medications if flagged.`
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuthAPI()
+  if (authResult instanceof Response) return authResult
+
+  const rl = rateLimit(`ai:packing-list:${authResult.user.id}`, 5, 60_000)
+  if (!rl.success) return rl.response!
+
   let body: { camper: Record<string, unknown> }
   try {
     body = await request.json()
