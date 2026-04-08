@@ -315,11 +315,7 @@ export default function AdminPage() {
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
-              {fetchErrors.tasks ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.tasks}>⚠</p>
-              ) : (
-                <p className="text-3xl font-black">{tasks.filter(t => t.status !== 'done').length}</p>
-              )}
+              <p className="text-3xl font-black">—</p>
               <p className="text-xs uppercase tracking-wider text-gray-500">Open Tasks</p>
             </CardContent>
           </Card>
