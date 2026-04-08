@@ -8,6 +8,7 @@ import { fetchActiveFloorplan, fetchFloorplanObjects } from '@/lib/floorplan'
 import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFitSpot } from '@/lib/camp-spots'
 import { createClient } from '@/lib/supabase/client'
 import { getTemplateForType } from '@/components/floorplan/object-templates'
+import { ObjectDetailSVG } from '@/components/floorplan/object-detail-svg'
 
 // Lazy-load the heavy Three.js 3D component
 const CampMap3D = lazy(() => import('@/components/camp-map-3d').then(m => ({ default: m.CampMap3D })))
@@ -818,6 +819,14 @@ export function CampMap() {
                         borderStyle: isShadeBackground ? 'dashed' : 'solid',
                       }}
                     >
+                      {/* Detailed SVG overlay */}
+                      <ObjectDetailSVG
+                        objectType={obj.object_type}
+                        width={objWidthPx}
+                        height={objHeightPx}
+                        color={obj.color}
+                      />
+
                       {/* Shade structure corner posts + open interior */}
                       {obj.object_type === 'shade_structure' && (
                         <>

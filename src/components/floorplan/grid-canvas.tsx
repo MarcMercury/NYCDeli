@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import type { FloorplanObjectRow, UtilityLineRow, UtilityLineType, UtilityLinePoint, FrontageSide } from '@/types/database'
 import { getTemplateForType } from './object-templates'
 import { computeSafetyZones } from './validation-engine'
+import { ObjectDetailSVG } from './object-detail-svg'
 
 export type DrawingMode = null | 'power' | 'water'
 
@@ -424,6 +425,14 @@ export function GridCanvas({
             }}
             onPointerDown={e => !isShadeBackground && handleObjectPointerDown(e, obj)}
           >
+            {/* Detailed SVG overlay for realistic object appearance */}
+            <ObjectDetailSVG
+              objectType={obj.object_type}
+              width={obj.width_ft * scale}
+              height={obj.height_ft * scale}
+              color={obj.color}
+            />
+
             {/* Distance marker rendering */}
             {isDistanceMarker && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
