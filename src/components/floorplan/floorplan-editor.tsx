@@ -22,6 +22,7 @@ import { GridCanvas, type DrawingMode } from './grid-canvas'
 import { ObjectPalette } from './object-palette'
 import { PropertiesPanel } from './properties-panel'
 import { ValidationPanel } from './validation-panel'
+import { TentSizeSummary } from './tent-size-summary'
 import { getTemplateForType, type ObjectTemplate } from './object-templates'
 
 export function FloorplanEditor() {
@@ -1039,6 +1040,7 @@ export function FloorplanEditor() {
               onSendBackward={handleSendBackward}
               onSetParent={handleSetParent}
             />
+            <TentSizeSummary objects={objects} />
             {showValidation && config && (
               <ValidationPanel
                 objects={objects}
