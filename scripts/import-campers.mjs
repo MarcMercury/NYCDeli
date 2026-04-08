@@ -423,14 +423,14 @@ async function main() {
       }
       console.log(`         ↳ camper record upserted${camperId ? ` (${camperId.slice(0, 8)}...)` : ''}`);
 
-      // Step 3: Update user_profile → role='user', link camper_id, approve
+      // Step 3: Update user_profile → link camper_id, approve (preserve existing admin role)
       if (camperId) {
         const profileSQL = `
           UPDATE user_profiles
-          SET role = 'user',
+          SET role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'user' END,
               camper_id = '${camperId}',
-              approved_at = NOW(),
-              approved_by = id
+              approved_at = COALESCE(approved_at, NOW()),
+              approved_by = COALESCE(approved_by, id)
           WHERE id = '${userId}'
             AND (camper_id IS NULL OR camper_id != '${camperId}');
         `;
