@@ -995,6 +995,29 @@ export function FloorplanEditor() {
               </div>
             </div>
 
+            {/* Tent Size Summary */}
+            {(() => {
+              const tents = objects.filter(o => o.object_type === 'tent')
+              if (tents.length === 0) return null
+              const sizeCounts: Record<string, number> = {}
+              for (const t of tents) {
+                const key = `${t.width_ft}x${t.height_ft}`
+                sizeCounts[key] = (sizeCounts[key] || 0) + 1
+              }
+              const sorted = Object.entries(sizeCounts).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+              return (
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+                  <span className="font-black uppercase tracking-wider text-[10px] text-gray-500">⛺ Tent Sizes:</span>
+                  {sorted.map(([size, count]) => (
+                    <span key={size} className="bg-blue-50 border border-blue-300 px-2 py-0.5 font-bold">
+                      {size} — {count}
+                    </span>
+                  ))}
+                  <span className="text-gray-400">({tents.length} total)</span>
+                </div>
+              )
+            })()}
+
             {/* Keyboard shortcuts hint */}
             <div className="flex flex-wrap gap-2 mt-2 text-[10px] text-gray-500">
               <span><kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 font-mono">Del</kbd> Delete selected</span>
