@@ -21,6 +21,7 @@ export default function CampersPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCamper, setSelectedCamper] = useState<CamperDirectory | null>(null)
+  const [campersById, setCampersById] = useState<Map<string, CamperRow>>(new Map())
 
   const fetchDirectory = useCallback(async () => {
     const supabase = createClient()
@@ -45,6 +46,10 @@ export default function CampersPage() {
 
     const campersByEmail = new Map<string, CamperRow>()
     campers?.forEach(c => campersByEmail.set(c.email, c))
+
+    const campersById_ = new Map<string, CamperRow>()
+    campers?.forEach(c => campersById_.set(c.id, c))
+    setCampersById(campersById_)
 
     const photosByUser = new Map<string, CamperPhotoRow[]>()
     photos?.forEach(p => {
@@ -204,6 +209,16 @@ export default function CampersPage() {
                     <span className="text-gray-500 block">Kitchen</span>
                     <span className="font-bold">{selectedCamper.camper.kitchen_participation ? 'Yes' : 'No'}</span>
                   </div>
+                  {selectedCamper.camper.sharing_tent_with && campersById.get(selectedCamper.camper.sharing_tent_with) && (
+                    <div>
+                      <span className="text-gray-500 block">Sharing Tent With</span>
+                      <span className="font-bold">
+                        {campersById.get(selectedCamper.camper.sharing_tent_with)?.playa_name
+                          ? `${campersById.get(selectedCamper.camper.sharing_tent_with)!.full_name} ("${campersById.get(selectedCamper.camper.sharing_tent_with)!.playa_name}")`
+                          : campersById.get(selectedCamper.camper.sharing_tent_with)!.full_name}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -260,9 +275,14 @@ export default function CampersPage() {
             {entry.profile.bio && (
               <p className="text-xs text-gray-500 mt-1 line-clamp-2">{entry.profile.bio}</p>
             )}
-            <div className="flex gap-1 mt-2">
+            <div className="flex gap-1 mt-2 flex-wrap">
               {entry.profile.role === 'admin' && <Badge variant="info">Admin</Badge>}
               {entry.camper?.build_week_attending && <Badge variant="default">Builder</Badge>}
+              {entry.camper?.sharing_tent_with && campersById.get(entry.camper.sharing_tent_with) && (
+                <Badge variant="info">
+                  🏕️ w/ {campersById.get(entry.camper.sharing_tent_with)?.playa_name || campersById.get(entry.camper.sharing_tent_with)?.full_name}
+                </Badge>
+              )}
             </div>
           </button>
         ))}

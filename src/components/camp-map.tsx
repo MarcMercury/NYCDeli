@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Alert, Input } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow, RoofShape } from '@/types/database'
+import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow } from '@/types/database'
 import { fetchActiveFloorplan, fetchFloorplanObjects } from '@/lib/floorplan'
 import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFitSpot } from '@/lib/camp-spots'
 import { createClient } from '@/lib/supabase/client'
@@ -11,168 +11,6 @@ import { getTemplateForType } from '@/components/floorplan/object-templates'
 
 // Lazy-load the heavy Three.js 3D component
 const CampMap3D = lazy(() => import('@/components/camp-map-3d').then(m => ({ default: m.CampMap3D })))
-
-// ─── 3D View Helpers ───────────────────────────────────────────
-// This scale converts feet of elevation to pixels of visual height
-const HEIGHT_PX_PER_FT = 4
-
-// Fallback heights when admin hasn't set elevation_ft on the object
-function getDefaultElevation(type: string): number {
-  const heights: Record<string, number> = {
-    shade_structure: 12, tent: 7, kitchen: 10, bar: 10, stage: 8,
-    common_area: 10, refrigerated_truck: 10, shower_container: 9,
-    pc_container: 9, rv: 10, vehicle: 5, generator: 4, porta_potty: 8,
-    water_station: 3, first_aid: 8, storage: 6, prep_area: 8,
-    service_area: 8, fuel_storage: 3, propane_storage: 3,
-    fire_extinguisher: 2, fire_pit: 1, grill: 4, flame_effect: 3,
-    fence: 6, sign: 5, entrance: 8, bike_parking: 3,
-    fire_lane: 0, road: 0, path_of_travel: 0, distance_marker: 0, neighbor_zone: 0,
-  }
-  return heights[type] ?? 5
-}
-
-function getObjectElevation(obj: FloorplanObjectRow): number {
-  if (typeof obj.properties?.elevation_ft === 'number') return obj.properties.elevation_ft
-  return getDefaultElevation(obj.object_type)
-}
-
-function getObjectRoofShape(obj: FloorplanObjectRow): RoofShape {
-  return obj.properties?.roof_shape || 'flat'
-}
-
-function darkenHex(hex: string, amount: number): string {
-  const c = hex.replace('#', '')
-  const r = Math.max(0, Math.round(parseInt(c.slice(0, 2), 16) * (1 - amount)))
-  const g = Math.max(0, Math.round(parseInt(c.slice(2, 4), 16) * (1 - amount)))
-  const b = Math.max(0, Math.round(parseInt(c.slice(4, 6), 16) * (1 - amount)))
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-}
-
-function lightenHex(hex: string, amount: number): string {
-  const c = hex.replace('#', '')
-  const r = Math.min(255, Math.round(parseInt(c.slice(0, 2), 16) + (255 - parseInt(c.slice(0, 2), 16)) * amount))
-  const g = Math.min(255, Math.round(parseInt(c.slice(2, 4), 16) + (255 - parseInt(c.slice(2, 4), 16)) * amount))
-  const b = Math.min(255, Math.round(parseInt(c.slice(4, 6), 16) + (255 - parseInt(c.slice(4, 6), 16)) * amount))
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-}
-
-// ─── Roof Shape Geometry (3D shapes rising ABOVE the top face) ─────────
-function RoofGeometry({
-  roofShape, objWidthPx, objHeightPx,
-  wallDirX, wallDirY,
-  topFaceX, topFaceY,
-  color, objId,
-}: {
-  roofShape: RoofShape
-  objWidthPx: number
-  objHeightPx: number
-  wallDirX: number
-  wallDirY: number
-  topFaceX: number
-  topFaceY: number
-  color: string
-  objId: string
-}) {
-  // Roof peak height (proportional to shorter dimension)
-  const roofPeakPx = Math.min(objWidthPx, objHeightPx) * 0.4
-  const peakDx = wallDirX * roofPeakPx
-  const peakDy = wallDirY * roofPeakPx
-
-  // Top-face corners (relative to wrapper div)
-  const tl = { x: topFaceX, y: topFaceY }
-  const tr = { x: topFaceX + objWidthPx, y: topFaceY }
-  const br = { x: topFaceX + objWidthPx, y: topFaceY + objHeightPx }
-  const bl = { x: topFaceX, y: topFaceY + objHeightPx }
-
-  const pts = (arr: { x: number; y: number }[]) => arr.map(p => `${p.x},${p.y}`).join(' ')
-
-  if (roofShape === 'pyramid') {
-    const peak = {
-      x: topFaceX + objWidthPx / 2 + peakDx,
-      y: topFaceY + objHeightPx / 2 + peakDy,
-    }
-    // 4 triangular faces — shade by orientation
-    const faces = [
-      { points: [tl, tr, peak], shade: 0.05 },
-      { points: [tr, br, peak], shade: 0.2 },
-      { points: [br, bl, peak], shade: -0.05 },
-      { points: [bl, tl, peak], shade: 0.12 },
-    ]
-    return (
-      <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 5 }}>
-        {faces.map((face, i) => (
-          <polygon
-            key={i}
-            points={pts(face.points)}
-            fill={face.shade >= 0 ? darkenHex(color, face.shade) : lightenHex(color, -face.shade)}
-            stroke={darkenHex(color, 0.4)}
-            strokeWidth="1"
-            strokeLinejoin="round"
-            opacity="0.92"
-          />
-        ))}
-        <circle cx={peak.x} cy={peak.y} r="2.5" fill={lightenHex(color, 0.5)} />
-      </svg>
-    )
-  }
-
-  if (roofShape === 'a_frame') {
-    const isWide = objWidthPx >= objHeightPx
-    let ridgeStart: { x: number; y: number }
-    let ridgeEnd: { x: number; y: number }
-    let face1: { x: number; y: number }[]
-    let face2: { x: number; y: number }[]
-
-    if (isWide) {
-      ridgeStart = { x: tl.x + peakDx, y: (tl.y + bl.y) / 2 + peakDy }
-      ridgeEnd = { x: tr.x + peakDx, y: (tr.y + br.y) / 2 + peakDy }
-      face1 = [tl, tr, ridgeEnd, ridgeStart]
-      face2 = [bl, br, ridgeEnd, ridgeStart]
-    } else {
-      ridgeStart = { x: (tl.x + tr.x) / 2 + peakDx, y: tl.y + peakDy }
-      ridgeEnd = { x: (bl.x + br.x) / 2 + peakDx, y: bl.y + peakDy }
-      face1 = [tl, ridgeStart, ridgeEnd, bl]
-      face2 = [tr, ridgeStart, ridgeEnd, br]
-    }
-
-    return (
-      <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 5 }}>
-        <polygon points={pts(face1)} fill={lightenHex(color, 0.02)} stroke={darkenHex(color, 0.3)} strokeWidth="1" strokeLinejoin="round" opacity="0.92" />
-        <polygon points={pts(face2)} fill={darkenHex(color, 0.14)} stroke={darkenHex(color, 0.3)} strokeWidth="1" strokeLinejoin="round" opacity="0.92" />
-        <line x1={ridgeStart.x} y1={ridgeStart.y} x2={ridgeEnd.x} y2={ridgeEnd.y}
-          stroke={lightenHex(color, 0.45)} strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
-    )
-  }
-
-  if (roofShape === 'dome') {
-    const cx = topFaceX + objWidthPx / 2 + peakDx * 0.5
-    const cy = topFaceY + objHeightPx / 2 + peakDy * 0.5
-    const rx = objWidthPx * 0.48
-    const ry = objHeightPx * 0.48
-
-    return (
-      <svg className="absolute pointer-events-none" style={{ left: 0, top: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 5 }}>
-        <defs>
-          <radialGradient id={`dome-${objId}`} cx="38%" cy="32%">
-            <stop offset="0%" stopColor={lightenHex(color, 0.4)} stopOpacity="0.95" />
-            <stop offset="45%" stopColor={color} stopOpacity="0.85" />
-            <stop offset="100%" stopColor={darkenHex(color, 0.3)} stopOpacity="0.75" />
-          </radialGradient>
-        </defs>
-        <ellipse cx={cx} cy={cy} rx={rx} ry={ry}
-          fill={`url(#dome-${objId})`}
-          stroke={darkenHex(color, 0.3)}
-          strokeWidth="1.5"
-        />
-        <ellipse cx={cx - rx * 0.15} cy={cy - ry * 0.2} rx={rx * 0.35} ry={ry * 0.3}
-          fill="none" stroke={lightenHex(color, 0.5)} strokeWidth="1" opacity="0.4" />
-      </svg>
-    )
-  }
-
-  return null
-}
 
 type WizardStep = 'identify' | 'verify-dimensions' | 'confirm'
 
@@ -214,9 +52,7 @@ export function CampMap() {
   const [aiRecs, setAiRecs] = useState<Array<{ spot_id: string; label: string; reason: string }>>([])
   const [aiRecsLoading, setAiRecsLoading] = useState(false)
 
-  // 3D camera angles
-  const [tiltX, setTiltX] = useState(50) // rotateX — 0 = top-down, 80 = nearly side-on
-  const [rotateZ, setRotateZ] = useState(0) // bearing / compass rotation
+
 
   // Search / jump-to
   const [searchQuery, setSearchQuery] = useState('')
@@ -232,7 +68,7 @@ export function CampMap() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 3D view mode
-  const [viewMode, setViewMode] = useState<'2d' | '3d' | '3d-webgl'>('2d')
+  const [viewMode, setViewMode] = useState<'2d' | '3d-webgl'>('2d')
 
   // 3D model generation state
   const [generating3D, setGenerating3D] = useState<string | null>(null) // object ID being generated
@@ -536,8 +372,6 @@ export function CampMap() {
   function handleResetView() {
     setScale(DEFAULT_SCALE)
 
-    setTiltX(50)
-    setRotateZ(0)
     if (config && containerRef.current) {
       const viewportW = containerRef.current.clientWidth
       const viewportH = containerRef.current.clientHeight
@@ -631,11 +465,6 @@ export function CampMap() {
       setGenerating3D(null)
     }
   }
-
-  // Compute wall offset direction based on rotation for 2.5D extrusion
-  const rotRad = (rotateZ * Math.PI) / 180
-  const wallDirX = -Math.cos(rotRad + Math.PI / 4) * 0.7  // ~upper-left by default
-  const wallDirY = -Math.sin(rotRad + Math.PI / 4) * 0.7
 
   // Spot overlay ring colors on the map
   function getSpotOverlayClass(obj: FloorplanObjectRow): string {
@@ -787,20 +616,6 @@ export function CampMap() {
             <span className="text-[10px] uppercase font-bold">Labels</span>
           </label>
 
-          {/* 3D View Toggle */}
-          <button
-            onClick={() => setViewMode(prev => prev === '2d' ? '3d' : '2d')}
-            className={cn(
-              'px-3 py-1 text-xs font-black uppercase tracking-wider transition-colors',
-              viewMode === '3d'
-                ? 'bg-yellow-400 text-black hover:bg-yellow-300'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
-            )}
-            title={viewMode === '2d' ? 'Switch to 3D Birds Eye View' : 'Switch to 2D Top-Down View'}
-          >
-            {viewMode === '2d' ? '🏔️ Birdseye View' : '📋 2D View'}
-          </button>
-
           {/* Full 3D WebGL View */}
           <button
             onClick={() => setViewMode(prev => prev === '3d-webgl' ? '2d' : '3d-webgl')}
@@ -900,10 +715,6 @@ export function CampMap() {
                   : 'none',
                 backgroundSize: `${config.grid_size_ft * scale}px ${config.grid_size_ft * scale}px`,
                 transition: 'transform 0.6s ease',
-                ...(viewMode === '3d' ? {
-                  transform: `perspective(1200px) rotateX(${tiltX}deg) rotateZ(${rotateZ}deg)`,
-                  transformOrigin: 'center 60%',
-                } : {}),
               }}
             >
               {/* Border labels */}
@@ -956,31 +767,11 @@ export function CampMap() {
                 const isSelected = selectedObject?.object?.id === obj.id
                 const spotOverlay = getSpotOverlayClass(obj)
                 const isReservable = obj.properties?.reservable
-                const elevationFt = getObjectElevation(obj)
-                const wallHeight = viewMode === '3d' ? elevationFt * HEIGHT_PX_PER_FT : 0
-                const is3d = viewMode === '3d' && wallHeight > 0
-                const roofShape = getObjectRoofShape(obj)
                 const objWidthPx = obj.width_ft * scale
                 const objHeightPx = obj.height_ft * scale
 
-                // In 3D mode, the top face shifts to create the extrusion illusion
-                // Direction follows the compass rotation
-                const offsetX = is3d ? wallDirX * wallHeight : 0
-                const offsetY = is3d ? wallDirY * wallHeight : 0
-                // Extra space in the wrapper for walls extending beyond the footprint
-                const extraLeft = is3d ? Math.max(0, -offsetX) : 0
-                const extraTop = is3d ? Math.max(0, -offsetY) : 0
-                const extraRight = is3d ? Math.max(0, offsetX) : 0
-                const extraBottom = is3d ? Math.max(0, offsetY) : 0
-                // Which walls to draw based on offset direction
-                const showRightWall = offsetX < -2
-                const showLeftWall = offsetX > 2
-                const showBottomWall = offsetY < -2
-                const showTopWall = offsetY > 2
-
                 const isShade = obj.object_type === 'shade_structure'
-                // In 2D mode, shades are background items so items underneath are selectable
-                const isShadeBackground = isShade && !is3d && !isSelected
+                const isShadeBackground = isShade && !isSelected
 
                 return (
                   <div
@@ -990,13 +781,13 @@ export function CampMap() {
                       isShadeBackground ? 'pointer-events-none' : 'cursor-pointer'
                     )}
                     style={{
-                      left: obj.x * scale - extraLeft,
-                      top: obj.y * scale - extraTop,
-                      width: objWidthPx + extraLeft + extraRight,
-                      height: objHeightPx + extraTop + extraBottom,
+                      left: obj.x * scale,
+                      top: obj.y * scale,
+                      width: objWidthPx,
+                      height: objHeightPx,
                       zIndex: isShadeBackground
                         ? -1
-                        : isSelected ? 200 : isHovered ? 150 : (is3d ? obj.z_index + Math.round(elevationFt) : obj.z_index),
+                        : isSelected ? 200 : isHovered ? 150 : obj.z_index,
                       transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
                     }}
                     onClick={(e) => {
@@ -1006,154 +797,25 @@ export function CampMap() {
                     onMouseEnter={() => setHoveredObjectId(obj.id)}
                     onMouseLeave={() => setHoveredObjectId(null)}
                   >
-                    {/* === 3D Extrusion: ground shadow, walls, then top face === */}
-                    {is3d && (
-                      <>
-                        {/* Ground shadow */}
-                        <div
-                          className="absolute pointer-events-none"
-                          style={{
-                            left: extraLeft + 3,
-                            top: extraTop + 5,
-                            width: objWidthPx,
-                            height: objHeightPx,
-                            backgroundColor: 'rgba(0,0,0,0.18)',
-                            filter: 'blur(6px)',
-                            borderRadius: 2,
-                          }}
-                        />
-
-                        {/* Right wall (east face) */}
-                        {showRightWall && (
-                          <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: extraLeft + objWidthPx + offsetX,
-                              top: extraTop + offsetY,
-                              width: Math.abs(offsetX),
-                              height: objHeightPx,
-                              backgroundColor: darkenHex(obj.color, 0.35),
-                              borderRight: `2px solid ${darkenHex(obj.color, 0.55)}`,
-                              clipPath: `polygon(100% ${Math.abs(offsetY)}px, 100% calc(100% + ${Math.abs(offsetY)}px), 0% 100%, 0% 0%)`,
-                            }}
-                          />
-                        )}
-
-                        {/* Left wall (west face) */}
-                        {showLeftWall && (
-                          <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: extraLeft - offsetX,
-                              top: extraTop + offsetY,
-                              width: Math.abs(offsetX),
-                              height: objHeightPx,
-                              backgroundColor: darkenHex(obj.color, 0.35),
-                              borderLeft: `2px solid ${darkenHex(obj.color, 0.55)}`,
-                              clipPath: `polygon(0% ${Math.abs(offsetY)}px, 0% calc(100% + ${Math.abs(offsetY)}px), 100% 100%, 100% 0%)`,
-                            }}
-                          />
-                        )}
-
-                        {/* Bottom wall (south face) */}
-                        {showBottomWall && (
-                          <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: extraLeft + offsetX,
-                              top: extraTop + objHeightPx + offsetY,
-                              width: objWidthPx,
-                              height: Math.abs(offsetY),
-                              backgroundColor: darkenHex(obj.color, 0.25),
-                              borderBottom: `2px solid ${darkenHex(obj.color, 0.5)}`,
-                              clipPath: `polygon(0% 0%, 100% 0%, calc(100% + ${Math.abs(offsetX)}px) 100%, ${Math.abs(offsetX)}px 100%)`,
-                            }}
-                          />
-                        )}
-
-                        {/* Top wall (north face) */}
-                        {showTopWall && (
-                          <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: extraLeft + offsetX,
-                              top: extraTop - offsetY,
-                              width: objWidthPx,
-                              height: Math.abs(offsetY),
-                              backgroundColor: darkenHex(obj.color, 0.25),
-                              borderTop: `2px solid ${darkenHex(obj.color, 0.5)}`,
-                              clipPath: `polygon(${Math.abs(offsetX)}px 0%, calc(100% - ${Math.abs(offsetX)}px) 0%, 100% 100%, 0% 100%)`,
-                            }}
-                          />
-                        )}
-
-                        {/* Corner piece */}
-                        {(showRightWall && showBottomWall) && (
-                          <div className="absolute pointer-events-none" style={{
-                            left: extraLeft + objWidthPx + offsetX,
-                            top: extraTop + objHeightPx + offsetY,
-                            width: Math.abs(offsetX),
-                            height: Math.abs(offsetY),
-                            backgroundColor: darkenHex(obj.color, 0.45),
-                            clipPath: 'polygon(0% 0%, 100% 100%, 0% 100%)',
-                          }} />
-                        )}
-                        {(showLeftWall && showBottomWall) && (
-                          <div className="absolute pointer-events-none" style={{
-                            left: extraLeft,
-                            top: extraTop + objHeightPx + offsetY,
-                            width: Math.abs(offsetX),
-                            height: Math.abs(offsetY),
-                            backgroundColor: darkenHex(obj.color, 0.45),
-                            clipPath: 'polygon(100% 0%, 100% 100%, 0% 100%)',
-                          }} />
-                        )}
-                        {(showRightWall && showTopWall) && (
-                          <div className="absolute pointer-events-none" style={{
-                            left: extraLeft + objWidthPx + offsetX,
-                            top: extraTop,
-                            width: Math.abs(offsetX),
-                            height: Math.abs(offsetY),
-                            backgroundColor: darkenHex(obj.color, 0.45),
-                            clipPath: 'polygon(0% 0%, 100% 0%, 0% 100%)',
-                          }} />
-                        )}
-                        {(showLeftWall && showTopWall) && (
-                          <div className="absolute pointer-events-none" style={{
-                            left: extraLeft,
-                            top: extraTop,
-                            width: Math.abs(offsetX),
-                            height: Math.abs(offsetY),
-                            backgroundColor: darkenHex(obj.color, 0.45),
-                            clipPath: 'polygon(100% 0%, 0% 0%, 100% 100%)',
-                          }} />
-                        )}
-                      </>
-                    )}
-
-                    {/* Top face — the main visible object */}
+                    {/* The main visible object */}
                     <div
                       className={cn(
                         'absolute border-2 transition-all duration-150',
-                        isHovered && !is3d && 'shadow-[4px_4px_0px_0px_rgba(0,0,0,0.6)]',
+                        isHovered && 'shadow-[4px_4px_0px_0px_rgba(0,0,0,0.6)]',
                         isSelected && 'ring-2 ring-blue-400 ring-offset-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
                         isReservable && 'hover:scale-[1.02]',
-                        is3d && isHovered && 'brightness-110',
                         spotOverlay
                       )}
                       style={{
-                        left: extraLeft + offsetX,
-                        top: extraTop + offsetY,
+                        left: 0,
+                        top: 0,
                         width: objWidthPx,
                         height: objHeightPx,
                         backgroundColor: isShadeBackground
                           ? `${obj.color}30`
-                          : `${obj.color}${is3d ? 'ee' : (isHovered ? 'ee' : 'bb')}`,
-                        borderColor: is3d ? darkenHex(obj.color, 0.15) : obj.color,
+                          : `${obj.color}${isHovered ? 'ee' : 'bb'}`,
+                        borderColor: obj.color,
                         borderStyle: isShadeBackground ? 'dashed' : 'solid',
-                        ...(is3d ? {
-                          boxShadow: `1px 1px 0 ${darkenHex(obj.color, 0.3)}, 2px 2px 0 ${darkenHex(obj.color, 0.2)}`,
-                        } : {}),
                       }}
                     >
                       {/* Shade structure corner posts + open interior */}
@@ -1173,9 +835,6 @@ export function CampMap() {
                           <span className="text-[7px] font-black uppercase tracking-wider text-center leading-none text-black/80 truncate max-w-full px-px">
                             {obj.label || template?.label || obj.object_type}
                           </span>
-                          {is3d && objWidthPx > 35 && (
-                            <span className="text-[6px] text-black/50 font-bold">{elevationFt}ft</span>
-                          )}
                           {isReservable && (() => {
                             const spot = findSpotForObject(obj)
                             if (!spot) return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
@@ -1196,21 +855,6 @@ export function CampMap() {
                         </div>
                       )}
                     </div>
-
-                    {/* Roof geometry — rendered ABOVE top face as sibling */}
-                    {is3d && roofShape !== 'flat' && (
-                      <RoofGeometry
-                        roofShape={roofShape}
-                        objWidthPx={objWidthPx}
-                        objHeightPx={objHeightPx}
-                        wallDirX={wallDirX}
-                        wallDirY={wallDirY}
-                        topFaceX={extraLeft + offsetX}
-                        topFaceY={extraTop + offsetY}
-                        color={obj.color}
-                        objId={obj.id}
-                      />
-                    )}
                   </div>
                 )
               })}
@@ -1226,68 +870,11 @@ export function CampMap() {
         </div>
         )} {/* End viewMode !== '3d-webgl' */}
 
-        {/* === Compass + Zoom Controls (Google Maps style) === */}
+        {/* === Zoom Controls === */}
         <div
           className="absolute z-50 flex flex-col items-center gap-2"
           style={{ bottom: 20, right: sidebarOpen ? 360 : 16, transition: 'right 0.3s ease' }}
         >
-          {/* Compass ring — only visible in 3D mode */}
-          {viewMode === '3d' && (
-            <div className="relative" style={{ width: 100, height: 100 }}>
-              {/* Compass circle background */}
-              <div
-                className="absolute inset-0 rounded-full bg-white/90 border-2 border-gray-300 shadow-lg backdrop-blur-sm"
-              />
-              {/* N indicator — rotates with the map */}
-              <div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ transform: `rotate(${-rotateZ}deg)`, transition: 'transform 0.3s ease' }}
-              >
-                <div className="absolute top-[6px] left-1/2 -translate-x-1/2 flex flex-col items-center">
-                  <span className="text-[9px] font-black text-red-500 leading-none">N</span>
-                  <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[6px] border-l-transparent border-r-transparent border-b-red-500" />
-                </div>
-              </div>
-              {/* Rotation arrows (4 directions) */}
-              <button
-                onClick={() => setRotateZ(prev => prev - 15)}
-                className="absolute left-[4px] top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold transition-colors border border-gray-300"
-                title="Rotate left"
-              >
-                ↺
-              </button>
-              <button
-                onClick={() => setRotateZ(prev => prev + 15)}
-                className="absolute right-[4px] top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold transition-colors border border-gray-300"
-                title="Rotate right"
-              >
-                ↻
-              </button>
-              <button
-                onClick={() => setTiltX(prev => Math.min(75, prev + 10))}
-                className="absolute top-[4px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold transition-colors border border-gray-300"
-                title="Tilt more (more perspective)"
-              >
-                ↑
-              </button>
-              <button
-                onClick={() => setTiltX(prev => Math.max(0, prev - 10))}
-                className="absolute bottom-[4px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold transition-colors border border-gray-300"
-                title="Tilt less (more overhead)"
-              >
-                ↓
-              </button>
-              {/* Center reset */}
-              <button
-                onClick={() => { setRotateZ(0); setTiltX(50) }}
-                className="absolute inset-0 m-auto w-6 h-6 rounded-full bg-white hover:bg-gray-100 flex items-center justify-center text-[8px] font-black text-gray-600 border border-gray-300 transition-colors"
-                title="Reset rotation & tilt"
-              >
-                ⟲
-              </button>
-            </div>
-          )}
-
           {/* Zoom controls */}
           <div className="flex flex-col bg-white/90 rounded-lg border-2 border-gray-300 shadow-lg backdrop-blur-sm overflow-hidden">
             <button

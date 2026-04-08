@@ -61,6 +61,9 @@ export default function ProfilePage() {
   const [allAssignments, setAllAssignments] = useState<EnrichedAssignment[]>([])
   const [myAssignments, setMyAssignments] = useState<EnrichedAssignment[]>([])
 
+  // All campers for Sharing Tent With dropdown
+  const [allCampersList, setAllCampersList] = useState<{ id: string; full_name: string; playa_name: string | null }[]>([])
+
   const fetchProfile = useCallback(async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -100,6 +103,13 @@ export default function ProfilePage() {
       if (camperData) {
         setEditCamper(camperData)
       }
+
+      // Fetch all campers for Sharing Tent With dropdown
+      const { data: campersForDropdown } = await supabase
+        .from('campers')
+        .select('id, full_name, playa_name')
+        .order('full_name') as unknown as { data: { id: string; full_name: string; playa_name: string | null }[] | null }
+      setAllCampersList((campersForDropdown || []).filter(c => c.id !== camperData?.id))
     }
 
     setPhotos(photosResult.data || [])
@@ -290,6 +300,7 @@ export default function ProfilePage() {
       volunteer_commitment: editCamper.volunteer_commitment,
       sober_shifts: editCamper.sober_shifts,
       background_check_consent: editCamper.background_check_consent,
+      sharing_tent_with: editCamper.sharing_tent_with || null,
     }
 
     const { error } = await supabase
@@ -724,6 +735,19 @@ export default function ProfilePage() {
                     value={editCamper.orientation_preference || 'any'}
                     onChange={(e) => updateField('orientation_preference', e.target.value as CamperRow['orientation_preference'])}
                     options={orientationPreferences.map(o => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
+                  />
+                  <Select
+                    label="Sharing Tent With"
+                    value={editCamper.sharing_tent_with || ''}
+                    onChange={(e) => updateField('sharing_tent_with', e.target.value || null)}
+                    placeholder="None"
+                    options={[
+                      { value: '', label: 'None' },
+                      ...allCampersList.map(c => ({
+                        value: c.id,
+                        label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                      })),
+                    ]}
                   />
                 </CardContent>
               </Card>

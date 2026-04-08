@@ -75,6 +75,7 @@ export interface CamperRow {
   layout_y: number | null
   zone_assignment: string | null
   placement_locked: boolean
+  sharing_tent_with: string | null
   is_admin: boolean
   notes: string | null
 }
@@ -126,6 +127,7 @@ export interface CamperInsert {
   layout_y?: number | null
   zone_assignment?: string | null
   placement_locked?: boolean
+  sharing_tent_with?: string | null
   is_admin?: boolean
   notes?: string | null
 }
@@ -177,6 +179,7 @@ export interface CamperUpdate {
   layout_y?: number | null
   zone_assignment?: string | null
   placement_locked?: boolean
+  sharing_tent_with?: string | null
   is_admin?: boolean
   notes?: string | null
 }
