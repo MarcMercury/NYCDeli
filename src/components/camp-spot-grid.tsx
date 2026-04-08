@@ -9,6 +9,7 @@ import { doesTentFitSpot } from '@/lib/camp-spots'
 const spotColors = {
   available: 'bg-emerald-100 border-emerald-500 hover:bg-emerald-200 cursor-pointer',
   reserved: 'bg-red-100 border-red-400 cursor-not-allowed opacity-70',
+  joinable: 'bg-orange-100 border-orange-400 hover:bg-orange-200 cursor-pointer',
   yours: 'bg-yellow-300 border-yellow-600 hover:bg-yellow-400 cursor-pointer ring-2 ring-yellow-600',
   selected: 'bg-blue-300 border-blue-600 ring-2 ring-blue-600',
   tooSmall: 'bg-orange-100 border-orange-400 cursor-not-allowed opacity-50',
@@ -63,9 +64,9 @@ export function SpotGrid({
 
   function getSpotState(spot: CampSpotWithReservation) {
     if (!spot.is_available) return 'unavailable'
-    if (spot.reservation?.camper_id === currentCamperId) return 'yours'
+    if (spot.reservations.some(r => r.camper_id === currentCamperId)) return 'yours'
     if (spot.id === selectedSpotId) return 'selected'
-    if (spot.reservation) return 'reserved'
+    if (spot.reservations.length >= spot.max_occupants) return 'reserved'
 
     // Check tent fit (only for non-admin camper selection)
     if (!isAdmin && currentTentWidth != null && currentTentLength != null) {
@@ -77,13 +78,16 @@ export function SpotGrid({
       }
     }
 
+    if (spot.reservations.length > 0) return 'joinable'
     return 'available'
   }
 
   function getTooltip(spot: CampSpotWithReservation, state: string) {
     const base = `${spot.label} — ${spot.spot_width_ft}×${spot.spot_length_ft}ft (${spot.size_category.toUpperCase()})`
+    const names = spot.campers.map(c => c.playa_name || c.full_name).join(', ')
     if (state === 'yours') return `${base}\n🏕️ YOUR SPOT — Click to release`
-    if (state === 'reserved') return `${base}\n🔒 Reserved by ${spot.camper?.playa_name || spot.camper?.full_name || 'someone'}`
+    if (state === 'reserved') return `${base}\n🔒 Full (${spot.reservations.length}/${spot.max_occupants}): ${names}`
+    if (state === 'joinable') return `${base}\n🤝 ${names} — ${spot.max_occupants - spot.reservations.length} spot(s) open. Click to join!`
     if (state === 'tooBig') return `${base}\n⚠️ Your tent is too large for this spot`
     if (state === 'tooSmall') return `${base}\n⚠️ Your tent is too small for this spot`
     if (state === 'unavailable') return `${base}\n🚫 Not available`
@@ -96,15 +100,15 @@ export function SpotGrid({
       onSelectSpot(spot)
       return
     }
-    if (state === 'available' || state === 'yours' || state === 'selected') {
+    if (state === 'available' || state === 'yours' || state === 'selected' || state === 'joinable') {
       onSelectSpot(spot)
     }
   }
 
   // Stats
   const totalSpots = spots.length
-  const availableSpots = spots.filter(s => s.is_available && !s.reservation).length
-  const reservedSpots = spots.filter(s => s.reservation?.status === 'reserved').length
+  const availableSpots = spots.filter(s => s.is_available && s.reservations.length < s.max_occupants).length
+  const fullSpots = spots.filter(s => s.reservations.length >= s.max_occupants).length
 
   return (
     <div className="space-y-6">
@@ -117,7 +121,7 @@ export function SpotGrid({
           Available: {availableSpots}
         </span>
         <span className="px-3 py-1 bg-red-100 border-2 border-red-500">
-          Reserved: {reservedSpots}
+          Full: {fullSpots}
         </span>
       </div>
 
@@ -129,7 +133,11 @@ export function SpotGrid({
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 bg-red-100 border-2 border-red-400" />
-          <span>Reserved</span>
+          <span>Full</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-orange-100 border-2 border-orange-400" />
+          <span>Joinable</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 bg-yellow-300 border-2 border-yellow-600" />
@@ -174,7 +182,7 @@ export function SpotGrid({
                 {rowSpots.map((spot) => {
                   const state = getSpotState(spot)
                   const tooltip = getTooltip(spot, state)
-                  const isClickable = isAdmin || state === 'available' || state === 'yours' || state === 'selected'
+                  const isClickable = isAdmin || state === 'available' || state === 'yours' || state === 'selected' || state === 'joinable'
 
                   return (
                     <button
@@ -213,7 +221,14 @@ export function SpotGrid({
                         {spot.is_accessible && <span className="text-[8px]" title="Accessible">♿</span>}
                       </div>
 
-                      {/* Reserved indicator */}
+                      {/* Occupancy indicator */}
+                      {spot.reservations.length > 0 && (
+                        <div className="text-[7px] font-bold mt-0.5">
+                          {spot.reservations.length}/{spot.max_occupants}
+                        </div>
+                      )}
+
+                      {/* Full indicator */}
                       {state === 'reserved' && (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <span className="text-red-500 text-lg font-black opacity-30">✕</span>
@@ -257,15 +272,16 @@ export function SpotGrid({
           <div className="text-sm space-y-1 mt-1">
             <p>Size: <span className="font-bold">{hoveredSpot.spot_width_ft}×{hoveredSpot.spot_length_ft}ft</span> ({hoveredSpot.size_category})</p>
             <p>Tent range: {hoveredSpot.min_tent_width_ft}-{hoveredSpot.max_tent_width_ft}ft W × {hoveredSpot.min_tent_length_ft}-{hoveredSpot.max_tent_length_ft}ft L</p>
+            <p>Occupancy: <span className="font-bold">{hoveredSpot.reservations.length}/{hoveredSpot.max_occupants}</span></p>
             <div className="flex gap-2 text-xs">
               {hoveredSpot.has_power && <span className="px-1 bg-yellow-100 border border-yellow-500">⚡ Power</span>}
               {hoveredSpot.has_shade && <span className="px-1 bg-blue-100 border border-blue-500">⛱️ Shade</span>}
               {hoveredSpot.is_accessible && <span className="px-1 bg-purple-100 border border-purple-500">♿ Accessible</span>}
             </div>
-            {hoveredSpot.reservation && (
-              <p className="text-red-600 font-bold">
-                Reserved by: {hoveredSpot.camper?.playa_name || hoveredSpot.camper?.full_name || 'Unknown'}
-              </p>
+            {hoveredSpot.campers.length > 0 && (
+              <div className="text-red-600 font-bold">
+                {hoveredSpot.campers.map(c => c.playa_name || c.full_name).join(', ')}
+              </div>
             )}
           </div>
         </div>

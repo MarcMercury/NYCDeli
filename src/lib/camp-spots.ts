@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
-import type { CampSpotRow, CampReservationRow, CampSpotWithReservation, FloorplanObjectRow } from '@/types/database'
+import type { CampSpotRow, CampReservationRow, CampSpotWithReservation, CampSpotCamperInfo, FloorplanObjectRow } from '@/types/database'
 
-/** Fetch all spots with their active reservation + camper info */
+/** Fetch all spots with their active reservations + camper info (supports tent sharing) */
 export async function fetchSpotsWithReservations(): Promise<CampSpotWithReservation[]> {
   const supabase = createClient()
 
@@ -20,39 +20,53 @@ export async function fetchSpotsWithReservations(): Promise<CampSpotWithReservat
 
   if (resError) throw resError
 
-  // Fetch camper info for reserved spots
+  // Fetch camper info for all active reservations
   const camperIds = (reservations ?? [])
     .filter((r) => r.status === 'reserved')
     .map((r) => r.camper_id)
 
-  const { data: campers } = camperIds.length > 0
+  const uniqueCamperIds = [...new Set(camperIds)]
+
+  const { data: campers } = uniqueCamperIds.length > 0
     ? await supabase
         .from('campers')
         .select('id, full_name, playa_name, shelter_type, shelter_width_ft, shelter_length_ft')
-        .in('id', camperIds) as { data: CampSpotWithReservation['camper'][] | null }
-    : { data: [] as CampSpotWithReservation['camper'][] }
+        .in('id', uniqueCamperIds) as { data: CampSpotCamperInfo[] | null }
+    : { data: [] as CampSpotCamperInfo[] }
 
   const camperMap = new Map(
     (campers ?? []).map((c) => [c!.id, c])
   )
 
-  const reservationBySpot = new Map(
-    (reservations ?? [])
-      .filter((r) => r.status === 'reserved')
-      .map((r) => [r.spot_id, r])
-  )
+  // Group reservations by spot (supports multiple per spot for tent sharing)
+  const reservationsBySpot = new Map<string, CampReservationRow[]>()
+  for (const r of (reservations ?? []).filter((r) => r.status === 'reserved')) {
+    const existing = reservationsBySpot.get(r.spot_id) ?? []
+    existing.push(r)
+    reservationsBySpot.set(r.spot_id, existing)
+  }
 
   return spots.map((spot) => {
-    const res = reservationBySpot.get(spot.id)
+    const spotReservations = reservationsBySpot.get(spot.id) ?? []
+    const spotCampers = spotReservations
+      .map((r) => camperMap.get(r.camper_id))
+      .filter((c): c is CampSpotCamperInfo => c != null)
+    // Primary reservation (first / is_primary=true) for backward-compat
+    const primaryRes = spotReservations.find(r => r.is_primary) ?? spotReservations[0] ?? null
     return {
       ...spot,
-      reservation: res ?? null,
-      camper: res ? (camperMap.get(res.camper_id) ?? null) : null,
+      // Legacy single fields (backward compat)
+      reservation: primaryRes,
+      camper: primaryRes ? (camperMap.get(primaryRes.camper_id) ?? null) : null,
+      // New array fields for tent sharing
+      reservations: spotReservations,
+      campers: spotCampers,
     }
   })
 }
 
-/** Reserve a spot for a camper (releases any existing reservation first) */
+/** Reserve a spot for a camper (releases any existing reservation first).
+ *  Supports tent sharing: multiple campers can reserve the same spot up to max_occupants. */
 export async function reserveSpot(
   spotId: string,
   camperId: string,
@@ -60,12 +74,39 @@ export async function reserveSpot(
 ): Promise<void> {
   const supabase = createClient()
 
-  // Release any existing reservation for this camper first
+  // Check how many active reservations this spot already has
+  const { data: existingRes } = await supabase
+    .from('camp_reservations' as never)
+    .select('*')
+    .eq('spot_id' as never, spotId)
+    .eq('status' as never, 'reserved') as unknown as { data: CampReservationRow[] | null }
+
+  // Fetch the spot to check max_occupants
+  const { data: spotData } = await supabase
+    .from('camp_spots' as never)
+    .select('max_occupants')
+    .eq('id' as never, spotId)
+    .single() as unknown as { data: { max_occupants: number } | null }
+
+  const maxOccupants = spotData?.max_occupants ?? 2
+  const currentCount = (existingRes ?? []).length
+
+  // Don't count this camper if they already have a reservation on this spot
+  const alreadyOnSpot = (existingRes ?? []).some(r => r.camper_id === camperId)
+
+  if (!alreadyOnSpot && currentCount >= maxOccupants) {
+    throw new Error(`This spot is full (${currentCount}/${maxOccupants} occupants).`)
+  }
+
+  // Release any existing reservation for this camper on OTHER spots
   await supabase
     .from('camp_reservations' as never)
     .delete()
     .eq('camper_id' as never, camperId)
     .eq('status' as never, 'reserved')
+
+  // First reservation on the spot = primary
+  const isPrimary = currentCount === 0 || (alreadyOnSpot && currentCount === 1)
 
   const { error } = await supabase
     .from('camp_reservations' as never)
@@ -74,6 +115,7 @@ export async function reserveSpot(
       camper_id: camperId,
       status: 'reserved',
       reserved_by: reservedBy ?? camperId,
+      is_primary: isPrimary,
     } as never)
 
   if (error) throw error

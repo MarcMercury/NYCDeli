@@ -272,9 +272,10 @@ function MapObject3D({
   // Selection ring color
   let ringColor = 'transparent'
   if (isSelected) ringColor = '#3b82f6'
-  else if (spot && !spot.reservation) ringColor = '#10b981'
-  else if (spot?.reservation && camper && spot.reservation.camper_id === camper.id) ringColor = '#eab308'
-  else if (spot?.reservation) ringColor = '#ef4444'
+  else if (spot && spot.reservations.length === 0) ringColor = '#10b981'
+  else if (spot && camper && spot.reservations.some(r => r.camper_id === camper.id)) ringColor = '#eab308'
+  else if (spot && spot.reservations.length >= spot.max_occupants) ringColor = '#ef4444'
+  else if (spot && spot.reservations.length > 0) ringColor = '#f97316' // orange — joinable
 
   return (
     <group
@@ -342,7 +343,7 @@ function MapObject3D({
           }}
         >
           {obj.label || obj.object_type.replace(/_/g, ' ')}
-          {spot?.reservation?.camper_id === camper?.id && ' ⭐'}
+          {camper && spot?.reservations.some(r => r.camper_id === camper.id) && ' ⭐'}
         </Html>
       )}
     </group>

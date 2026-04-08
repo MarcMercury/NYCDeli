@@ -643,6 +643,7 @@ export interface CampSpotRow {
   is_available: boolean
   notes: string | null
   floorplan_object_id: string | null
+  max_occupants: number
 }
 
 export interface CampSpotInsert {
@@ -663,6 +664,7 @@ export interface CampSpotInsert {
   is_available?: boolean
   notes?: string | null
   floorplan_object_id?: string | null
+  max_occupants?: number
 }
 
 export interface CampSpotUpdate {
@@ -682,6 +684,7 @@ export interface CampSpotUpdate {
   is_accessible?: boolean
   is_available?: boolean
   notes?: string | null
+  max_occupants?: number
 }
 
 export interface CampReservationRow {
@@ -693,6 +696,7 @@ export interface CampReservationRow {
   status: ReservationStatus
   reserved_by: string | null
   admin_notes: string | null
+  is_primary: boolean
 }
 
 export interface CampReservationInsert {
@@ -701,6 +705,7 @@ export interface CampReservationInsert {
   status?: ReservationStatus
   reserved_by?: string | null
   admin_notes?: string | null
+  is_primary?: boolean
 }
 
 export interface CampReservationUpdate {
@@ -709,6 +714,7 @@ export interface CampReservationUpdate {
   status?: ReservationStatus
   reserved_by?: string | null
   admin_notes?: string | null
+  is_primary?: boolean
 }
 
 // Deli Idea Forum Types
@@ -759,10 +765,19 @@ export type CampSpot = CampSpotRow
 export type CampReservation = CampReservationRow
 export type DeliIdea = DeliIdeaRow
 
-// Extended type for spot with reservation info
+// Camper info included with spot reservations
+export type CampSpotCamperInfo = Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'shelter_type' | 'shelter_width_ft' | 'shelter_length_ft'>
+
+// Extended type for spot with reservation info (supports tent sharing)
 export interface CampSpotWithReservation extends CampSpotRow {
+  /** @deprecated Use reservations[] instead */
   reservation: CampReservationRow | null
-  camper: Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'shelter_type' | 'shelter_width_ft' | 'shelter_length_ft'> | null
+  /** @deprecated Use campers[] instead */
+  camper: CampSpotCamperInfo | null
+  /** All active reservations for this spot (tent sharing) */
+  reservations: CampReservationRow[]
+  /** All campers occupying this spot */
+  campers: CampSpotCamperInfo[]
 }
 
 // ==========================================

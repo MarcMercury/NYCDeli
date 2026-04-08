@@ -395,8 +395,8 @@ export function CampMap() {
         const type = obj.object_type.replace(/_/g, ' ').toLowerCase()
         // Also match camper playa_name for reserved spots
         const spot = obj.properties?.reservable ? findSpotForObject(obj) : null
-        const camperName = spot?.camper?.playa_name?.toLowerCase() || spot?.camper?.full_name?.toLowerCase() || ''
-        return label.includes(q) || type.includes(q) || camperName.includes(q)
+        const camperNames = spot?.campers.map(c => (c.playa_name || c.full_name || '').toLowerCase()).join(' ') || ''
+        return label.includes(q) || type.includes(q) || camperNames.includes(q)
       }).slice(0, 12)
     : []
 
@@ -470,19 +470,19 @@ export function CampMap() {
     try {
       const spot = selectedObject.spot
 
-      // Release existing reservation if camper already has one
-      const existingReservation = spots.find(s => s.reservation?.camper_id === camper.id)
-      if (existingReservation?.reservation) {
-        await releaseReservation(existingReservation.reservation.id)
-      }
-
+      // reserveSpot() handles releasing existing reservation on other spots internally
       await reserveSpot(spot.id, camper.id)
-      setSuccess(`Spot ${spot.label} is yours! 🏕️`)
+
+      const tentMates = spot.campers.filter(c => c.id !== camper.id)
+      const shareMsg = tentMates.length > 0
+        ? ` Sharing with ${tentMates.map(c => c.playa_name || c.full_name).join(', ')}.`
+        : ''
+      setSuccess(`Spot ${spot.label} is yours! 🏕️${shareMsg}`)
       setWizardStep(null)
       setSelectedObject(null)
       await loadData()
-    } catch {
-      setError('Failed to reserve spot. It may have just been taken.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reserve spot. It may be full.')
       await loadData()
     } finally {
       setActionLoading(false)
@@ -491,13 +491,15 @@ export function CampMap() {
 
   // Release your spot
   async function handleReleaseSpot(spot: CampSpotWithReservation) {
-    if (!spot.reservation) return
+    if (!camper) return
+    const myRes = spot.reservations.find(r => r.camper_id === camper.id)
+    if (!myRes) return
     setActionLoading(true)
     setError(null)
     setSuccess(null)
 
     try {
-      await releaseReservation(spot.reservation.id)
+      await releaseReservation(myRes.id)
       setSuccess(`Spot ${spot.label} released.`)
       setSelectedObject(null)
       setWizardStep(null)
@@ -640,16 +642,21 @@ export function CampMap() {
     if (!obj.properties?.reservable) return ''
     const spot = findSpotForObject(obj)
     if (!spot) return 'ring-4 ring-emerald-400'
-    if (spot.reservation && camper && spot.reservation.camper_id === camper.id) return 'ring-4 ring-yellow-400'
-    if (spot.reservation) return 'ring-4 ring-red-400'
+    const isMine = camper && spot.reservations.some(r => r.camper_id === camper.id)
+    if (isMine) return 'ring-4 ring-yellow-400'
+    if (spot.reservations.length >= spot.max_occupants) return 'ring-4 ring-red-400'
+    if (spot.reservations.length > 0) return 'ring-4 ring-orange-400' // partially occupied, joinable
     return 'ring-4 ring-emerald-400'
   }
 
   // Sorted objects by z-index — all always visible
   const visibleObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
 
-  // My reservation
-  const myReservation = camper ? spots.find(s => s.reservation?.camper_id === camper.id) : undefined
+  // My reservation (supports tent sharing — find the spot where I'm one of the campers)
+  const myReservation = camper ? spots.find(s => s.reservations.some(r => r.camper_id === camper.id)) : undefined
+  const myReservationRecord = camper && myReservation
+    ? myReservation.reservations.find(r => r.camper_id === camper.id)
+    : undefined
 
   if (loading) {
     return (
@@ -735,10 +742,13 @@ export function CampMap() {
                         <div className="font-bold text-white truncate">{obj.label || obj.object_type.replace(/_/g, ' ')}</div>
                         <div className="text-gray-400 text-[10px]">{obj.object_type.replace(/_/g, ' ')} • {obj.width_ft}×{obj.height_ft}ft</div>
                       </div>
-                      {spot?.reservation && (
-                        <span className="text-[10px] bg-red-500/20 text-red-400 px-1 rounded">Taken</span>
+                      {spot && spot.reservations.length >= spot.max_occupants && (
+                        <span className="text-[10px] bg-red-500/20 text-red-400 px-1 rounded">Full</span>
                       )}
-                      {spot && !spot.reservation && (
+                      {spot && spot.reservations.length > 0 && spot.reservations.length < spot.max_occupants && (
+                        <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1 rounded">{spot.reservations.length}/{spot.max_occupants}</span>
+                      )}
+                      {spot && spot.reservations.length === 0 && (
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 rounded">Open</span>
                       )}
                     </button>
@@ -1169,11 +1179,17 @@ export function CampMap() {
                           {isReservable && (() => {
                             const spot = findSpotForObject(obj)
                             if (!spot) return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
-                            if (spot.reservation && camper && spot.reservation.camper_id === camper.id) {
+                            const isMine = camper && spot.reservations.some(r => r.camper_id === camper.id)
+                            if (isMine) {
                               return <span className="text-[7px] bg-yellow-500 text-black px-1 rounded-sm mt-0.5 font-bold">YOUR SPOT</span>
                             }
-                            if (spot.reservation) {
-                              return <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">{spot.camper?.playa_name || 'Taken'}</span>
+                            if (spot.reservations.length >= spot.max_occupants) {
+                              const names = spot.campers.map(c => c.playa_name || c.full_name).join(', ')
+                              return <span className="text-[7px] bg-red-500 text-white px-1 rounded-sm mt-0.5">{names || 'Full'}</span>
+                            }
+                            if (spot.reservations.length > 0) {
+                              const names = spot.campers.map(c => c.playa_name || c.full_name).join(', ')
+                              return <span className="text-[7px] bg-orange-400 text-white px-1 rounded-sm mt-0.5">{names} +{spot.max_occupants - spot.reservations.length}</span>
                             }
                             return <span className="text-[7px] bg-emerald-500 text-white px-1 rounded-sm mt-0.5">AVAILABLE</span>
                           })()}
@@ -1397,39 +1413,69 @@ export function CampMap() {
                       {selectedObject.spot.is_accessible && <span className="px-2 py-0.5 bg-purple-100 border border-purple-500">♿ Accessible</span>}
                     </div>
 
-                    {/* Reservation status */}
-                    {selectedObject.spot.reservation && selectedObject.spot.reservation.camper_id !== camper?.id && (
-                      <div className="p-2 bg-red-50 border border-red-300 text-xs text-center">
-                        <p className="font-bold text-red-700">🔒 Reserved by {selectedObject.spot.camper?.playa_name || selectedObject.spot.camper?.full_name || 'a camper'}</p>
-                      </div>
-                    )}
+                    {/* Occupancy info */}
+                    {(() => {
+                      const spot = selectedObject.spot!
+                      const isMine = camper && spot.reservations.some(r => r.camper_id === camper.id)
+                      const isFull = spot.reservations.length >= spot.max_occupants
+                      const occupantCount = spot.reservations.length
 
-                    {/* Your spot — release option */}
-                    {selectedObject.spot.reservation && camper && selectedObject.spot.reservation.camper_id === camper.id && (
-                      <div className="space-y-2">
-                        <div className="p-2 bg-yellow-50 border-2 border-yellow-400 text-center">
-                          <p className="font-black">🏕️ This is YOUR spot!</p>
-                        </div>
-                        <Button
-                          variant="danger"
-                          onClick={() => handleReleaseSpot(selectedObject.spot!)}
-                          loading={actionLoading}
-                          className="w-full"
-                        >
-                          🔓 Release This Spot
-                        </Button>
-                      </div>
-                    )}
+                      return (
+                        <>
+                          {/* Show all current occupants */}
+                          {occupantCount > 0 && (
+                            <div className="p-2 bg-gray-50 border text-xs space-y-1">
+                              <p className="font-bold text-gray-700">🏕️ Occupants ({occupantCount}/{spot.max_occupants}):</p>
+                              {spot.campers.map((c) => (
+                                <div key={c.id} className="flex justify-between">
+                                  <span>{c.playa_name || c.full_name}</span>
+                                  {camper && c.id === camper.id && (
+                                    <span className="text-yellow-600 font-bold">← You</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
-                    {/* RESERVE button — only if spot is available and not already yours */}
-                    {!selectedObject.spot.reservation && !wizardStep && (
-                      <Button
-                        onClick={handleStartReserve}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider text-base py-3"
-                      >
-                        🏕️ Reserve This Spot
-                      </Button>
-                    )}
+                          {/* Full spot — not your spot */}
+                          {isFull && !isMine && (
+                            <div className="p-2 bg-red-50 border border-red-300 text-xs text-center">
+                              <p className="font-bold text-red-700">🔒 This tent is full ({occupantCount}/{spot.max_occupants})</p>
+                            </div>
+                          )}
+
+                          {/* Your spot — release option */}
+                          {isMine && camper && (
+                            <div className="space-y-2">
+                              <div className="p-2 bg-yellow-50 border-2 border-yellow-400 text-center">
+                                <p className="font-black">🏕️ This is YOUR spot!</p>
+                                {occupantCount > 1 && (
+                                  <p className="text-xs text-gray-600 mt-1">Sharing with {spot.campers.filter(c => c.id !== camper.id).map(c => c.playa_name || c.full_name).join(', ')}</p>
+                                )}
+                              </div>
+                              <Button
+                                variant="danger"
+                                onClick={() => handleReleaseSpot(spot)}
+                                loading={actionLoading}
+                                className="w-full"
+                              >
+                                🔓 Release This Spot
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* RESERVE / JOIN button — available if spot has room and it's not already yours */}
+                          {!isMine && !isFull && !wizardStep && (
+                            <Button
+                              onClick={handleStartReserve}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider text-base py-3"
+                            >
+                              {occupantCount > 0 ? '🤝 Join This Tent' : '🏕️ Reserve This Spot'}
+                            </Button>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                 )}
 
@@ -1576,12 +1622,22 @@ export function CampMap() {
                     <p className="font-bold text-yellow-800">⚠️ You currently have spot {myReservation.label}. Reserving this one will release your current spot.</p>
                   </div>
                 )}
+                {/* Tent sharing notice */}
+                {selectedObject.spot.reservations.length > 0 && (
+                  <div className="p-2 bg-blue-50 border border-blue-300 text-xs">
+                    <p className="font-bold text-blue-800">🤝 Tent Sharing — You&apos;ll be joining:</p>
+                    {selectedObject.spot.campers.map(c => (
+                      <p key={c.id} className="ml-2">• {c.playa_name || c.full_name}</p>
+                    ))}
+                    <p className="text-blue-600 mt-1">({selectedObject.spot.reservations.length}/{selectedObject.spot.max_occupants} occupants)</p>
+                  </div>
+                )}
                 <Button
                   onClick={handleConfirmReserve}
                   loading={actionLoading}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-wider text-base py-3"
                 >
-                  🏕️ Confirm Reservation
+                  {selectedObject.spot.reservations.length > 0 ? '🤝 Confirm & Join Tent' : '🏕️ Confirm Reservation'}
                 </Button>
                 <button
                   type="button"
@@ -1668,7 +1724,8 @@ export function CampMap() {
               <p>🔍 <strong>Find button</strong> to search &amp; jump to any area</p>
               <p>👆 <strong>Click any object</strong> to see details</p>
               <p>🟢 <strong>Green ring</strong> = available tent spot</p>
-              <p>🔴 <strong>Red ring</strong> = taken by another camper</p>
+              <p>� <strong>Orange ring</strong> = has room for tent-mates</p>
+              <p>🔴 <strong>Red ring</strong> = tent is full</p>
               <p>🟡 <strong>Yellow ring</strong> = your reserved spot</p>
             </CardContent>
           </Card>
@@ -1676,7 +1733,7 @@ export function CampMap() {
           {/* Stats footer */}
           <div className="text-[10px] text-gray-400 text-center space-y-0.5 pt-2">
             <p>{config.name} — {config.width_ft}×{config.length_ft}ft</p>
-            <p>{objects.length} objects • {spots.filter(s => !s.reservation).length}/{spots.length} spots available</p>
+            <p>{objects.length} objects • {spots.filter(s => s.reservations.length < s.max_occupants).length}/{spots.length} spots with room</p>
           </div>
           </div>
         </div>
