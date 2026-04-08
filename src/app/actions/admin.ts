@@ -84,7 +84,7 @@ export async function updateUserRoleAction(
   await requireAdmin()
 
   // Prevent non-admin from escalating roles (defense in depth)
-  if (!['user', 'admin', 'pending'].includes(newRole)) {
+  if (!['user', 'builder', 'admin', 'pending'].includes(newRole)) {
     return { success: false, error: 'Invalid role' }
   }
 

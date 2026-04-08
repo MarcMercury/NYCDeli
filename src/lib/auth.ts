@@ -49,6 +49,10 @@ export async function requireRole(requiredRole: UserRole) {
     redirect('/')
   }
 
+  if (requiredRole === 'builder' && profile.role !== 'builder' && profile.role !== 'admin') {
+    redirect('/')
+  }
+
   if (requiredRole === 'user' && profile.role === 'pending') {
     redirect('/pending')
   }
@@ -58,6 +62,10 @@ export async function requireRole(requiredRole: UserRole) {
 
 export async function requireApproved() {
   return requireRole('user')
+}
+
+export async function requireBuilder() {
+  return requireRole('builder')
 }
 
 export async function requireAdmin() {

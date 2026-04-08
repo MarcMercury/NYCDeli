@@ -14,18 +14,18 @@ const publicNavItems = [
   { href: '/intake', label: 'Register', icon: '📝' },
 ]
 
-const userNavItems = [
+const baseNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
   { href: '/campers', label: 'Campers', icon: '🐀' },
   { href: '/profile', label: 'Profile', icon: '👤' },
   { href: '/events', label: 'Events', icon: '🗓️' },
   { href: '/map', label: 'Camp Map', icon: '🏕️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
-  { href: '/build-week', label: 'Build Week', icon: '🔨' },
   { href: '/ideas', label: 'Ideas', icon: '💡' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
+const buildWeekNavItem = { href: '/build-week', label: 'Build Week', icon: '🔨' }
 const adminNavItem = { href: '/admin', label: 'Admin', icon: '⚙️' }
 
 export function Navigation() {
@@ -69,7 +69,8 @@ export function Navigation() {
 
   const navItems = (() => {
     if (!isLoggedIn || userRole === 'pending') return publicNavItems
-    const items = [...userNavItems]
+    const items = [...baseNavItems]
+    if (userRole === 'builder' || userRole === 'admin') items.splice(6, 0, buildWeekNavItem)
     if (userRole === 'admin') items.push(adminNavItem)
     return items
   })()

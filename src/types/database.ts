@@ -182,7 +182,7 @@ export interface CamperUpdate {
 }
 
 // Auth & User Profile Types (defined before Database interface for type resolution)
-export type UserRole = 'pending' | 'user' | 'admin'
+export type UserRole = 'pending' | 'user' | 'builder' | 'admin'
 
 export interface UserProfileRow {
   id: string
