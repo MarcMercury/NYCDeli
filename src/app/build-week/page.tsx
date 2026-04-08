@@ -11,7 +11,6 @@ import {
   fetchBuildStagesWithGoals,
   fetchBuildResources,
   fetchBuildProcedures,
-  fetchBuildQuestions,
   fetchBuildWeekBuilders,
   fetchBuildInventory,
   fetchBuildSchedule,
@@ -20,14 +19,10 @@ import {
   deleteScheduleItem,
   reorderScheduleItems,
   updateGoalStatus,
-  updateQuestionStatus,
-  updateBuildQuestion,
-  deleteBuildQuestion,
   updateResourceStatus,
   createBuildResource,
   updateBuildResource,
   deleteBuildResource,
-  createBuildQuestion,
   createInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
@@ -44,7 +39,6 @@ import type {
   BuildStageWithGoals,
   BuildResource,
   BuildProcedure,
-  BuildQuestion,
   BuildGoal,
   BuildInventory,
   BuildScheduleItem,
@@ -52,7 +46,6 @@ import type {
   BuildScheduleCategory,
   TaskStatus,
   BuildResourceStatus,
-  BuildQuestionStatus,
   BuildCategory,
   InventoryCategory,
   Camper,
@@ -64,7 +57,6 @@ const tabs: Tab[] = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'electrical', label: 'Electrical Load' },
-  { id: 'issues', label: "Q's & Issues" },
   { id: 'shade', label: 'Shade Guide' },
   { id: 'schedule', label: 'Build Schedule' },
 ]
@@ -108,18 +100,12 @@ export default function BuildWeekPage() {
   const [stages, setStages] = useState<BuildStageWithGoals[]>([])
   const [resources, setResources] = useState<BuildResource[]>([])
   const [procedures, setProcedures] = useState<BuildProcedure[]>([])
-  const [questions, setQuestions] = useState<BuildQuestion[]>([])
   const [builders, setBuilders] = useState<Camper[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
   const [resourceStatusFilter, setResourceStatusFilter] = useState<string>('all')
   const [updatingGoals, setUpdatingGoals] = useState<Record<string, boolean>>({})
   const [updatingResources, setUpdatingResources] = useState<Record<string, boolean>>({})
-  const [updatingQuestions, setUpdatingQuestions] = useState<Record<string, boolean>>({})
-  const [resolutionInputs, setResolutionInputs] = useState<Record<string, string>>({})
-  const [showResolutionInput, setShowResolutionInput] = useState<Record<string, boolean>>({})
-  const [questionFilter, setQuestionFilter] = useState<'all' | 'open' | 'resolved' | 'deferred'>('all')
-  const [editingQuestion, setEditingQuestion] = useState<BuildQuestion | null>(null)
   const [expandedRef, setExpandedRef] = useState<Record<string, boolean>>({ schedule: true })
   const [showAddResource, setShowAddResource] = useState(false)
   const [editingResource, setEditingResource] = useState<BuildResource | null>(null)
@@ -130,8 +116,6 @@ export default function BuildWeekPage() {
   const [editingInventory, setEditingInventory] = useState<BuildInventory | null>(null)
   const [savingInventory, setSavingInventory] = useState(false)
   const [updatingInventory, setUpdatingInventory] = useState<Record<string, boolean>>({})
-  const [showAddQuestion, setShowAddQuestion] = useState(false)
-  const [savingQuestion, setSavingQuestion] = useState(false)
   const [unifiedCategoryFilter, setUnifiedCategoryFilter] = useState<string>('all')
   const [unifiedStatusFilter, setUnifiedStatusFilter] = useState<string>('all')
   const [addItemType, setAddItemType] = useState<'resource' | 'checklist' | null>(null)
@@ -150,12 +134,11 @@ export default function BuildWeekPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [stagesData, resourcesData, proceduresData, questionsData, buildersData, inventoryData, scheduleData] =
+      const [stagesData, resourcesData, proceduresData, buildersData, inventoryData, scheduleData] =
         await Promise.all([
           fetchBuildStagesWithGoals(),
           fetchBuildResources(),
           fetchBuildProcedures(),
-          fetchBuildQuestions(),
           fetchBuildWeekBuilders(),
           fetchBuildInventory(),
           fetchBuildSchedule(),
@@ -163,7 +146,6 @@ export default function BuildWeekPage() {
       setStages(stagesData)
       setResources(resourcesData)
       setProcedures(proceduresData)
-      setQuestions(questionsData)
       setBuilders(buildersData)
       setInventory(inventoryData)
       setScheduleItems(scheduleData)
@@ -220,71 +202,6 @@ export default function BuildWeekPage() {
       // Silently fail
     } finally {
       setUpdatingResources(prev => ({ ...prev, [resourceId]: false }))
-    }
-  }
-
-  const handleQuestionStatusChange = async (questionId: string, newStatus: BuildQuestionStatus, resolution?: string) => {
-    setUpdatingQuestions(prev => ({ ...prev, [questionId]: true }))
-    try {
-      await updateQuestionStatus(questionId, newStatus, resolution)
-      setQuestions(prev =>
-        prev.map(q =>
-          q.id === questionId
-            ? { ...q, status: newStatus, ...(resolution !== undefined ? { resolution } : {}) }
-            : q
-        )
-      )
-      setShowResolutionInput(prev => ({ ...prev, [questionId]: false }))
-      setResolutionInputs(prev => ({ ...prev, [questionId]: '' }))
-    } catch {
-      // Silently fail
-    } finally {
-      setUpdatingQuestions(prev => ({ ...prev, [questionId]: false }))
-    }
-  }
-
-  const handleAddQuestion = async (data: QuestionFormData) => {
-    setSavingQuestion(true)
-    try {
-      const newQuestion = await createBuildQuestion(data)
-      setQuestions(prev => [...prev, newQuestion])
-      setShowAddQuestion(false)
-    } catch {
-      // Silently fail
-    } finally {
-      setSavingQuestion(false)
-    }
-  }
-
-  const handleEditQuestion = async (data: QuestionFormData) => {
-    if (!editingQuestion) return
-    setSavingQuestion(true)
-    try {
-      await updateBuildQuestion(editingQuestion.id, data)
-      setQuestions(prev =>
-        prev.map(q => q.id === editingQuestion.id
-          ? { ...q, question: data.question, category: data.category as BuildCategory, context: data.context ?? null, is_pain_point: data.is_pain_point ?? q.is_pain_point }
-          : q
-        )
-      )
-      setEditingQuestion(null)
-    } catch {
-      // Silently fail
-    } finally {
-      setSavingQuestion(false)
-    }
-  }
-
-  const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm('Delete this question/issue?')) return
-    setUpdatingQuestions(prev => ({ ...prev, [questionId]: true }))
-    try {
-      await deleteBuildQuestion(questionId)
-      setQuestions(prev => prev.filter(q => q.id !== questionId))
-    } catch {
-      // Silently fail
-    } finally {
-      setUpdatingQuestions(prev => ({ ...prev, [questionId]: false }))
     }
   }
 
@@ -460,9 +377,6 @@ export default function BuildWeekPage() {
       ? resources
       : resources.filter(r => r.status === resourceStatusFilter)
 
-  const filteredQuestions =
-    questionFilter === 'all' ? questions : questions.filter(q => q.status === questionFilter)
-
   const filteredInventory =
     inventoryCategoryFilter === 'all'
       ? inventory
@@ -475,7 +389,6 @@ export default function BuildWeekPage() {
   const totalGoals = stages.reduce((sum, s) => sum + s.goals.length, 0)
   const doneGoals = stages.reduce((sum, s) => sum + s.goals.filter(g => g.status === 'done').length, 0)
   const overallProgress = totalGoals > 0 ? Math.round((doneGoals / totalGoals) * 100) : 0
-  const openIssueCount = questions.filter(q => q.status === 'open').length
   const needCount = resources.filter(r => r.status === 'need').length
 
   // ── Unified inventory: merge resources + checklist items ──
@@ -534,19 +447,6 @@ export default function BuildWeekPage() {
     exportToCSV('build-week-inventory.csv', headers, rows)
   }
 
-  const handleExportQuestions = () => {
-    const headers = ['Question', 'Category', 'Status', 'Pain Point', 'Context', 'Resolution']
-    const rows = filteredQuestions.map(q => [
-      q.question,
-      q.category,
-      q.status,
-      q.is_pain_point ? 'Yes' : 'No',
-      q.context || '',
-      q.resolution || '',
-    ])
-    exportToCSV('build-week-questions.csv', headers, rows)
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -573,7 +473,6 @@ export default function BuildWeekPage() {
             <span className="font-bold">{doneGoals}/{totalGoals} tasks</span>
             <div className="flex gap-3 text-xs text-gray-400">
               {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
-              {openIssueCount > 0 && <span className="text-yellow-600">{openIssueCount} open</span>}
               {inventory.length > 0 && <span>{verifiedCount}/{inventory.length} verified</span>}
               <span>{builders.length} builders</span>
             </div>
@@ -1052,196 +951,6 @@ export default function BuildWeekPage() {
                     </div>
                   )
                 })}
-            </div>
-          )}
-        </TabPanel>
-
-        {/* ═══════════  Q'S & ISSUES  ═══════════ */}
-        <TabPanel tabId="issues" activeTab={activeTab}>
-          <div className="flex items-center gap-2 mb-4">
-            <select
-              value={questionFilter}
-              onChange={e => setQuestionFilter(e.target.value as typeof questionFilter)}
-              className="px-3 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
-            >
-              <option value="all">All ({questions.length})</option>
-              <option value="open">Open ({questions.filter(q => q.status === 'open').length})</option>
-              <option value="resolved">Resolved ({questions.filter(q => q.status === 'resolved').length})</option>
-              <option value="deferred">Deferred ({questions.filter(q => q.status === 'deferred').length})</option>
-            </select>
-            <button
-              onClick={handleExportQuestions}
-              className="px-3 py-1 text-xs font-bold border-2 border-black bg-white hover:bg-gray-100 transition-colors"
-              title="Export as CSV"
-            >
-              📥 Export
-            </button>
-            <button
-              onClick={() => setShowAddQuestion(true)}
-              className="ml-auto px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
-            >
-              + Add
-            </button>
-          </div>
-
-          {showAddQuestion && (
-            <QuestionForm
-              saving={savingQuestion}
-              onSave={handleAddQuestion}
-              onCancel={() => setShowAddQuestion(false)}
-            />
-          )}
-
-          {editingQuestion && (
-            <QuestionForm
-              initialData={editingQuestion}
-              saving={savingQuestion}
-              onSave={handleEditQuestion}
-              onCancel={() => setEditingQuestion(null)}
-            />
-          )}
-
-          {filteredQuestions.length === 0 ? (
-            <p className="text-gray-400 text-sm">No items match this filter.</p>
-          ) : (
-            <div className="border-2 border-black bg-white overflow-x-auto">
-              {/* Table header */}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 text-[11px] font-black uppercase tracking-wider bg-gray-100 border-b-2 border-black">
-                <div className="px-3 py-2">Status</div>
-                <div className="px-3 py-2">Question / Issue</div>
-                <div className="px-3 py-2 text-center">Actions</div>
-                <div className="px-3 py-2 text-center">Edit</div>
-                <div className="px-3 py-2 text-center">Delete</div>
-              </div>
-
-              {/* Table rows */}
-              {filteredQuestions.map(q => (
-                <div key={q.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 border-b border-gray-100 last:border-b-0 items-center hover:bg-gray-50 transition-colors">
-                  {/* Status icon */}
-                  <div className="px-3 py-2.5 flex-shrink-0 text-center">
-                    {q.status === 'resolved' ? '✅' : q.status === 'deferred' ? '⏸️' : q.is_pain_point ? '🔥' : '❓'}
-                  </div>
-
-                  {/* Question text + context + resolution */}
-                  <div className="px-3 py-2.5 min-w-0">
-                    {showResolutionInput[q.id] ? (
-                      <div className="flex gap-2 w-full">
-                        <input
-                          type="text"
-                          value={resolutionInputs[q.id] || ''}
-                          onChange={e => setResolutionInputs(prev => ({ ...prev, [q.id]: e.target.value }))}
-                          placeholder="How was this resolved?"
-                          className="flex-1 px-2 py-1 text-sm border-2 border-black focus:outline-none"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => handleQuestionStatusChange(q.id, 'resolved', resolutionInputs[q.id] || '')}
-                          disabled={updatingQuestions[q.id]}
-                          className="px-3 py-1 text-xs font-bold bg-green-500 text-white hover:bg-green-600 whitespace-nowrap"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: false }))}
-                          className="px-3 py-1 text-xs font-bold bg-gray-200 hover:bg-gray-300"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <p className={cn(
-                          'text-sm',
-                          q.status === 'resolved' && 'line-through text-gray-400'
-                        )}>
-                          {q.question}
-                          {q.is_pain_point && q.status === 'open' && (
-                            <span className="ml-1.5 text-[10px] font-bold text-red-600">PAIN POINT</span>
-                          )}
-                        </p>
-                        {q.context && (
-                          <p className="text-xs text-gray-400 mt-0.5">{q.context}</p>
-                        )}
-                        {q.resolution && (
-                          <p className="text-xs text-green-700 mt-0.5">→ {q.resolution}</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Action buttons column */}
-                  <div className="px-3 py-2.5 flex items-center gap-1.5">
-                    {q.status === 'open' && (
-                      <>
-                        <button
-                          onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
-                          disabled={updatingQuestions[q.id]}
-                          className="px-2 py-0.5 text-[11px] font-bold border bg-green-50 border-green-300 text-green-700 hover:bg-green-100 whitespace-nowrap"
-                        >
-                          Resolve
-                        </button>
-                        <button
-                          onClick={() => handleQuestionStatusChange(q.id, 'deferred')}
-                          disabled={updatingQuestions[q.id]}
-                          className="px-2 py-0.5 text-[11px] font-bold border bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100 whitespace-nowrap"
-                        >
-                          Defer
-                        </button>
-                      </>
-                    )}
-                    {q.status === 'deferred' && (
-                      <>
-                        <button
-                          onClick={() => setShowResolutionInput(prev => ({ ...prev, [q.id]: true }))}
-                          disabled={updatingQuestions[q.id]}
-                          className="px-2 py-0.5 text-[11px] font-bold border bg-green-50 border-green-300 text-green-700 hover:bg-green-100 whitespace-nowrap"
-                        >
-                          Resolve
-                        </button>
-                        <button
-                          onClick={() => handleQuestionStatusChange(q.id, 'open')}
-                          disabled={updatingQuestions[q.id]}
-                          className="px-2 py-0.5 text-[11px] font-bold border bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap"
-                        >
-                          Reopen
-                        </button>
-                      </>
-                    )}
-                    {q.status === 'resolved' && (
-                      <button
-                        onClick={() => handleQuestionStatusChange(q.id, 'open')}
-                        disabled={updatingQuestions[q.id]}
-                        className="px-2 py-0.5 text-[11px] font-bold border bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 whitespace-nowrap"
-                      >
-                        Reopen
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Edit button */}
-                  <div className="px-3 py-2.5 text-center">
-                    <button
-                      onClick={() => setEditingQuestion(q)}
-                      className="px-2 py-0.5 text-[11px] font-bold border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
-                      title="Edit"
-                    >
-                      ✏️
-                    </button>
-                  </div>
-
-                  {/* Delete button */}
-                  <div className="px-3 py-2.5 text-center">
-                    <button
-                      onClick={() => handleDeleteQuestion(q.id)}
-                      disabled={updatingQuestions[q.id]}
-                      className="px-2 py-0.5 text-[11px] font-bold border bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </TabPanel>
@@ -2142,101 +1851,6 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
           )}
         >
           {saving ? 'Saving…' : item ? 'Save Changes' : 'Add Item'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-1.5 text-sm font-bold bg-gray-200 hover:bg-gray-300"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  )
-}
-
-// ── Question / Issue Form ──
-
-type QuestionFormData = {
-  question: string
-  category: string
-  context?: string
-  is_pain_point?: boolean
-}
-
-function QuestionForm({ initialData, saving, onSave, onCancel }: {
-  initialData?: { question: string; category: string; context?: string | null; is_pain_point?: boolean }
-  saving: boolean
-  onSave: (data: QuestionFormData) => void
-  onCancel: () => void
-}) {
-  const [question, setQuestion] = useState(initialData?.question || '')
-  const [category, setCategory] = useState<string>(initialData?.category || 'logistics')
-  const [context, setContext] = useState(initialData?.context || '')
-  const [isPainPoint, setIsPainPoint] = useState(initialData?.is_pain_point || false)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!question.trim()) return
-    onSave({
-      question: question.trim(),
-      category,
-      context: context.trim() || undefined,
-      is_pain_point: isPainPoint,
-    })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="border-2 border-black bg-gray-50 p-3 mb-4 space-y-2">
-      <input
-        type="text"
-        value={question}
-        onChange={e => setQuestion(e.target.value)}
-        placeholder="Question or issue *"
-        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
-        autoFocus
-      />
-
-      <div className="flex gap-2">
-        <select
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-          className="px-3 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
-        >
-          {CATEGORIES.map(c => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
-
-        <label className="flex items-center gap-1.5 text-sm font-bold cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isPainPoint}
-            onChange={e => setIsPainPoint(e.target.checked)}
-            className="w-4 h-4"
-          />
-          🔥 Pain Point
-        </label>
-      </div>
-
-      <input
-        type="text"
-        value={context}
-        onChange={e => setContext(e.target.value)}
-        placeholder="Context / details (optional)"
-        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
-      />
-
-      <div className="flex gap-2 pt-1">
-        <button
-          type="submit"
-          disabled={saving || !question.trim()}
-          className={cn(
-            'px-4 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800',
-            (saving || !question.trim()) && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          {saving ? 'Saving…' : initialData ? 'Save' : 'Add'}
         </button>
         <button
           type="button"
