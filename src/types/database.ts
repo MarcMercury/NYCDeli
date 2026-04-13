@@ -1092,6 +1092,7 @@ export interface BuildGoalRow {
   responsible_party: string | null
   estimated_people: number | null
   notes: string | null
+  floorplan_object_id: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -1110,6 +1111,7 @@ export interface BuildResourceRow {
   confirmed_working: boolean
   notes: string | null
   install_day: string | null
+  floorplan_object_id: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -1170,12 +1172,13 @@ export interface BuildInventoryRow {
   confirmed_working: boolean
   notes: string | null
   install_day: string | null
+  floorplan_object_id: string | null
   sort_order: number
   created_at: string
   updated_at: string
 }
 
-export type BuildScheduleDay = 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+export type BuildScheduleDay = 'pre_build' | 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 export type BuildScheduleCategory = 'delivery' | 'infrastructure' | 'shade' | 'kitchen' | 'electrical' | 'plumbing' | 'layout' | 'decoration' | 'logistics' | 'safety' | 'other'
 
 export interface BuildScheduleItemRow {
@@ -1190,6 +1193,9 @@ export interface BuildScheduleItemRow {
   completed: boolean
   assigned_to: string | null
   notes: string | null
+  floorplan_object_id: string | null
+  goal_id: string | null
+  stage_id: string | null
   created_at: string
   updated_at: string
 }
@@ -1229,6 +1235,7 @@ export interface ElectricalLoadItemRow {
   total_wattage: number
   notes: string | null
   distro_box_id: string | null
+  floorplan_object_id: string | null
   sort_order: number
   created_at: string
   updated_at: string

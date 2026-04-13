@@ -280,6 +280,7 @@ export async function createInventoryItem(item: {
   size_l?: string
   quantity_expected: number
   notes?: string
+  floorplan_object_id?: string | null
 }): Promise<BuildInventory> {
   const supabase = createClient()
   const { data: existing } = await supabase
@@ -311,6 +312,7 @@ export async function updateInventoryItem(itemId: string, updates: {
   verified_at?: string | null
   confirmed_working?: boolean
   notes?: string | null
+  floorplan_object_id?: string | null
 }) {
   const supabase = createClient()
   const { error } = await supabase
@@ -404,10 +406,11 @@ export const INVENTORY_CATEGORY_ICONS: Record<string, string> = {
 // ==========================================
 
 export const BUILD_SCHEDULE_DAYS = [
-  'saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+  'pre_build', 'saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
 ] as const
 
 export const BUILD_SCHEDULE_DAY_LABELS: Record<string, string> = {
+  pre_build: 'PRE-Build Week',
   saturday: 'Saturday',
   sunday: 'Sunday',
   monday: 'Monday',
@@ -607,6 +610,7 @@ export async function createElectricalLoadItem(item: {
   total_wattage: number
   notes?: string
   distro_box_id?: string | null
+  floorplan_object_id?: string | null
 }): Promise<ElectricalLoadItem> {
   const supabase = createClient()
   const { data: existing } = await supabase
@@ -642,6 +646,7 @@ export async function updateElectricalLoadItem(id: string, updates: {
   total_wattage?: number
   notes?: string | null
   distro_box_id?: string | null
+  floorplan_object_id?: string | null
 }): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase

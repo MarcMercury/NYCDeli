@@ -7,6 +7,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import ElectricalLoadTab from './electrical-load-tab'
+import LayoutSyncTab from './layout-sync-tab'
 import {
   fetchBuildStagesWithGoals,
   fetchBuildResources,
@@ -57,12 +58,22 @@ type Tab = { id: string; label: string }
 
 const tabs: Tab[] = [
   { id: 'roster', label: 'Roster' },
-  { id: 'schedule', label: 'Build Schedule' },
+  { id: 'schedule', label: 'Schedule' },
   { id: 'inventory', label: 'Inventory' },
-  { id: 'tasks', label: 'Tasks' },
   { id: 'electrical', label: 'Electrical Load' },
+  { id: 'layout-sync', label: 'Layout Sync' },
   { id: 'shade', label: 'Shade Guide' },
 ]
+
+/** Map build_stages.stage values to schedule day keys */
+const STAGE_TO_DAY: Record<string, string> = {
+  planning: 'pre_build',
+  monday: 'monday',
+  tuesday: 'tuesday',
+  wednesday: 'wednesday',
+  thursday: 'thursday',
+  friday: 'friday',
+}
 
 type UnifiedItem = {
   id: string
@@ -391,10 +402,13 @@ export default function BuildWeekPage() {
   const inventoryCategories = Array.from(new Set(inventory.map(i => i.category))).sort()
   const verifiedCount = inventory.filter(i => i.verified).length
 
-  // Overall stats
+  // Overall stats (combined schedule items + goals)
   const totalGoals = stages.reduce((sum, s) => sum + s.goals.length, 0)
   const doneGoals = stages.reduce((sum, s) => sum + s.goals.filter(g => g.status === 'done').length, 0)
-  const overallProgress = totalGoals > 0 ? Math.round((doneGoals / totalGoals) * 100) : 0
+  const completedScheduleItems = scheduleItems.filter(i => i.completed).length
+  const totalAll = totalGoals + scheduleItems.length
+  const doneAll = doneGoals + completedScheduleItems
+  const overallProgress = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0
   const needCount = resources.filter(r => r.status === 'need').length
 
   // ── Unified inventory: merge resources + checklist items ──
@@ -476,7 +490,7 @@ export default function BuildWeekPage() {
         {/* ── Progress summary — one glanceable strip ── */}
         <div className="border-2 border-black bg-white p-3">
           <div className="flex items-center justify-between text-sm mb-1.5">
-            <span className="font-bold">{doneGoals}/{totalGoals} tasks</span>
+            <span className="font-bold">{doneAll}/{totalAll} tasks</span>
             <div className="flex gap-3 text-xs text-gray-400">
               {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
               {inventory.length > 0 && <span>{verifiedCount}/{inventory.length} verified</span>}
@@ -571,73 +585,6 @@ export default function BuildWeekPage() {
                 </div>
               </div>
             )}
-          </div>
-        </TabPanel>
-
-        {/* ═══════════  TASKS  ═══════════ */}
-        <TabPanel tabId="tasks" activeTab={activeTab}>
-          <div className="space-y-3">
-            {stages.map(stage => {
-              const { goals } = stage
-              const progress = getStageProgress(goals)
-              const isExpanded = expandedStages[stage.id]
-              const doneCount = goals.filter(g => g.status === 'done').length
-              const isComplete = goals.length > 0 && doneCount === goals.length
-
-              return (
-                <div
-                  key={stage.id}
-                  className={cn(
-                    'border-2 bg-white',
-                    isComplete ? 'border-green-300' : 'border-black'
-                  )}
-                >
-                  {/* Stage row */}
-                  <button
-                    onClick={() => setExpandedStages(prev => ({ ...prev, [stage.id]: !prev[stage.id] }))}
-                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-lg">{STAGE_ICONS[stage.stage] || '📋'}</span>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-bold text-sm uppercase tracking-wide">{stage.title}</span>
-                      {stage.date_label && (
-                        <span className="text-xs text-gray-400 ml-2">{stage.date_label}</span>
-                      )}
-                      <ProgressBar value={progress} className="mt-1 h-1" />
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 tabular-nums">
-                      {doneCount}/{goals.length}
-                    </span>
-                    <span className="text-gray-300">{isExpanded ? '▾' : '▸'}</span>
-                  </button>
-
-                  {/* Expanded goal list */}
-                  {isExpanded && (
-                    <div className="border-t-2 border-inherit divide-y divide-gray-100">
-                      {stage.builder_notes && (
-                        <p className="px-4 py-2 text-xs text-blue-600 bg-blue-50/60">
-                          {stage.builder_notes}
-                        </p>
-                      )}
-
-                      {goals.length === 0 ? (
-                        <p className="text-gray-400 text-sm px-4 py-3">No goals yet.</p>
-                      ) : (
-                        goals.map(goal => (
-                          <GoalRow
-                            key={goal.id}
-                            goal={goal}
-                            updating={!!updatingGoals[goal.id]}
-                            nextStatus={GOAL_STATUS_CYCLE[goal.status]}
-                            onToggle={() => handleGoalStatusChange(goal.id, goal.status)}
-                          />
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
           </div>
         </TabPanel>
 
@@ -1366,7 +1313,7 @@ export default function BuildWeekPage() {
           </div>
         </TabPanel>
 
-        {/* ═══════════  BUILD SCHEDULE  ═══════════ */}
+        {/* ═══════════  SCHEDULE (combined schedule + tasks)  ═══════════ */}
         <TabPanel tabId="schedule" activeTab={activeTab}>
           <div className="flex items-center justify-between mb-4">
             <p className="text-[11px] text-gray-400 uppercase tracking-wider font-bold">
@@ -1383,27 +1330,56 @@ export default function BuildWeekPage() {
           <div className="space-y-3">
             {BUILD_SCHEDULE_DAYS.map(day => {
               const dayItems = scheduleItems.filter(item => item.day === day)
-              const completedCount = dayItems.filter(i => i.completed).length
+              const matchingStage = stages.find(s => STAGE_TO_DAY[s.stage] === day)
+              const dayGoals = matchingStage ? matchingStage.goals : []
+
+              // Combined progress
+              const completedSchedule = dayItems.filter(i => i.completed).length
+              const doneGoals = dayGoals.filter(g => g.status === 'done').length
+              const totalCount = dayItems.length + dayGoals.length
+              const completedCount = completedSchedule + doneGoals
+              const dayProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
               const isExpanded = expandedScheduleDays[day] !== false
+              const isPreBuild = day === 'pre_build'
+              const isComplete = totalCount > 0 && completedCount === totalCount
 
               return (
-                <div key={day} className="border border-gray-200 bg-white">
+                <div key={day} className={cn(
+                  'border-2 bg-white',
+                  isPreBuild ? 'border-purple-400' : isComplete ? 'border-green-300' : 'border-black'
+                )}>
                   <button
                     onClick={() => setExpandedScheduleDays(prev => ({ ...prev, [day]: !isExpanded }))}
-                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                    className={cn(
+                      'w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors',
+                      isPreBuild && 'bg-purple-50/40'
+                    )}
                   >
-                    <span className="text-lg">📅</span>
-                    <span className="flex-1 font-bold text-sm">
-                      {BUILD_SCHEDULE_DAY_LABELS[day]}
-                    </span>
-                    {dayItems.length > 0 && (
-                      <span className="text-[10px] text-gray-400">
-                        {completedCount}/{dayItems.length} done
+                    <span className="text-lg">{isPreBuild ? '📋' : '📅'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm uppercase tracking-wide">
+                          {BUILD_SCHEDULE_DAY_LABELS[day]}
+                        </span>
+                        {isPreBuild && (
+                          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">
+                            PREP
+                          </span>
+                        )}
+                      </div>
+                      {totalCount > 0 && (
+                        <ProgressBar value={dayProgress} className="mt-1.5 h-1.5" />
+                      )}
+                    </div>
+                    {totalCount > 0 && (
+                      <span className="text-[10px] font-bold text-gray-400 tabular-nums">
+                        {completedCount}/{totalCount}
                       </span>
                     )}
                     {dayItems.some(i => i.is_delivery) && (
                       <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
-                        🚚 Deliveries
+                        🚚
                       </span>
                     )}
                     <span className="text-gray-300 text-xs">{isExpanded ? '▾' : '▸'}</span>
@@ -1411,16 +1387,24 @@ export default function BuildWeekPage() {
 
                   {isExpanded && (
                     <div className="border-t border-gray-100">
-                      {dayItems.length === 0 ? (
+                      {/* Stage builder notes if present */}
+                      {matchingStage?.builder_notes && (
+                        <p className="px-4 py-2 text-xs text-blue-600 bg-blue-50/60 border-b border-gray-100">
+                          {matchingStage.builder_notes}
+                        </p>
+                      )}
+
+                      {totalCount === 0 ? (
                         <p className="px-4 py-3 text-xs text-gray-400 italic">No items scheduled</p>
                       ) : (
                         <div className="divide-y divide-gray-50">
+                          {/* Schedule items */}
                           {dayItems.map((item, idx) => (
                             <ScheduleItemRow
                               key={item.id}
                               item={item}
                               isFirst={idx === 0}
-                              isLast={idx === dayItems.length - 1}
+                              isLast={idx === dayItems.length - 1 && dayGoals.length === 0}
                               onToggleComplete={async () => {
                                 const updated = await updateScheduleItem(item.id, { completed: !item.completed })
                                 setScheduleItems(prev => prev.map(i => i.id === item.id ? updated : i))
@@ -1476,6 +1460,28 @@ export default function BuildWeekPage() {
                               }}
                             />
                           ))}
+
+                          {/* Goals from matching stage */}
+                          {dayGoals.length > 0 && (
+                            <>
+                              {dayItems.length > 0 && (
+                                <div className="px-4 py-1.5 bg-gray-50 border-y border-gray-100">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                    Tasks
+                                  </span>
+                                </div>
+                              )}
+                              {dayGoals.map(goal => (
+                                <GoalRow
+                                  key={goal.id}
+                                  goal={goal}
+                                  updating={!!updatingGoals[goal.id]}
+                                  nextStatus={GOAL_STATUS_CYCLE[goal.status]}
+                                  onToggle={() => handleGoalStatusChange(goal.id, goal.status)}
+                                />
+                              ))}
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1489,6 +1495,11 @@ export default function BuildWeekPage() {
         {/* ═══════  ELECTRICAL LOAD  ═══════ */}
         <TabPanel tabId="electrical" activeTab={activeTab}>
           <ElectricalLoadTab />
+        </TabPanel>
+
+        {/* ═══════  LAYOUT SYNC  ═══════ */}
+        <TabPanel tabId="layout-sync" activeTab={activeTab}>
+          <LayoutSyncTab />
         </TabPanel>
 
         {/* Schedule Item Form Modal */}
