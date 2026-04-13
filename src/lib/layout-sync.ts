@@ -147,6 +147,10 @@ export interface LayoutAuditItem {
   needsInventory: boolean
   /** Whether this type should have an electrical link */
   needsElectrical: boolean
+  /** True if directly linked OR covered by a group inventory row */
+  coveredByInventory: boolean
+  /** True if directly linked OR covered by a group electrical row */
+  coveredByElectrical: boolean
 }
 
 export interface LayoutAuditSummary {
@@ -167,21 +171,30 @@ export interface LayoutAuditSummary {
 /**
  * Fetch a full audit of layout objects vs. inventory/electrical/schedule.
  * Returns every trackable floorplan object and its linked records.
+ *
+ * Uses TWO matching strategies:
+ *   1. Direct link via floorplan_object_id (strongest match)
+ *   2. Type-based coverage: an inventory row whose quantity_expected
+ *      covers the count of objects of that type on the map
  */
 export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAuditSummary> {
   const supabase = createClient()
 
-  // Fetch all three in parallel
-  const [objRes, invRes, resRes, elecRes] = await Promise.all([
+  // Fetch all data in parallel
+  const [objRes, invAllRes, resRes, elecAllRes] = await Promise.all([
     supabase.from('floorplan_objects').select('*').eq('floorplan_id', floorplanId),
-    supabase.from('build_inventory').select('*').not('floorplan_object_id', 'is', null),
+    supabase.from('build_inventory').select('*'),
     supabase.from('build_resources').select('*').not('floorplan_object_id', 'is', null),
-    supabase.from('electrical_load_items').select('*').not('floorplan_object_id', 'is', null),
+    supabase.from('electrical_load_items').select('*'),
   ])
 
   const objects = (objRes.data || []) as FloorplanObjectRow[]
+  const allInventory = (invAllRes.data || []) as BuildInventoryRow[]
+  const allElectrical = (elecAllRes.data || []) as ElectricalLoadItemRow[]
+
+  // Build direct-link maps
   const inventoryByObj = new Map<string, BuildInventoryRow>()
-  for (const row of (invRes.data || []) as BuildInventoryRow[]) {
+  for (const row of allInventory) {
     if (row.floorplan_object_id) inventoryByObj.set(row.floorplan_object_id, row)
   }
   const resourcesByObj = new Map<string, BuildResourceRow>()
@@ -189,11 +202,72 @@ export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAudit
     if (row.floorplan_object_id) resourcesByObj.set(row.floorplan_object_id, row)
   }
   const elecByObj = new Map<string, ElectricalLoadItemRow>()
-  for (const row of (elecRes.data || []) as ElectricalLoadItemRow[]) {
+  for (const row of allElectrical) {
     if (row.floorplan_object_id) elecByObj.set(row.floorplan_object_id, row)
   }
 
+  // Build type-based coverage maps:
+  // Inventory rows whose category matches the object type's mapped category
+  // → sum their quantity_expected to see if total covers the placed count
+  const invCategoryMap = new Map<InventoryCategory, { total: number; rows: BuildInventoryRow[] }>()
+  for (const row of allInventory) {
+    const cat = row.category as InventoryCategory
+    const entry = invCategoryMap.get(cat) || { total: 0, rows: [] }
+    entry.total += row.quantity_expected
+    entry.rows.push(row)
+    invCategoryMap.set(cat, entry)
+  }
+
+  // Electrical: sum quantity across all items that share a type-match
+  const elecSumByType = new Map<FloorplanObjectType, { totalQty: number; rows: ElectricalLoadItemRow[] }>()
+  for (const row of allElectrical) {
+    // Try to determine which object type this electrical item covers
+    // based on its floorplan_object_id linking or name matching
+    if (row.floorplan_object_id) {
+      const obj = objects.find(o => o.id === row.floorplan_object_id)
+      if (obj) {
+        const entry = elecSumByType.get(obj.object_type) || { totalQty: 0, rows: [] }
+        entry.totalQty += row.quantity
+        entry.rows.push(row)
+        elecSumByType.set(obj.object_type, entry)
+      }
+    }
+  }
+
+  // Count objects by type
+  const objectsByType = new Map<FloorplanObjectType, FloorplanObjectRow[]>()
   const typeCounts: Record<string, number> = {}
+  for (const obj of objects) {
+    const t = obj.object_type
+    typeCounts[t] = (typeCounts[t] || 0) + 1
+    const arr = objectsByType.get(t) || []
+    arr.push(obj)
+    objectsByType.set(t, arr)
+  }
+
+  // Determine type-level coverage
+  const typeCoveredInventory = new Set<FloorplanObjectType>()
+  const typeCoveredElectrical = new Set<FloorplanObjectType>()
+  for (const [objType, objList] of objectsByType) {
+    if (SKIP_TYPES.has(objType)) continue
+    const invCat = INVENTORY_CATEGORY_MAP[objType]
+    if (invCat) {
+      const catInfo = invCategoryMap.get(invCat)
+      // Check if any linked inventory row references objects of this type
+      const directLinked = objList.filter(o => inventoryByObj.has(o.id)).length
+      if (directLinked > 0 || (catInfo && catInfo.total >= objList.length)) {
+        typeCoveredInventory.add(objType)
+      }
+    }
+    if (ELECTRICAL_DEFAULTS[objType]) {
+      const elecInfo = elecSumByType.get(objType)
+      const directLinked = objList.filter(o => elecByObj.has(o.id)).length
+      if (directLinked > 0 || (elecInfo && elecInfo.totalQty >= objList.length)) {
+        typeCoveredElectrical.add(objType)
+      }
+    }
+  }
+
   const items: LayoutAuditItem[] = []
   let totalLinkedInventory = 0
   let totalUnlinkedInventory = 0
@@ -202,8 +276,6 @@ export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAudit
 
   for (const obj of objects) {
     const t = obj.object_type
-    typeCounts[t] = (typeCounts[t] || 0) + 1
-
     if (SKIP_TYPES.has(t)) continue
 
     const needsInventory = !!INVENTORY_CATEGORY_MAP[t]
@@ -212,12 +284,16 @@ export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAudit
     const resourceItem = resourcesByObj.get(obj.id) || null
     const electricalItem = elecByObj.get(obj.id) || null
 
+    // An item is "covered" if directly linked OR type-level covered
+    const invCovered = !!inventoryItem || typeCoveredInventory.has(t)
+    const elecCovered = !!electricalItem || typeCoveredElectrical.has(t)
+
     if (needsInventory) {
-      if (inventoryItem) totalLinkedInventory++
+      if (invCovered) totalLinkedInventory++
       else totalUnlinkedInventory++
     }
     if (needsElectrical) {
-      if (electricalItem) totalLinkedElectrical++
+      if (elecCovered) totalLinkedElectrical++
       else totalUnlinkedElectrical++
     }
 
@@ -232,6 +308,8 @@ export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAudit
       electricalItem,
       needsInventory,
       needsElectrical,
+      coveredByInventory: invCovered,
+      coveredByElectrical: elecCovered,
     })
   }
 
@@ -257,15 +335,38 @@ export async function syncLayoutToInventory(floorplanId: string): Promise<number
 
   const [objRes, invRes] = await Promise.all([
     supabase.from('floorplan_objects').select('*').eq('floorplan_id', floorplanId),
-    supabase.from('build_inventory').select('id, floorplan_object_id').not('floorplan_object_id', 'is', null),
+    supabase.from('build_inventory').select('*'),
   ])
 
   const objects = (objRes.data || []) as FloorplanObjectRow[]
+  const allInventory = (invRes.data || []) as BuildInventoryRow[]
   const linkedIds = new Set(
-    ((invRes.data || []) as { id: string; floorplan_object_id: string | null }[])
+    allInventory
       .map(r => r.floorplan_object_id)
       .filter(Boolean)
   )
+
+  // Build type-level coverage: count objects per type, sum inventory qty per category
+  const objectCountByType = new Map<FloorplanObjectType, number>()
+  for (const obj of objects) {
+    if (!SKIP_TYPES.has(obj.object_type) && INVENTORY_CATEGORY_MAP[obj.object_type]) {
+      objectCountByType.set(obj.object_type, (objectCountByType.get(obj.object_type) || 0) + 1)
+    }
+  }
+  const invQtyByCategory = new Map<InventoryCategory, number>()
+  for (const row of allInventory) {
+    const cat = row.category as InventoryCategory
+    invQtyByCategory.set(cat, (invQtyByCategory.get(cat) || 0) + row.quantity_expected)
+  }
+  // Types already covered by existing inventory quantity
+  const coveredTypes = new Set<FloorplanObjectType>()
+  for (const [objType, count] of objectCountByType) {
+    const cat = INVENTORY_CATEGORY_MAP[objType]!
+    const directLinked = objects.filter(o => o.object_type === objType && linkedIds.has(o.id)).length
+    if (directLinked > 0 || (invQtyByCategory.get(cat) || 0) >= count) {
+      coveredTypes.add(objType)
+    }
+  }
 
   // Get max sort_order
   const { data: maxRow } = await supabase
@@ -279,6 +380,7 @@ export async function syncLayoutToInventory(floorplanId: string): Promise<number
   for (const obj of objects) {
     if (SKIP_TYPES.has(obj.object_type)) continue
     if (linkedIds.has(obj.id)) continue
+    if (coveredTypes.has(obj.object_type)) continue // already covered by existing inventory
 
     const category = INVENTORY_CATEGORY_MAP[obj.object_type]
     if (!category) continue
@@ -311,15 +413,40 @@ export async function syncLayoutToElectrical(floorplanId: string): Promise<numbe
 
   const [objRes, elecRes] = await Promise.all([
     supabase.from('floorplan_objects').select('*').eq('floorplan_id', floorplanId),
-    supabase.from('electrical_load_items').select('id, floorplan_object_id').not('floorplan_object_id', 'is', null),
+    supabase.from('electrical_load_items').select('*'),
   ])
 
   const objects = (objRes.data || []) as FloorplanObjectRow[]
+  const allElectrical = (elecRes.data || []) as ElectricalLoadItemRow[]
   const linkedIds = new Set(
-    ((elecRes.data || []) as { id: string; floorplan_object_id: string | null }[])
+    allElectrical
       .map(r => r.floorplan_object_id)
       .filter(Boolean)
   )
+
+  // Build type-level coverage for electrical
+  const objectCountByType = new Map<FloorplanObjectType, number>()
+  for (const obj of objects) {
+    if (ELECTRICAL_DEFAULTS[obj.object_type]) {
+      objectCountByType.set(obj.object_type, (objectCountByType.get(obj.object_type) || 0) + 1)
+    }
+  }
+  const elecLinkedByType = new Map<FloorplanObjectType, number>()
+  for (const row of allElectrical) {
+    if (row.floorplan_object_id) {
+      const obj = objects.find(o => o.id === row.floorplan_object_id)
+      if (obj) {
+        elecLinkedByType.set(obj.object_type, (elecLinkedByType.get(obj.object_type) || 0) + row.quantity)
+      }
+    }
+  }
+  const coveredTypes = new Set<FloorplanObjectType>()
+  for (const [objType, count] of objectCountByType) {
+    const directLinked = objects.filter(o => o.object_type === objType && linkedIds.has(o.id)).length
+    if (directLinked > 0 || (elecLinkedByType.get(objType) || 0) >= count) {
+      coveredTypes.add(objType)
+    }
+  }
 
   const { data: maxRow } = await supabase
     .from('electrical_load_items')
@@ -333,6 +460,7 @@ export async function syncLayoutToElectrical(floorplanId: string): Promise<numbe
     const defaults = ELECTRICAL_DEFAULTS[obj.object_type]
     if (!defaults) continue
     if (linkedIds.has(obj.id)) continue
+    if (coveredTypes.has(obj.object_type)) continue // already covered by existing electrical items
 
     const { error } = await supabase.from('electrical_load_items').insert({
       name: obj.label || obj.object_type.replace(/_/g, ' '),
@@ -364,15 +492,27 @@ export async function syncLayoutToSchedule(floorplanId: string): Promise<number>
 
   const [objRes, schedRes] = await Promise.all([
     supabase.from('floorplan_objects').select('*').eq('floorplan_id', floorplanId),
-    supabase.from('build_schedule_items').select('id, floorplan_object_id').not('floorplan_object_id', 'is', null),
+    supabase.from('build_schedule_items').select('*'),
   ])
 
   const objects = (objRes.data || []) as FloorplanObjectRow[]
+  const allSchedule = (schedRes.data || []) as { id: string; floorplan_object_id: string | null; title: string }[]
   const linkedIds = new Set(
-    ((schedRes.data || []) as { id: string; floorplan_object_id: string | null }[])
+    allSchedule
       .map(r => r.floorplan_object_id)
       .filter(Boolean)
   )
+
+  // Build type-level coverage: if there's already a schedule item for any
+  // object of this type, consider the type covered (schedule items are tasks,
+  // not quantity based)
+  const coveredTypes = new Set<FloorplanObjectType>()
+  for (const obj of objects) {
+    if (SKIP_TYPES.has(obj.object_type)) continue
+    if (linkedIds.has(obj.id)) {
+      coveredTypes.add(obj.object_type)
+    }
+  }
 
   const { data: maxRow } = await supabase
     .from('build_schedule_items')
@@ -385,6 +525,7 @@ export async function syncLayoutToSchedule(floorplanId: string): Promise<number>
   for (const obj of objects) {
     if (SKIP_TYPES.has(obj.object_type)) continue
     if (linkedIds.has(obj.id)) continue
+    if (coveredTypes.has(obj.object_type)) continue // already has schedule items for this type
 
     const category = SCHEDULE_CATEGORY_MAP[obj.object_type]
     if (!category) continue

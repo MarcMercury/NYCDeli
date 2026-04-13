@@ -94,8 +94,8 @@ export default function LayoutSyncTab() {
   // Filtered items
   const filteredItems = audit.items.filter(item => {
     if (typeFilter !== 'all' && item.objectType !== typeFilter) return false
-    if (linkFilter === 'linked' && !item.inventoryItem && !item.electricalItem) return false
-    if (linkFilter === 'unlinked' && (item.inventoryItem || item.electricalItem || (!item.needsInventory && !item.needsElectrical))) return false
+    if (linkFilter === 'linked' && !item.coveredByInventory && !item.coveredByElectrical) return false
+    if (linkFilter === 'unlinked' && (item.coveredByInventory || item.coveredByElectrical || (!item.needsInventory && !item.needsElectrical))) return false
     return true
   })
 
@@ -203,9 +203,9 @@ export default function LayoutSyncTab() {
                 {sortedGroups.map(([type, items]) => {
                   const trackable = isTrackableType(type as never)
                   const electrical = isElectricalType(type as never)
-                  const linkedInv = items.filter(i => i.inventoryItem).length
-                  const linkedElec = items.filter(i => i.electricalItem).length
-                  const allGood = (!trackable || linkedInv === items.length) && (!electrical || linkedElec === items.length)
+                  const coveredInv = items.filter(i => i.coveredByInventory).length
+                  const coveredElec = items.filter(i => i.coveredByElectrical).length
+                  const allGood = (!trackable || coveredInv === items.length) && (!electrical || coveredElec === items.length)
 
                   return (
                     <tr key={type} className="border-b border-gray-200 hover:bg-gray-50">
@@ -213,8 +213,8 @@ export default function LayoutSyncTab() {
                       <td className="text-center px-3 py-2">{items.length}</td>
                       <td className="text-center px-3 py-2">
                         {trackable ? (
-                          <span className={linkedInv === items.length ? 'text-green-600' : 'text-red-600 font-bold'}>
-                            {linkedInv}/{items.length}
+                          <span className={coveredInv === items.length ? 'text-green-600' : 'text-red-600 font-bold'}>
+                            {coveredInv}/{items.length}
                           </span>
                         ) : (
                           <span className="text-gray-300">—</span>
@@ -222,8 +222,8 @@ export default function LayoutSyncTab() {
                       </td>
                       <td className="text-center px-3 py-2">
                         {electrical ? (
-                          <span className={linkedElec === items.length ? 'text-green-600' : 'text-red-600 font-bold'}>
-                            {linkedElec}/{items.length}
+                          <span className={coveredElec === items.length ? 'text-green-600' : 'text-red-600 font-bold'}>
+                            {coveredElec}/{items.length}
                           </span>
                         ) : (
                           <span className="text-gray-300">—</span>
@@ -292,7 +292,7 @@ export default function LayoutSyncTab() {
                   </div>
                   <div className="flex gap-1.5 shrink-0">
                     {item.needsInventory && (
-                      item.inventoryItem ? (
+                      item.coveredByInventory ? (
                         <Badge variant="default" className="text-[9px] bg-green-100 text-green-800 border-green-300">
                           INV ✓
                         </Badge>
@@ -301,7 +301,7 @@ export default function LayoutSyncTab() {
                       )
                     )}
                     {item.needsElectrical && (
-                      item.electricalItem ? (
+                      item.coveredByElectrical ? (
                         <Badge variant="default" className="text-[9px] bg-blue-100 text-blue-800 border-blue-300">
                           ELEC ✓
                         </Badge>
