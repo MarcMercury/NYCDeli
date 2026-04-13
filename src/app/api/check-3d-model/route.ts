@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTextTo3DTask } from '@/lib/meshy'
+import { getTextTo3DTask, verifyTaskOwner } from '@/lib/meshy'
 import { requireAuthAPI } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -15,6 +15,11 @@ export async function GET(request: NextRequest) {
 
   if (!taskId) {
     return NextResponse.json({ error: 'task_id is required' }, { status: 400 })
+  }
+
+  // Verify the requesting user owns this task
+  if (!verifyTaskOwner(taskId, authResult.user.id)) {
+    return NextResponse.json({ error: 'Not authorized to check this task' }, { status: 403 })
   }
 
   try {

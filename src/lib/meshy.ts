@@ -3,6 +3,27 @@
 
 const MESHY_API_BASE = 'https://api.meshy.ai/openapi'
 
+// ─── Task ownership tracking (in-memory, suitable for ~70 campers) ──
+// Maps taskId → userId so we can verify ownership on status checks
+const taskOwnership = new Map<string, string>()
+
+// Clean up expired entries every 10 minutes (tasks are short-lived)
+setInterval(() => {
+  // Keep map size bounded; tasks older than 1 hour are stale
+  if (taskOwnership.size > 500) taskOwnership.clear()
+}, 600_000)
+
+export function registerTaskOwner(taskId: string, userId: string): void {
+  taskOwnership.set(taskId, userId)
+}
+
+export function verifyTaskOwner(taskId: string, userId: string): boolean {
+  const owner = taskOwnership.get(taskId)
+  // If no owner recorded (e.g. server restart), allow access
+  if (!owner) return true
+  return owner === userId
+}
+
 function getMeshyApiKey(): string {
   const key = process.env.MESHY_API_KEY
   if (!key) throw new Error('MESHY_API_KEY is not configured')

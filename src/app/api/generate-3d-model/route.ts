@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { chatCompletion } from '@/lib/openai'
-import { createTextTo3DTask } from '@/lib/meshy'
+import { chatCompletion, sanitizeForPrompt } from '@/lib/openai'
+import { createTextTo3DTask, registerTaskOwner } from '@/lib/meshy'
 import { requireAuthAPI } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -42,13 +42,13 @@ Rules:
 - Return ONLY the prompt text, nothing else`
 
     const userPrompt = `Generate a 3D model prompt for this Burning Man camp object:
-- Type: ${object_type.replace(/_/g, ' ')}
-- Label: "${label}"
+- Type: ${sanitizeForPrompt(object_type).replace(/_/g, ' ')}
+- Label: "${sanitizeForPrompt(label)}"
 - Real-world size: ${width_ft}ft × ${height_ft}ft
-- Base color: ${color}
+- Base color: ${sanitizeForPrompt(color)}
 - Elevation/height: ${properties?.elevation_ft || 'standard'}ft tall
-- Roof shape: ${properties?.roof_shape || 'flat'}
-- Additional properties: ${JSON.stringify(properties)}
+- Roof shape: ${sanitizeForPrompt(properties?.roof_shape) || 'flat'}
+- Additional properties: ${sanitizeForPrompt(JSON.stringify(properties))}
 
 Create a prompt that will generate a realistic 3D model of this object as it would appear at Burning Man in the Black Rock Desert.`
 
@@ -68,6 +68,9 @@ Create a prompt that will generate a realistic 3D model of this object as it wou
       art_style: 'realistic',
       negative_prompt: 'low quality, blurry, distorted, ugly, deformed',
     })
+
+    // Track ownership so check-3d-model can verify
+    registerTaskOwner(taskId, authResult.user.id)
 
     return NextResponse.json({
       task_id: taskId,

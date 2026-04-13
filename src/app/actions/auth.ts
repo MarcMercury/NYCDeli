@@ -4,6 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { rateLimit } from '@/lib/rate-limit'
+import { headers } from 'next/headers'
+
+async function getActionClientKey(): Promise<string> {
+  const h = await headers()
+  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+}
 
 const signUpSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -25,6 +32,12 @@ export type AuthState = {
 } | null
 
 export async function signUp(_prevState: AuthState, formData: FormData): Promise<AuthState> {
+  const clientKey = await getActionClientKey()
+  const rl = rateLimit(`auth:signup:${clientKey}`, 5, 60_000)
+  if (!rl.success) {
+    return { error: 'Too many attempts. Please try again later.' }
+  }
+
   const raw = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
@@ -50,6 +63,12 @@ export async function signUp(_prevState: AuthState, formData: FormData): Promise
 }
 
 export async function signIn(_prevState: AuthState, formData: FormData): Promise<AuthState> {
+  const clientKey = await getActionClientKey()
+  const rl = rateLimit(`auth:signin:${clientKey}`, 10, 60_000)
+  if (!rl.success) {
+    return { error: 'Too many login attempts. Please try again later.' }
+  }
+
   const raw = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,

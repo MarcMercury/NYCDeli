@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
-import { chatCompletion } from '@/lib/openai'
+import { chatCompletion, sanitizeCamperForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit, getClientKey } from '@/lib/rate-limit'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are the camp placement advisor for NYC Deli Rats, a Burning Man theme camp.
 Given a camper's shelter details and a list of available camp spots, recommend the TOP 3 best spots for them.
@@ -34,10 +34,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { camper: c, spots } = body
-  if (!c || !spots) {
+  const { camper, spots } = body
+  if (!camper || !spots) {
     return Response.json({ error: 'Missing camper or spots data' }, { status: 400 })
   }
+
+  const c = sanitizeCamperForPrompt(camper)
 
   // Only include available spots
   const available = spots.filter(s => s.is_available && !s.reservation)
@@ -60,8 +62,8 @@ export async function POST(request: NextRequest) {
 
   const userPrompt = `Camper: ${c.full_name}
 Shelter: ${c.shelter_type} (${c.shelter_width_ft}W × ${c.shelter_length_ft}L ft)
-Power Needs: ${c.power_type} (required: ${c.power_required ? 'Yes' : 'No'})
-Shade Required: ${c.shade_required ? 'Yes' : 'No'}
+Power Needs: ${c.power_type} (required: ${c.power_required || 'No'})
+Shade Required: ${c.shade_required || 'No'}
 
 Available spots:
 ${JSON.stringify(spotSummaries, null, 1)}

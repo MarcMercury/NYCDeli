@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
-import { chatCompletion } from '@/lib/openai'
+import { chatCompletion, sanitizeForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit, getClientKey } from '@/lib/rate-limit'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are a helpful assistant for NYC Deli Rats, a Burning Man theme camp.
 Given an idea submission title and body from a camper, help them improve and flesh out their idea.
@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Title and body required' }, { status: 400 })
   }
 
-  const userPrompt = `Category: ${body.category}
-Title: ${body.title}
-Description: ${body.body}
+  const userPrompt = `Category: ${sanitizeForPrompt(body.category)}
+Title: ${sanitizeForPrompt(body.title)}
+Description: ${sanitizeForPrompt(body.body)}
 
 Enhance this idea while keeping the original spirit.`
 

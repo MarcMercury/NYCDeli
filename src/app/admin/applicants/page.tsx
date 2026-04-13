@@ -265,7 +265,7 @@ export default function ApplicantReviewPage() {
                     </CardTitle>
                     <CardDescription>
                       {selectedApplicant.camper?.playa_name && (
-                        <span className="text-yellow-600 font-bold">
+                        <span className="text-yellow-700 font-bold">
                           &quot;{selectedApplicant.camper.playa_name}&quot; •{' '}
                         </span>
                       )}

@@ -138,7 +138,7 @@ export default function CampersPage() {
                   </CardTitle>
                   <CardDescription>
                     {selectedCamper.camper?.playa_name && (
-                      <span className="text-yellow-600 font-bold">
+                      <span className="text-yellow-700 font-bold">
                         &quot;{selectedCamper.camper.playa_name}&quot;
                       </span>
                     )}
@@ -268,7 +268,7 @@ export default function CampersPage() {
               {entry.camper?.full_name || entry.profile.email}
             </h3>
             {entry.camper?.playa_name && (
-              <p className="text-xs text-yellow-600 font-bold truncate">
+              <p className="text-xs text-yellow-700 font-bold truncate">
                 &quot;{entry.camper.playa_name}&quot;
               </p>
             )}

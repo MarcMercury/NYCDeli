@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import OpenAI from 'openai'
 import { requireAuthAPI } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
+import { sanitizeForPrompt } from '@/lib/openai'
 
 interface FrontageObject {
   object_type: string
@@ -32,7 +33,7 @@ function describeObject(obj: FrontageObject): string | null {
   const h = obj.height_ft
   const elevation = (obj.properties?.elevation_ft as number) || null
   const roofShape = (obj.properties?.roof_shape as string) || null
-  const label = obj.label
+  const label = sanitizeForPrompt(obj.label)
 
   const heightStr = elevation ? `${elevation}ft tall` : ''
 
@@ -135,7 +136,7 @@ function buildPrompt(data: FrontageRequest): string {
     .map(describeObject)
     .filter(Boolean)
 
-  const campName = config.camp_name || 'Burning Man theme camp'
+  const campName = sanitizeForPrompt(config.camp_name) || 'Burning Man theme camp'
   const totalWidth = config.width_ft
 
   let prompt = `Photorealistic wide-angle photograph of a Burning Man theme camp called "${campName}" as seen from the front (south side looking north). `

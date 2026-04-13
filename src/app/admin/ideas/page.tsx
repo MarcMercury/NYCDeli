@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { markIdeaReadAction } from '@/app/actions/ideas'
 import {
@@ -31,6 +31,7 @@ export default function AdminIdeasPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
 
   const fetchIdeas = useCallback(async () => {
     const supabase = createClient()
@@ -61,7 +62,7 @@ export default function AdminIdeasPage() {
   }, [categoryFilter, readFilter])
 
   useEffect(() => {
-    fetchIdeas()
+    startTransition(() => { fetchIdeas() })
   }, [fetchIdeas])
 
   const toggleRead = async (idea: DeliIdeaRow) => {

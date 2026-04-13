@@ -141,7 +141,7 @@ function findSharingPairs(
     if (isNoSharing(raw)) continue
 
     // Clean the sharing text: strip prefixes like "Yes, ", "Sharing with ", "My wife ", etc.
-    let cleaned = raw
+    const cleaned = raw
       .replace(/^(yes[,!]?\s*)/i, '')
       .replace(/^(sharing\s+(a\s+)?tent\s+with\s*)/i, '')
       .replace(/^(with\s+)/i, '')

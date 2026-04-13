@@ -75,6 +75,11 @@ export function FloorplanEditor() {
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
 
+  // Frontage image generation
+  const [generatingFrontage, setGeneratingFrontage] = useState(false)
+  const [frontageImage, setFrontageImage] = useState<{ url: string; prompt: string } | null>(null)
+  const [frontageError, setFrontageError] = useState<string | null>(null)
+
   // Export
   const canvasContainerRef = useRef<HTMLDivElement>(null)
 
@@ -190,6 +195,47 @@ export function FloorplanEditor() {
       prev.includes(side) ? prev.filter(s => s !== side) : [...prev, side]
     )
     setHasUnsavedChanges(true)
+  }
+
+  // Generate AI frontage image from current layout
+  async function handleGenerateFrontage() {
+    if (!config) return
+    setGeneratingFrontage(true)
+    setFrontageError(null)
+    try {
+      const payload = {
+        objects: objects.map(o => ({
+          object_type: o.object_type,
+          label: o.label,
+          x: o.x,
+          y: o.y,
+          width_ft: o.width_ft,
+          height_ft: o.height_ft,
+          rotation: o.rotation,
+          color: o.color,
+          properties: o.properties || {},
+        })),
+        config: {
+          width_ft: config.width_ft,
+          length_ft: config.length_ft,
+          camp_name: campName || config.camp_name || null,
+          frontage_sides: frontageSides,
+          border_label_south: borderSouth || null,
+        },
+      }
+      const res = await fetch('/api/generate-frontage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate frontage image')
+      setFrontageImage({ url: data.imageUrl, prompt: data.prompt })
+    } catch (err) {
+      setFrontageError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setGeneratingFrontage(false)
+    }
   }
 
   // Export layout to high-res PNG with all labels visible
@@ -906,6 +952,16 @@ export function FloorplanEditor() {
                   >
                     📷 Export
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleGenerateFrontage}
+                    loading={generatingFrontage}
+                    disabled={generatingFrontage || objects.length === 0}
+                    className="text-[10px] px-2 py-0.5"
+                  >
+                    🎨 Frontage
+                  </Button>
                   {/* Zoom */}
                   <div className="flex items-center gap-1 ml-2">
                     <Button
@@ -1051,6 +1107,32 @@ export function FloorplanEditor() {
           </div>
         </div>
       </div>
+
+      {/* Frontage Image Modal */}
+      {(frontageImage || frontageError) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setFrontageImage(null); setFrontageError(null) }}>
+          <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b-2 border-black">
+              <h2 className="text-lg font-black uppercase tracking-wider">🎨 Camp Frontage</h2>
+              <Button size="sm" variant="secondary" onClick={() => { setFrontageImage(null); setFrontageError(null) }}>✕</Button>
+            </div>
+            <div className="p-4">
+              {frontageError && (
+                <Alert variant="error">{frontageError}</Alert>
+              )}
+              {frontageImage && (
+                <div className="space-y-3">
+                  <img src={frontageImage.url} alt="AI-generated camp frontage" className="w-full border-2 border-black" />
+                  <details className="text-xs text-gray-500">
+                    <summary className="cursor-pointer font-bold uppercase">Prompt used</summary>
+                    <p className="mt-1 whitespace-pre-wrap">{frontageImage.prompt}</p>
+                  </details>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

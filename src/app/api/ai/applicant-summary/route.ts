@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
-import { chatCompletion } from '@/lib/openai'
+import { chatCompletion, sanitizeCamperForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit, getClientKey } from '@/lib/rate-limit'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are the admin assistant for NYC Deli Rats, a ~70-person Burning Man theme camp. 
 You help camp leadership quickly evaluate applicants by summarizing their registration data into a concise, actionable overview.
@@ -29,13 +29,14 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const c = body.camper
-  if (!c) {
+  if (!body.camper) {
     return Response.json({ error: 'Missing camper data' }, { status: 400 })
   }
 
+  const c = sanitizeCamperForPrompt(body.camper)
+
   // Sanitize: strip medical details from prompt, just include flags
-  const hasMedical = !!(c.medical_conditions || c.medications || c.allergies)
+  const hasMedical = !!(body.camper.medical_conditions || body.camper.medications || body.camper.allergies)
 
   const userPrompt = `Summarize this applicant for admin review:
 
@@ -51,22 +52,22 @@ First Burn Hopes: ${c.first_burn_hopes || 'N/A'}
 Shelter: ${c.shelter_type} (${c.shelter_length_ft}×${c.shelter_width_ft} ft)
 Arrival: ${c.arrival_date} via ${c.arrival_method}
 Departure: ${c.departure_date}
-Early Arrival: ${c.early_arrival ? 'Yes' : 'No'}
-Power Needs: ${c.power_type} (required: ${c.power_required ? 'Yes' : 'No'})
-Shade Required: ${c.shade_required ? 'Yes' : 'No'}
+Early Arrival: ${c.early_arrival || 'No'}
+Power Needs: ${c.power_type} (required: ${c.power_required || 'No'})
+Shade Required: ${c.shade_required || 'No'}
 
-Skills: ${Array.isArray(c.skills) ? c.skills.join(', ') : 'None listed'}
+Skills: ${c.skills || 'None listed'}
 Custom Skills: ${c.custom_skills || 'None'}
-Kitchen Participation: ${c.kitchen_participation ? 'Yes' : 'No'}
-Preferred Shifts: ${Array.isArray(c.preferred_shift_types) ? c.preferred_shift_types.join(', ') : 'Any'}
-Strike Participation: ${c.strike_participation ? 'Yes' : 'No'}
-Build Week: ${c.build_week_attending ? 'Yes' : 'No'}
-Tools Bringing: ${Array.isArray(c.tools_bringing) && c.tools_bringing.length > 0 ? c.tools_bringing.join(', ') : 'None'}
+Kitchen Participation: ${c.kitchen_participation || 'No'}
+Preferred Shifts: ${c.preferred_shift_types || 'Any'}
+Strike Participation: ${c.strike_participation || 'No'}
+Build Week: ${c.build_week_attending || 'No'}
+Tools Bringing: ${c.tools_bringing || 'None'}
 Vehicle: ${c.vehicle_info || 'None'}
 
-Volunteer Commitment: ${c.volunteer_commitment ? 'Yes' : 'No'}
-Sober Shifts Agreement: ${c.sober_shifts ? 'Yes' : 'No'}
-Background Check Consent: ${c.background_check_consent ? 'Yes' : 'No'}
+Volunteer Commitment: ${c.volunteer_commitment || 'No'}
+Sober Shifts Agreement: ${c.sober_shifts || 'No'}
+Background Check Consent: ${c.background_check_consent || 'No'}
 Emergency Contact Provided: ${c.emergency_contact_name ? 'Yes' : 'No'}
 Has Medical Considerations: ${hasMedical ? 'Yes' : 'No'}
 Dietary Restrictions: ${c.dietary_restrictions || 'None'}

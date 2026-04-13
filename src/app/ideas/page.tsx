@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useTransition } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { submitIdeaAction } from '@/app/actions/ideas'
 import {
@@ -32,6 +32,7 @@ export default function IdeasPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [enhancing, setEnhancing] = useState(false)
   const [enhanced, setEnhanced] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
 
   const fetchMyIdeas = useCallback(async () => {
     const supabase = createClient()
@@ -49,7 +50,7 @@ export default function IdeasPage() {
   }, [])
 
   useEffect(() => {
-    fetchMyIdeas()
+    startTransition(() => { fetchMyIdeas() })
   }, [fetchMyIdeas])
 
   const handleSubmit = async (e: React.FormEvent) => {

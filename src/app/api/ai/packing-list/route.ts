@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
-import { chatCompletion } from '@/lib/openai'
+import { chatCompletion, sanitizeCamperForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit, getClientKey } from '@/lib/rate-limit'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are a packing advisor for NYC Deli Rats, a Burning Man theme camp in Black Rock City, Nevada.
 Given a camper's specific details (shelter type, skills, roles, dietary needs, arrival method, etc.), generate a personalized packing list.
@@ -32,12 +32,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const c = body.camper
-  if (!c) {
+  if (!body.camper) {
     return Response.json({ error: 'Missing camper data' }, { status: 400 })
   }
 
-  const hasMedical = !!(c.medical_conditions || c.medications)
+  const c = sanitizeCamperForPrompt(body.camper)
+  const hasMedical = !!(body.camper.medical_conditions || body.camper.medications)
 
   const userPrompt = `Generate a personalized Burning Man packing list for this camper:
 
@@ -45,12 +45,12 @@ Name: ${c.full_name || 'Camper'}
 Shelter Type: ${c.shelter_type || 'tent'}
 Shelter Dimensions: ${c.shelter_length_ft}×${c.shelter_width_ft} ft
 Arrival Method: ${c.arrival_method || 'car'}
-Early Arrival (Build Week): ${c.early_arrival ? 'Yes' : 'No'}
-Build Week Attending: ${c.build_week_attending ? 'Yes' : 'No'}
-Tools Bringing: ${Array.isArray(c.tools_bringing) && c.tools_bringing.length > 0 ? c.tools_bringing.join(', ') : 'None yet'}
-Skills: ${Array.isArray(c.skills) ? c.skills.join(', ') : 'None listed'}
-Kitchen Participation: ${c.kitchen_participation ? 'Yes' : 'No'}
-Preferred Shifts: ${Array.isArray(c.preferred_shift_types) ? c.preferred_shift_types.join(', ') : 'Any'}
+Early Arrival (Build Week): ${c.early_arrival || 'No'}
+Build Week Attending: ${c.build_week_attending || 'No'}
+Tools Bringing: ${c.tools_bringing || 'None yet'}
+Skills: ${c.skills || 'None listed'}
+Kitchen Participation: ${c.kitchen_participation || 'No'}
+Preferred Shifts: ${c.preferred_shift_types || 'Any'}
 Power Needs: ${c.power_type || 'none'}
 Dietary Restrictions: ${c.dietary_restrictions || 'None'}
 Has Prescribed Medications: ${hasMedical ? 'Yes — remind to bring medications' : 'No'}

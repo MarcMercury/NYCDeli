@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
-import { chatCompletion } from '@/lib/openai'
+import { chatCompletion, sanitizeCamperForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit, getClientKey } from '@/lib/rate-limit'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are a fun, witty bio writer for NYC Deli Rats, a Burning Man theme camp.
 Given a camper's registration data, write a short, engaging camp bio (2-4 sentences, max 400 chars).
@@ -24,10 +24,11 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const c = body.camper
-  if (!c) {
+  if (!body.camper) {
     return Response.json({ error: 'Missing camper data' }, { status: 400 })
   }
+
+  const c = sanitizeCamperForPrompt(body.camper)
 
   const userPrompt = `Write a camp bio for this person:
 
@@ -36,11 +37,11 @@ Playa Name: ${c.playa_name || 'None yet'}
 Burn Count: ${c.burn_count || 'First burn'}
 What Attracted Them to Deli Rats: ${c.what_attracted_you || 'Not specified'}
 First Burn Hopes: ${c.first_burn_hopes || 'N/A'}
-Skills: ${Array.isArray(c.skills) ? c.skills.join(', ') : 'None listed'}
+Skills: ${c.skills || 'None listed'}
 Custom Skills: ${c.custom_skills || 'None'}
-Kitchen Participation: ${c.kitchen_participation ? 'Yes' : 'No'}
-Build Week: ${c.build_week_attending ? 'Yes' : 'No'}
-Tools Bringing: ${Array.isArray(c.tools_bringing) && c.tools_bringing.length > 0 ? c.tools_bringing.join(', ') : 'None'}
+Kitchen Participation: ${c.kitchen_participation || 'No'}
+Build Week: ${c.build_week_attending || 'No'}
+Tools Bringing: ${c.tools_bringing || 'None'}
 Shelter Type: ${c.shelter_type || 'Not specified'}
 
 Write in first person. Keep it under 400 characters. Make it fun.`

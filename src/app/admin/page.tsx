@@ -333,7 +333,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">🗺️</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Layout Builder</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Layout Builder</p>
               </CardContent>
             </Card>
           </Link>
@@ -341,7 +341,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">📋</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Applicant Review</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Applicant Review</p>
               </CardContent>
             </Card>
           </Link>
@@ -349,7 +349,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">🔐</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Permissions</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Permissions</p>
               </CardContent>
             </Card>
           </Link>
@@ -357,7 +357,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">🎯</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Shift Draft</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Shift Draft</p>
               </CardContent>
             </Card>
           </Link>
@@ -365,7 +365,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">💡</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-600 font-bold">Idea Forum</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Idea Forum</p>
               </CardContent>
             </Card>
           </Link>

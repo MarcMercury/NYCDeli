@@ -13,6 +13,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, helpText, type, id, ...props }, ref) => {
     const generatedId = React.useId()
     const inputId = id || generatedId
+    const errorId = error ? `${inputId}-error` : undefined
+    const helpId = helpText && !error ? `${inputId}-help` : undefined
+    const describedBy = errorId || helpId || undefined
     
     return (
       <div className="w-full">
@@ -28,6 +31,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           type={type}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={cn(
             "w-full px-4 py-2.5 text-black bg-white border-2 border-black",
             "focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400",
@@ -40,10 +45,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {(error || helpText) && (
-          <p className={cn(
-            "mt-1 text-xs",
-            error ? "text-red-600 font-medium" : "text-gray-600"
-          )}>
+          <p 
+            id={errorId || helpId}
+            className={cn(
+              "mt-1 text-xs",
+              error ? "text-red-600 font-medium" : "text-gray-600"
+            )}
+            role={error ? "alert" : undefined}
+          >
             {error || helpText}
           </p>
         )}
