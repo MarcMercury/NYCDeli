@@ -12,7 +12,15 @@ import type {
   ElectricalDistroBox,
   ElectricalLoadItem,
   Camper,
+  UserProfile,
 } from '@/types/database'
+
+export type RosterMember = {
+  id: string
+  role: 'admin' | 'builder'
+  email: string
+  camper: Camper | null
+}
 
 export async function fetchBuildStages(): Promise<BuildStage[]> {
   const supabase = createClient()
@@ -84,6 +92,39 @@ export async function fetchBuildWeekBuilders(): Promise<Camper[]> {
     .order('build_week_arrival_date')
   if (error) throw error
   return (data as Camper[]) || []
+}
+
+export async function fetchBuildWeekRoster(): Promise<RosterMember[]> {
+  const supabase = createClient()
+  const { data: profiles, error } = await supabase
+    .from('user_profiles')
+    .select('id, email, role, camper_id')
+    .in('role', ['admin', 'builder'])
+    .order('role')
+  if (error) throw error
+  if (!profiles || profiles.length === 0) return []
+
+  const camperIds = profiles
+    .map((p: { camper_id: string | null }) => p.camper_id)
+    .filter((id): id is string => id != null)
+
+  let camperMap: Record<string, Camper> = {}
+  if (camperIds.length > 0) {
+    const { data: campers } = await supabase
+      .from('campers')
+      .select('*')
+      .in('id', camperIds)
+    if (campers) {
+      camperMap = Object.fromEntries((campers as Camper[]).map(c => [c.id, c]))
+    }
+  }
+
+  return profiles.map((p: { id: string; email: string; role: string; camper_id: string | null }) => ({
+    id: p.id,
+    role: p.role as 'admin' | 'builder',
+    email: p.email,
+    camper: p.camper_id ? camperMap[p.camper_id] || null : null,
+  }))
 }
 
 export async function updateGoalStatus(goalId: string, status: 'pending' | 'active' | 'done') {

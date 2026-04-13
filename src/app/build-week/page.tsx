@@ -12,6 +12,7 @@ import {
   fetchBuildResources,
   fetchBuildProcedures,
   fetchBuildWeekBuilders,
+  fetchBuildWeekRoster,
   fetchBuildInventory,
   fetchBuildSchedule,
   createScheduleItem,
@@ -35,6 +36,7 @@ import {
   SCHEDULE_CATEGORY_ICONS,
   SCHEDULE_CATEGORY_COLORS,
 } from '@/lib/build-week'
+import type { RosterMember } from '@/lib/build-week'
 import type {
   BuildStageWithGoals,
   BuildResource,
@@ -54,11 +56,12 @@ import type {
 type Tab = { id: string; label: string }
 
 const tabs: Tab[] = [
-  { id: 'tasks', label: 'Tasks' },
+  { id: 'roster', label: 'Roster' },
+  { id: 'schedule', label: 'Build Schedule' },
   { id: 'inventory', label: 'Inventory' },
+  { id: 'tasks', label: 'Tasks' },
   { id: 'electrical', label: 'Electrical Load' },
   { id: 'shade', label: 'Shade Guide' },
-  { id: 'schedule', label: 'Build Schedule' },
 ]
 
 type UnifiedItem = {
@@ -72,7 +75,7 @@ type UnifiedItem = {
   count: number
   need: number | null
   status: string
-  question: string
+  installDay: string
   originalResource?: BuildResource
   originalInventory?: BuildInventory
 }
@@ -96,11 +99,12 @@ function exportToCSV(filename: string, headers: string[], rows: string[][]) {
 }
 
 export default function BuildWeekPage() {
-  const [activeTab, setActiveTab] = useState('tasks')
+  const [activeTab, setActiveTab] = useState('roster')
   const [stages, setStages] = useState<BuildStageWithGoals[]>([])
   const [resources, setResources] = useState<BuildResource[]>([])
   const [procedures, setProcedures] = useState<BuildProcedure[]>([])
   const [builders, setBuilders] = useState<Camper[]>([])
+  const [roster, setRoster] = useState<RosterMember[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
   const [resourceStatusFilter, setResourceStatusFilter] = useState<string>('all')
@@ -142,6 +146,7 @@ export default function BuildWeekPage() {
           fetchBuildWeekBuilders(),
           fetchBuildInventory(),
           fetchBuildSchedule(),
+          fetchBuildWeekRoster(),
         ])
       setStages(stagesData)
       setResources(resourcesData)
@@ -149,6 +154,7 @@ export default function BuildWeekPage() {
       setBuilders(buildersData)
       setInventory(inventoryData)
       setScheduleItems(scheduleData)
+      setRoster(rosterData)
       // Auto-expand the first stage with incomplete goals
       const firstIncomplete = stagesData.find(s => s.goals.some(g => g.status !== 'done'))
       if (firstIncomplete) {
@@ -404,7 +410,7 @@ export default function BuildWeekPage() {
       count: r.count,
       need: null as number | null,
       status: r.status,
-      question: r.notes || '',
+      installDay: r.install_day || '',
       originalResource: r,
     })),
     ...inventory.map(i => ({
@@ -418,7 +424,7 @@ export default function BuildWeekPage() {
       count: i.quantity_actual,
       need: i.quantity_expected as number | null,
       status: i.verified ? 'verified' : i.confirmed_working ? 'working' : 'pending',
-      question: i.notes || '',
+      installDay: i.install_day || '',
       originalInventory: i,
     })),
   ]
@@ -431,7 +437,7 @@ export default function BuildWeekPage() {
     .filter(i => unifiedStatusFilter === 'all' || i.status === unifiedStatusFilter)
 
   const handleExportInventory = () => {
-    const headers = ['Item', 'Category', 'Type', 'Size', 'Size (W)', 'Size (L)', 'Count', '# Needed', 'Status', 'Question / Notes']
+    const headers = ['Item', 'Category', 'Type', 'Size', 'Size (W)', 'Size (L)', 'Count', '# Needed', 'Status', 'Install Day']
     const rows = filteredUnifiedItems.map(item => [
       item.name,
       item.category,
@@ -442,7 +448,7 @@ export default function BuildWeekPage() {
       String(item.count),
       item.need != null ? String(item.need) : '',
       item.status,
-      item.question,
+      item.installDay,
     ])
     exportToCSV('build-week-inventory.csv', headers, rows)
   }
@@ -482,6 +488,91 @@ export default function BuildWeekPage() {
 
         {/* ── Tabs ── */}
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+
+        {/* ═══════════  ROSTER  ═══════════ */}
+        <TabPanel tabId="roster" activeTab={activeTab}>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-400">{roster.length} team member{roster.length !== 1 ? 's' : ''}</p>
+            </div>
+
+            {roster.length === 0 ? (
+              <p className="text-gray-400 text-sm">No admins or builders found.</p>
+            ) : (
+              <div className="border-2 border-black bg-white">
+                {/* Table header */}
+                <div className="hidden sm:grid grid-cols-[1fr_100px_1fr_1fr_1fr] gap-2 px-4 py-2 border-b-2 border-black text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100">
+                  <span>Name</span>
+                  <span>Role</span>
+                  <span>Email</span>
+                  <span>Arrival</span>
+                  <span>Skills / Tools</span>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  {roster.map(member => (
+                    <div key={member.id} className="px-4 py-2.5">
+                      {/* Desktop */}
+                      <div className="hidden sm:grid grid-cols-[1fr_100px_1fr_1fr_1fr] gap-2 items-center">
+                        <span className="text-sm font-bold">
+                          {member.camper?.playa_name || member.camper?.full_name || member.email}
+                          {member.camper?.full_name && member.camper?.playa_name && (
+                            <span className="text-xs text-gray-400 font-normal ml-1">({member.camper.full_name})</span>
+                          )}
+                        </span>
+                        <span className={cn(
+                          'text-[10px] font-bold uppercase px-2 py-0.5 border-2 rounded w-fit',
+                          member.role === 'admin'
+                            ? 'border-purple-400 bg-purple-50 text-purple-700'
+                            : 'border-blue-400 bg-blue-50 text-blue-700'
+                        )}>
+                          {member.role}
+                        </span>
+                        <span className="text-xs text-gray-500 truncate">{member.email}</span>
+                        <span className="text-xs text-gray-500">
+                          {member.camper?.build_week_arrival_date
+                            ? new Date(member.camper.build_week_arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                            : '—'}
+                        </span>
+                        <span className="text-xs text-gray-500 truncate">
+                          {member.camper?.tools_bringing && member.camper.tools_bringing.length > 0
+                            ? member.camper.tools_bringing.join(', ')
+                            : '—'}
+                        </span>
+                      </div>
+
+                      {/* Mobile */}
+                      <div className="sm:hidden space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold flex-1">
+                            {member.camper?.playa_name || member.camper?.full_name || member.email}
+                          </span>
+                          <span className={cn(
+                            'text-[10px] font-bold uppercase px-1.5 py-0.5 border rounded',
+                            member.role === 'admin'
+                              ? 'border-purple-400 bg-purple-50 text-purple-700'
+                              : 'border-blue-400 bg-blue-50 text-blue-700'
+                          )}>
+                            {member.role}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 ml-1 space-y-0.5">
+                          <p>{member.email}</p>
+                          {member.camper?.build_week_arrival_date && (
+                            <p>Arrives: {new Date(member.camper.build_week_arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                          )}
+                          {member.camper?.tools_bringing && member.camper.tools_bringing.length > 0 && (
+                            <p>Tools: {member.camper.tools_bringing.join(', ')}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabPanel>
 
         {/* ═══════════  TASKS  ═══════════ */}
         <TabPanel tabId="tasks" activeTab={activeTab}>
@@ -596,35 +687,22 @@ export default function BuildWeekPage() {
                 📥 Export
               </button>
               <button
-                onClick={() => { setAddItemType('resource'); setShowAddResource(true); setEditingResource(null); setShowAddInventory(false); setEditingInventory(null) }}
+                onClick={() => { setShowAddResource(true); setAddItemType('resource'); setEditingResource(null); setShowAddInventory(false); setEditingInventory(null) }}
                 className="px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
               >
-                + Material
-              </button>
-              <button
-                onClick={() => { setAddItemType('checklist'); setShowAddInventory(true); setEditingInventory(null); setShowAddResource(false); setEditingResource(null) }}
-                className="px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 transition-colors"
-              >
-                + Checklist
+                + Add Item
               </button>
             </div>
           </div>
 
-          {/* ── Add Forms (new items only) ── */}
+          {/* ── Add Form (unified) ── */}
           {showAddResource && !editingResource && (
-            <ResourceForm
-              resource={null}
-              saving={savingResource}
-              onSave={handleAddResource}
-              onCancel={() => { setShowAddResource(false); setAddItemType(null) }}
-            />
-          )}
-          {showAddInventory && !editingInventory && (
-            <InventoryForm
-              item={null}
-              saving={savingInventory}
-              onSave={handleAddInventory}
-              onCancel={() => { setShowAddInventory(false); setAddItemType(null) }}
+            <UnifiedAddItemForm
+              savingResource={savingResource}
+              savingInventory={savingInventory}
+              onSaveResource={handleAddResource}
+              onSaveInventory={handleAddInventory}
+              onCancel={() => { setShowAddResource(false); setShowAddInventory(false); setAddItemType(null) }}
             />
           )}
 
@@ -663,7 +741,7 @@ export default function BuildWeekPage() {
                             <span className="text-center">Count</span>
                             <span className="text-center"># Needed</span>
                             <span>Status</span>
-                            <span>Question</span>
+                            <span>Install Day</span>
                             <span className="w-16"></span>
                           </div>
 
@@ -798,9 +876,9 @@ export default function BuildWeekPage() {
                                     <span className="text-xs text-gray-400">{item.status}</span>
                                   )}
 
-                                  {/* Question / Notes */}
-                                  <span className="text-xs text-gray-500 truncate" title={item.question}>
-                                    {item.question || '—'}
+                                  {/* Install Day */}
+                                  <span className="text-xs text-gray-500 truncate" title={item.installDay}>
+                                    {item.installDay ? new Date(item.installDay + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '—'}
                                   </span>
 
                                   {/* Actions */}
@@ -899,8 +977,8 @@ export default function BuildWeekPage() {
                                       {item.status}
                                     </span>
                                   </div>
-                                  {item.question && (
-                                    <p className="text-xs text-amber-600 ml-2">{item.question}</p>
+                                  {item.installDay && (
+                                    <p className="text-xs text-blue-600 ml-2">📅 Install: {new Date(item.installDay + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                                   )}
                                   <div className="flex items-center gap-2 ml-2">
                                     {item.source === 'resource' && item.originalResource && (
@@ -1723,6 +1801,7 @@ type InventoryFormData = {
   size_l?: string
   quantity_expected: number
   notes?: string
+  install_day?: string
 }
 
 const INVENTORY_CATEGORIES: { value: InventoryCategory; label: string }[] = [
@@ -1859,6 +1938,133 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
         >
           Cancel
         </button>
+      </div>
+    </form>
+  )
+}
+
+/* ── Unified Add Item Form ── */
+
+const ALL_CATEGORIES = [
+  ...CATEGORIES.map(c => ({ value: c.value, label: c.label, icon: CATEGORY_ICONS[c.value] || '📦' })),
+  ...INVENTORY_CATEGORIES
+    .filter(c => !CATEGORIES.some(rc => rc.value === c.value))
+    .map(c => ({ value: c.value, label: c.label, icon: INVENTORY_CATEGORY_ICONS[c.value] || '📦' })),
+]
+
+// Categories that map to inventory/checklist table
+const INVENTORY_CATEGORY_VALUES = new Set(INVENTORY_CATEGORIES.map(c => c.value))
+
+function UnifiedAddItemForm({ savingResource, savingInventory, onSaveResource, onSaveInventory, onCancel }: {
+  savingResource: boolean
+  savingInventory: boolean
+  onSaveResource: (data: ResourceFormData) => void
+  onSaveInventory: (data: InventoryFormData) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState<string>('other')
+  const [description, setDescription] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [status, setStatus] = useState<string>('need')
+  const [priority, setPriority] = useState('')
+  const [sizeW, setSizeW] = useState('')
+  const [sizeL, setSizeL] = useState('')
+  const [quantityExpected, setQuantityExpected] = useState(1)
+  const [notes, setNotes] = useState('')
+
+  const isEquipment = INVENTORY_CATEGORY_VALUES.has(category as InventoryCategory)
+  const saving = savingResource || savingInventory
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    if (isEquipment) {
+      onSaveInventory({
+        name: name.trim(),
+        category,
+        description: description.trim() || undefined,
+        size_w: sizeW.trim() || undefined,
+        size_l: sizeL.trim() || undefined,
+        quantity_expected: Math.max(1, quantityExpected),
+        notes: notes.trim() || undefined,
+      })
+    } else {
+      onSaveResource({
+        name: name.trim(),
+        category,
+        description: description.trim() || undefined,
+        quantity: quantity.trim() || undefined,
+        status,
+        priority: priority || undefined,
+        notes: notes.trim() || undefined,
+      })
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border-2 border-black bg-white p-4 mb-4 space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Add Inventory Item</p>
+
+      {/* Row 1: Name + Category */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Item name *"
+          required
+          className="flex-1 px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none"
+        >
+          {ALL_CATEGORIES.map(c => (
+            <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Row 2: Conditional fields based on category */}
+      {isEquipment ? (
+        <div className="flex gap-2 items-center">
+          <label className="text-xs font-bold text-gray-500">Size (W):</label>
+          <input type="text" value={sizeW} onChange={e => setSizeW(e.target.value)} placeholder="Width" className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none" />
+          <label className="text-xs font-bold text-gray-500">Size (L):</label>
+          <input type="text" value={sizeL} onChange={e => setSizeL(e.target.value)} placeholder="Length" className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none" />
+          <label className="text-xs font-bold text-gray-500"># Needed:</label>
+          <input type="number" min={1} value={quantityExpected} onChange={e => setQuantityExpected(Math.max(1, parseInt(e.target.value) || 1))} className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none text-center" />
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input type="text" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="Qty" className="w-20 px-2 py-1.5 text-sm border-2 border-black focus:outline-none" />
+          <select value={status} onChange={e => setStatus(e.target.value)} className="px-2 py-1.5 text-sm border-2 border-black bg-white font-bold focus:outline-none">
+            <option value="need">Need</option>
+            <option value="have">Have</option>
+            <option value="fix">Fix</option>
+            <option value="discard">Discard</option>
+          </select>
+          <select value={priority} onChange={e => setPriority(e.target.value)} className="px-2 py-1.5 text-sm border-2 border-black bg-white focus:outline-none">
+            <option value="">Normal</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+      )}
+
+      {/* Description */}
+      <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none" />
+
+      {/* Notes */}
+      <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (optional)" className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none" />
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving || !name.trim()} className={cn('px-4 py-1.5 text-sm font-bold bg-black text-white hover:bg-gray-800', (saving || !name.trim()) && 'opacity-50 cursor-not-allowed')}>
+          {saving ? 'Saving…' : 'Add Item'}
+        </button>
+        <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm font-bold bg-gray-200 hover:bg-gray-300">Cancel</button>
       </div>
     </form>
   )

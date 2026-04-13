@@ -1109,6 +1109,7 @@ export interface BuildResourceRow {
   stage_needed: BuildStageType | null
   confirmed_working: boolean
   notes: string | null
+  install_day: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -1168,6 +1169,7 @@ export interface BuildInventoryRow {
   verified_at: string | null
   confirmed_working: boolean
   notes: string | null
+  install_day: string | null
   sort_order: number
   created_at: string
   updated_at: string
