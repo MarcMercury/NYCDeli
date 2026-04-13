@@ -138,7 +138,7 @@ export default function BuildWeekPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [stagesData, resourcesData, proceduresData, buildersData, inventoryData, scheduleData] =
+      const [stagesData, resourcesData, proceduresData, buildersData, inventoryData, scheduleData, rosterData] =
         await Promise.all([
           fetchBuildStagesWithGoals(),
           fetchBuildResources(),
