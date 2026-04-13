@@ -1319,10 +1319,6 @@ export function CampMap() {
               <p>🖱️ <strong>Click + drag</strong> to pan around the map</p>
               <p>🔍 <strong>Find button</strong> to search &amp; jump to any area</p>
               <p>👆 <strong>Click any object</strong> to see details</p>
-              <p>🟢 <strong>Green ring</strong> = available tent spot</p>
-              <p>� <strong>Orange ring</strong> = has room for tent-mates</p>
-              <p>🔴 <strong>Red ring</strong> = tent is full</p>
-              <p>🟡 <strong>Yellow ring</strong> = your reserved spot</p>
             </CardContent>
           </Card>
 

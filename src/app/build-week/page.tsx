@@ -139,9 +139,7 @@ export default function BuildWeekPage() {
   const [editingScheduleItem, setEditingScheduleItem] = useState<BuildScheduleItem | null>(null)
   const [showAddScheduleItem, setShowAddScheduleItem] = useState(false)
   const [savingScheduleItem, setSavingScheduleItem] = useState(false)
-  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(BUILD_SCHEDULE_DAYS.map(d => [d, true]))
-  )
+  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>({})
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))
@@ -1340,7 +1338,7 @@ export default function BuildWeekPage() {
               const completedCount = completedSchedule + doneGoals
               const dayProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
-              const isExpanded = expandedScheduleDays[day] !== false
+              const isExpanded = !!expandedScheduleDays[day]
               const isPreBuild = day === 'pre_build'
               const isComplete = totalCount > 0 && completedCount === totalCount
 
