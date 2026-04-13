@@ -1643,6 +1643,7 @@ type ResourceFormData = {
   priority?: string
   stage_needed?: string | null
   notes?: string
+  install_day?: string
 }
 
 const CATEGORIES: { value: BuildCategory; label: string }[] = [
@@ -1678,6 +1679,7 @@ function ResourceForm({ resource, saving, onSave, onCancel }: {
   const [status, setStatus] = useState<string>(resource?.status || 'need')
   const [priority, setPriority] = useState(resource?.priority || '')
   const [notes, setNotes] = useState(resource?.notes || '')
+  const [installDay, setInstallDay] = useState(resource?.install_day || '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1690,6 +1692,7 @@ function ResourceForm({ resource, saving, onSave, onCancel }: {
       status,
       priority: priority || undefined,
       notes: notes.trim() || undefined,
+      install_day: installDay || undefined,
     })
   }
 
@@ -1758,14 +1761,23 @@ function ResourceForm({ resource, saving, onSave, onCancel }: {
         className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
       />
 
-      {/* Row 4: Notes */}
-      <input
-        type="text"
-        value={notes}
-        onChange={e => setNotes(e.target.value)}
-        placeholder="Notes (optional)"
-        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
-      />
+      {/* Row 4: Install Day + Notes */}
+      <div className="flex gap-2 items-center">
+        <label className="text-xs font-bold text-gray-500">Install Day:</label>
+        <input
+          type="date"
+          value={installDay}
+          onChange={e => setInstallDay(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <input
+          type="text"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Notes (optional)"
+          className="flex-1 px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+      </div>
 
       {/* Actions */}
       <div className="flex gap-2 pt-1">
@@ -1831,6 +1843,7 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
   const [sizeL, setSizeL] = useState(item?.size_l || '')
   const [quantityExpected, setQuantityExpected] = useState(item?.quantity_expected ?? 1)
   const [notes, setNotes] = useState(item?.notes || '')
+  const [installDay, setInstallDay] = useState(item?.install_day || '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1843,6 +1856,7 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
       size_l: sizeL.trim() || undefined,
       quantity_expected: Math.max(1, quantityExpected),
       notes: notes.trim() || undefined,
+      install_day: installDay || undefined,
     })
   }
 
@@ -1910,14 +1924,23 @@ function InventoryForm({ item, saving, onSave, onCancel }: {
         className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
       />
 
-      {/* Row 4: Notes */}
-      <input
-        type="text"
-        value={notes}
-        onChange={e => setNotes(e.target.value)}
-        placeholder="Notes (optional)"
-        className="w-full px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
-      />
+      {/* Row 4: Install Day + Notes */}
+      <div className="flex gap-2 items-center">
+        <label className="text-xs font-bold text-gray-500">Install Day:</label>
+        <input
+          type="date"
+          value={installDay}
+          onChange={e => setInstallDay(e.target.value)}
+          className="px-2 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+        <input
+          type="text"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Notes (optional)"
+          className="flex-1 px-3 py-1.5 text-sm border-2 border-black focus:outline-none"
+        />
+      </div>
 
       {/* Actions */}
       <div className="flex gap-2 pt-1">
