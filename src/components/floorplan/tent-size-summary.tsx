@@ -318,11 +318,11 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
     }
   }, [])
 
-  // Initial load: try CSV first, fall back to Supabase
+  // Initial load: prefer Supabase (live data), fall back to CSV (static snapshot)
   useEffect(() => {
     async function load() {
       try {
-        const result = await loadFromCSV() ?? await loadFromSupabase()
+        const result = await loadFromSupabase() ?? await loadFromCSV()
         if (result) {
           setCsvCampers(result.campers)
           setSharingPairs(result.pairs)
@@ -334,13 +334,27 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
     load()
   }, [loadFromCSV, loadFromSupabase])
 
+  // Re-fetch when the user tabs back to this page (covers profile edits in another tab)
+  useEffect(() => {
+    async function onVisible() {
+      if (document.visibilityState === 'visible') {
+        const result = await loadFromSupabase()
+        if (result) {
+          setCsvCampers(result.campers)
+          setSharingPairs(result.pairs)
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [loadFromSupabase])
+
   // Realtime subscription: re-fetch from Supabase when campers table changes
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel('tent-size-summary-campers')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'campers' }, async () => {
-        // Always reload from Supabase on realtime changes (CSV is static)
         const result = await loadFromSupabase()
         if (result) {
           setCsvCampers(result.campers)
