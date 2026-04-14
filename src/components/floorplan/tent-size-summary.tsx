@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import type { FloorplanObjectRow } from '@/types/database'
@@ -213,115 +213,115 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null)
 
+  const loadFromCSV = useCallback(async (): Promise<{ campers: CamperInfo[]; pairs: [string, string][] } | null> => {
+    try {
+      const res = await fetch(CSV_PATH)
+      if (!res.ok) return null
+      const text = await res.text()
+      // If we got an HTML page instead of CSV, bail
+      if (text.trimStart().startsWith('<')) return null
+      const rows = parseCSV(text.startsWith('\uFEFF') ? text.slice(1) : text)
+      if (rows.length < 2) return null
+
+      const headers = rows[0]
+      const tentCol = headers.findIndex(h => h.toLowerCase().includes('tent size') || h.toLowerCase().includes('tent dimensions'))
+      const nameCol = headers.findIndex(h => h.toLowerCase().includes('full name'))
+      const sharingCol = headers.findIndex(h => h.toLowerCase().includes('sharing your tent'))
+
+      if (nameCol < 0 || tentCol < 0) return null
+
+      const names: string[] = []
+      const sharingMap = new Map<string, string>()
+      const camperList: CamperInfo[] = []
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i]
+        const name = (row[nameCol] ?? '').trim()
+        if (!name) continue
+
+        const tentRaw = (row[tentCol] ?? '').trim()
+        const sharingRaw = sharingCol >= 0 ? (row[sharingCol] ?? '').trim() : ''
+
+        const { w, l, isRV } = parseTentSize(tentRaw)
+        const bucket = toBucket(w, l, isRV)
+
+        names.push(name)
+        sharingMap.set(name, sharingRaw)
+        camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
+      }
+
+      // Detect sharing pairs
+      const pairs = findSharingPairs(names, sharingMap)
+
+      // Mark sharing partners
+      const partnerOf = new Map<string, string>()
+      for (const [a, b] of pairs) {
+        partnerOf.set(a, b)
+        partnerOf.set(b, a)
+      }
+      for (const c of camperList) {
+        c.sharingWith = partnerOf.get(c.name) ?? null
+      }
+
+      return { campers: camperList, pairs }
+    } catch {
+      return null
+    }
+  }, [])
+
+  const loadFromSupabase = useCallback(async (): Promise<{ campers: CamperInfo[]; pairs: [string, string][] } | null> => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('campers')
+        .select('full_name, shelter_type, shelter_width_ft, shelter_length_ft, notes')
+        .order('full_name')
+      if (!data || data.length === 0) return null
+
+      type Row = { full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; notes: string | null }
+      const rows = data as unknown as Row[]
+
+      const names: string[] = []
+      const sharingMap = new Map<string, string>()
+      const camperList: CamperInfo[] = []
+
+      for (const row of rows) {
+        const name = row.full_name ?? ''
+        if (!name) continue
+        const isRV = row.shelter_type === 'rv' || row.shelter_type === 'vehicle'
+        const w = isRV ? null : (row.shelter_width_ft > 0 ? row.shelter_width_ft : null)
+        const l = isRV ? null : (row.shelter_length_ft > 0 ? row.shelter_length_ft : null)
+        const bucket = toBucket(w, l, isRV)
+
+        // Extract sharing info from notes field: "Tent sharing with: ..."
+        const sharingMatch = (row.notes ?? '').match(/Tent sharing with:\s*(.+?)(?:\.|$)/i)
+        const sharingRaw = sharingMatch ? sharingMatch[1].trim() : ''
+
+        names.push(name)
+        sharingMap.set(name, sharingRaw)
+        camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
+      }
+
+      const pairs = findSharingPairs(names, sharingMap)
+      const partnerOf = new Map<string, string>()
+      for (const [a, b] of pairs) {
+        partnerOf.set(a, b)
+        partnerOf.set(b, a)
+      }
+      for (const c of camperList) {
+        c.sharingWith = partnerOf.get(c.name) ?? null
+      }
+
+      return { campers: camperList, pairs }
+    } catch {
+      return null
+    }
+  }, [])
+
+  // Initial load: try CSV first, fall back to Supabase
   useEffect(() => {
-    async function loadFromCSV(): Promise<{ campers: CamperInfo[]; pairs: [string, string][] } | null> {
-      try {
-        const res = await fetch(CSV_PATH)
-        if (!res.ok) return null
-        const text = await res.text()
-        // If we got an HTML page instead of CSV, bail
-        if (text.trimStart().startsWith('<')) return null
-        const rows = parseCSV(text.startsWith('\uFEFF') ? text.slice(1) : text)
-        if (rows.length < 2) return null
-
-        const headers = rows[0]
-        const tentCol = headers.findIndex(h => h.toLowerCase().includes('tent size') || h.toLowerCase().includes('tent dimensions'))
-        const nameCol = headers.findIndex(h => h.toLowerCase().includes('full name'))
-        const sharingCol = headers.findIndex(h => h.toLowerCase().includes('sharing your tent'))
-
-        if (nameCol < 0 || tentCol < 0) return null
-
-        const names: string[] = []
-        const sharingMap = new Map<string, string>()
-        const camperList: CamperInfo[] = []
-
-        for (let i = 1; i < rows.length; i++) {
-          const row = rows[i]
-          const name = (row[nameCol] ?? '').trim()
-          if (!name) continue
-
-          const tentRaw = (row[tentCol] ?? '').trim()
-          const sharingRaw = sharingCol >= 0 ? (row[sharingCol] ?? '').trim() : ''
-
-          const { w, l, isRV } = parseTentSize(tentRaw)
-          const bucket = toBucket(w, l, isRV)
-
-          names.push(name)
-          sharingMap.set(name, sharingRaw)
-          camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
-        }
-
-        // Detect sharing pairs
-        const pairs = findSharingPairs(names, sharingMap)
-
-        // Mark sharing partners
-        const partnerOf = new Map<string, string>()
-        for (const [a, b] of pairs) {
-          partnerOf.set(a, b)
-          partnerOf.set(b, a)
-        }
-        for (const c of camperList) {
-          c.sharingWith = partnerOf.get(c.name) ?? null
-        }
-
-        return { campers: camperList, pairs }
-      } catch {
-        return null
-      }
-    }
-
-    async function loadFromSupabase(): Promise<{ campers: CamperInfo[]; pairs: [string, string][] } | null> {
-      try {
-        const supabase = createClient()
-        const { data } = await supabase
-          .from('campers')
-          .select('full_name, shelter_type, shelter_width_ft, shelter_length_ft, notes')
-          .order('full_name')
-        if (!data || data.length === 0) return null
-
-        type Row = { full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; notes: string | null }
-        const rows = data as unknown as Row[]
-
-        const names: string[] = []
-        const sharingMap = new Map<string, string>()
-        const camperList: CamperInfo[] = []
-
-        for (const row of rows) {
-          const name = row.full_name ?? ''
-          if (!name) continue
-          const isRV = row.shelter_type === 'rv' || row.shelter_type === 'vehicle'
-          const w = isRV ? null : (row.shelter_width_ft > 0 ? row.shelter_width_ft : null)
-          const l = isRV ? null : (row.shelter_length_ft > 0 ? row.shelter_length_ft : null)
-          const bucket = toBucket(w, l, isRV)
-
-          // Extract sharing info from notes field: "Tent sharing with: ..."
-          const sharingMatch = (row.notes ?? '').match(/Tent sharing with:\s*(.+?)(?:\.|$)/i)
-          const sharingRaw = sharingMatch ? sharingMatch[1].trim() : ''
-
-          names.push(name)
-          sharingMap.set(name, sharingRaw)
-          camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
-        }
-
-        const pairs = findSharingPairs(names, sharingMap)
-        const partnerOf = new Map<string, string>()
-        for (const [a, b] of pairs) {
-          partnerOf.set(a, b)
-          partnerOf.set(b, a)
-        }
-        for (const c of camperList) {
-          c.sharingWith = partnerOf.get(c.name) ?? null
-        }
-
-        return { campers: camperList, pairs }
-      } catch {
-        return null
-      }
-    }
-
     async function load() {
       try {
-        // Try CSV first (more accurate), fall back to Supabase
         const result = await loadFromCSV() ?? await loadFromSupabase()
         if (result) {
           setCsvCampers(result.campers)
@@ -332,7 +332,25 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
       }
     }
     load()
-  }, [])
+  }, [loadFromCSV, loadFromSupabase])
+
+  // Realtime subscription: re-fetch from Supabase when campers table changes
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('tent-size-summary-campers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campers' }, async () => {
+        // Always reload from Supabase on realtime changes (CSV is static)
+        const result = await loadFromSupabase()
+        if (result) {
+          setCsvCampers(result.campers)
+          setSharingPairs(result.pairs)
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [loadFromSupabase])
 
   // ── Compute need counts (sharing pairs = 1 tent, not 2) ────────
   const { campersByBucket, needByBucket, totalCampers } = useMemo(() => {
