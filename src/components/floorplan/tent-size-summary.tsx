@@ -308,35 +308,42 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
       const supabase = createClient()
       const { data } = await supabase
         .from('campers')
-        .select('full_name, shelter_type, shelter_width_ft, shelter_length_ft, notes')
+        .select('id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with')
         .order('full_name')
       if (!data || data.length === 0) return null
 
-      type Row = { full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; notes: string | null }
+      type Row = { id: string; full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null }
       const rows = data as unknown as Row[]
 
-      const names: string[] = []
-      const sharingMap = new Map<string, string>()
       const camperList: CamperInfo[] = []
+      const idToName = new Map<string, string>()
 
       for (const row of rows) {
         const name = row.full_name ?? ''
         if (!name) continue
+        idToName.set(row.id, name)
         const isRV = row.shelter_type === 'rv' || row.shelter_type === 'vehicle'
         const w = isRV ? null : (row.shelter_width_ft > 0 ? row.shelter_width_ft : null)
         const l = isRV ? null : (row.shelter_length_ft > 0 ? row.shelter_length_ft : null)
         const bucket = toBucket(w, l, isRV)
-
-        // Extract sharing info from notes field: "Tent sharing with: ..."
-        const sharingMatch = (row.notes ?? '').match(/Tent sharing with:\s*(.+?)(?:\.|$)/i)
-        const sharingRaw = sharingMatch ? sharingMatch[1].trim() : ''
-
-        names.push(name)
-        sharingMap.set(name, sharingRaw)
         camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
       }
 
-      const pairs = findSharingPairs(names, sharingMap)
+      // Build sharing pairs from the sharing_tent_with FK column
+      const pairs: [string, string][] = []
+      const pairedIds = new Set<string>()
+      for (const row of rows) {
+        if (!row.sharing_tent_with || pairedIds.has(row.id)) continue
+        const partnerName = idToName.get(row.sharing_tent_with)
+        if (!partnerName) continue
+        // Only record each pair once (avoid A→B and B→A duplication)
+        pairedIds.add(row.id)
+        pairedIds.add(row.sharing_tent_with)
+        const myName = row.full_name ?? ''
+        if (myName) pairs.push([myName, partnerName])
+      }
+
+      // Mark sharing partners on camper info
       const partnerOf = new Map<string, string>()
       for (const [a, b] of pairs) {
         partnerOf.set(a, b)
