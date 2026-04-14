@@ -244,6 +244,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
   const [csvCampers, setCsvCampers] = useState<CamperInfo[]>([])
   const [sharingPairs, setSharingPairs] = useState<[string, string][]>([])
   const [loading, setLoading] = useState(true)
+  const [dataSource, setDataSource] = useState<'supabase' | 'csv' | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null)
 
@@ -363,10 +364,18 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
   useEffect(() => {
     async function load() {
       try {
-        const result = await loadFromSupabase() ?? await loadFromCSV()
-        if (result) {
-          setCsvCampers(result.campers)
-          setSharingPairs(result.pairs)
+        const sbResult = await loadFromSupabase()
+        if (sbResult) {
+          setCsvCampers(sbResult.campers)
+          setSharingPairs(sbResult.pairs)
+          setDataSource('supabase')
+          return
+        }
+        const csvResult = await loadFromCSV()
+        if (csvResult) {
+          setCsvCampers(csvResult.campers)
+          setSharingPairs(csvResult.pairs)
+          setDataSource('csv')
         }
       } finally {
         setLoading(false)
@@ -383,6 +392,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         if (result) {
           setCsvCampers(result.campers)
           setSharingPairs(result.pairs)
+          setDataSource('supabase')
         }
       }
     }
@@ -400,6 +410,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         if (result) {
           setCsvCampers(result.campers)
           setSharingPairs(result.pairs)
+          setDataSource('supabase')
         }
       })
       .subscribe()
@@ -723,6 +734,9 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
                 <span>RV: {tentNeeds.filter(n => n.isRV).length}</span>
                 <span>Unknown: {tentNeeds.filter(n => !n.isRV && n.shortSide == null).length}</span>
                 <span>Campers: {csvCampers.length}</span>
+                <span className={dataSource === 'supabase' ? 'text-emerald-500' : 'text-orange-500'}>
+                  {dataSource === 'supabase' ? '● Live' : dataSource === 'csv' ? '● CSV (stale)' : '—'}
+                </span>
               </div>
             </>
           )}
