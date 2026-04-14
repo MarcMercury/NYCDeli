@@ -691,7 +691,7 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I'm arriving early (before gates open)"
                     checked={editCamper.early_arrival ?? false}
-                    onChange={(checked) => updateField('early_arrival', checked as unknown as boolean)}
+                    onChange={(e) => updateField('early_arrival', e.target.checked)}
                   />
                 </CardContent>
               </Card>
@@ -768,7 +768,7 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I need electrical power"
                     checked={editCamper.power_required ?? false}
-                    onChange={(checked) => updateField('power_required', checked as unknown as boolean)}
+                    onChange={(e) => updateField('power_required', e.target.checked)}
                   />
                   {editCamper.power_required && (
                     <Select
@@ -788,7 +788,7 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I need to be under camp shade structure"
                     checked={editCamper.shade_required ?? false}
-                    onChange={(checked) => updateField('shade_required', checked as unknown as boolean)}
+                    onChange={(e) => updateField('shade_required', e.target.checked)}
                   />
                   <Textarea
                     label="Special Requests"
@@ -809,7 +809,7 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I will participate in kitchen duties"
                     checked={editCamper.kitchen_participation ?? true}
-                    onChange={(checked) => updateField('kitchen_participation', checked as unknown as boolean)}
+                    onChange={(e) => updateField('kitchen_participation', e.target.checked)}
                   />
                   <CheckboxGroup
                     label="Preferred Shift Types"
@@ -823,7 +823,7 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I will stay for strike (teardown)"
                     checked={editCamper.strike_participation ?? true}
-                    onChange={(checked) => updateField('strike_participation', checked as unknown as boolean)}
+                    onChange={(e) => updateField('strike_participation', e.target.checked)}
                   />
                 </CardContent>
               </Card>
@@ -864,7 +864,7 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I'm attending build week"
                     checked={editCamper.build_week_attending ?? false}
-                    onChange={(checked) => updateField('build_week_attending', checked as unknown as boolean)}
+                    onChange={(e) => updateField('build_week_attending', e.target.checked)}
                   />
                   {editCamper.build_week_attending && (
                     <>
@@ -979,17 +979,17 @@ export default function ProfilePage() {
                   <Checkbox
                     label="I commit to volunteering for camp duties"
                     checked={editCamper.volunteer_commitment ?? false}
-                    onChange={(checked) => updateField('volunteer_commitment', checked as unknown as boolean)}
+                    onChange={(e) => updateField('volunteer_commitment', e.target.checked)}
                   />
                   <Checkbox
                     label="I'm willing to take sober shifts"
                     checked={editCamper.sober_shifts ?? false}
-                    onChange={(checked) => updateField('sober_shifts', checked as unknown as boolean)}
+                    onChange={(e) => updateField('sober_shifts', e.target.checked)}
                   />
                   <Checkbox
                     label="I consent to a background check"
                     checked={editCamper.background_check_consent ?? false}
-                    onChange={(checked) => updateField('background_check_consent', checked as unknown as boolean)}
+                    onChange={(e) => updateField('background_check_consent', e.target.checked)}
                   />
                 </CardContent>
                 <CardFooter>
