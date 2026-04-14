@@ -81,6 +81,7 @@ export interface CamperRow {
   zone_assignment: string | null
   placement_locked: boolean
   sharing_tent_with: string | null
+  sharing_tent_with_2: string | null
   is_admin: boolean
   notes: string | null
 }
@@ -137,6 +138,7 @@ export interface CamperInsert {
   zone_assignment?: string | null
   placement_locked?: boolean
   sharing_tent_with?: string | null
+  sharing_tent_with_2?: string | null
   is_admin?: boolean
   notes?: string | null
 }
@@ -193,6 +195,7 @@ export interface CamperUpdate {
   zone_assignment?: string | null
   placement_locked?: boolean
   sharing_tent_with?: string | null
+  sharing_tent_with_2?: string | null
   is_admin?: boolean
   notes?: string | null
 }

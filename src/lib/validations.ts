@@ -54,6 +54,8 @@ export const shelterSchema = z.object({
   tent_make_model: z.string().max(100, "Keep the make/model under 100 characters.").optional().nullable(),
   tent_entrance_count: z.number().int().min(1, "At least one entrance, please.").max(4, "Four entrances max.").optional().nullable(),
   tent_opening_side: z.enum(tentOpeningSides).optional().nullable(),
+  sharing_tent_with: z.string().uuid().optional().nullable(),
+  sharing_tent_with_2: z.string().uuid().optional().nullable(),
 })
 
 // Infrastructure Section

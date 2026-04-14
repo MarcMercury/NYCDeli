@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -31,6 +31,7 @@ export default function IntakePage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
+  const [allCampersList, setAllCampersList] = useState<{ id: string; full_name: string; playa_name: string | null }[]>([])
   const router = useRouter()
   
   const { control, handleSubmit, watch, trigger, formState: { errors } } = useForm<IntakeFormData>({
@@ -55,6 +56,8 @@ export default function IntakePage() {
       tent_make_model: '',
       tent_entrance_count: 1,
       tent_opening_side: null,
+      sharing_tent_with: null,
+      sharing_tent_with_2: null,
       power_required: false,
       power_type: 'none',
       special_requests: '',
@@ -89,11 +92,24 @@ export default function IntakePage() {
   const powerRequired = watch('power_required')
   const copy = pageCopy.intake
 
+  // Fetch existing campers for sharing dropdowns
+  useEffect(() => {
+    const fetchCampers = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('campers')
+        .select('id, full_name, playa_name')
+        .order('full_name')
+      setAllCampersList(data || [])
+    }
+    fetchCampers()
+  }, [])
+
   const validateCurrentStep = async () => {
     const fieldsToValidate: (keyof IntakeFormData)[][] = [
       ['full_name', 'playa_name', 'email', 'phone', 'password', 'confirmPassword'],
       ['arrival_date', 'arrival_method', 'departure_date', 'early_arrival'],
-      ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference', 'bringing_vehicle', 'tent_make_model', 'tent_entrance_count', 'tent_opening_side'],
+      ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference', 'bringing_vehicle', 'tent_make_model', 'tent_entrance_count', 'tent_opening_side', 'sharing_tent_with', 'sharing_tent_with_2'],
       ['power_required', 'power_type', 'special_requests'],
       ['kitchen_participation', 'strike_participation'],
       ['skills', 'custom_skills'],
@@ -179,6 +195,8 @@ export default function IntakePage() {
         tent_make_model: camperFields.tent_make_model || null,
         tent_entrance_count: camperFields.tent_entrance_count || null,
         tent_opening_side: camperFields.tent_opening_side || null,
+        sharing_tent_with: camperFields.sharing_tent_with || null,
+        sharing_tent_with_2: camperFields.sharing_tent_with_2 || null,
       }
       
       const { error } = await supabase
@@ -548,6 +566,53 @@ export default function IntakePage() {
                             error={errors.orientation_preference?.message}
                             {...field}
                             value={field.value || 'any'}
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t-2 border-black pt-6 mt-2">
+                    <h3 className="font-black uppercase text-sm mb-4">Sharing Your Tent?</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      If you&apos;re sharing a tent with other campers who have already registered, select them below. You can update this later from your profile.
+                    </p>
+                    <div className="space-y-6">
+                      <Controller
+                        name="sharing_tent_with"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            label="Sharing Tent With (2nd Person)"
+                            options={[
+                              { value: '', label: 'None' },
+                              ...allCampersList.map(c => ({
+                                value: c.id,
+                                label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                              })),
+                            ]}
+                            {...field}
+                            value={field.value || ''}
+                            onChange={e => field.onChange(e.target.value || null)}
+                          />
+                        )}
+                      />
+                      <Controller
+                        name="sharing_tent_with_2"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            label="Sharing Tent With (3rd Person)"
+                            options={[
+                              { value: '', label: 'None' },
+                              ...allCampersList.map(c => ({
+                                value: c.id,
+                                label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                              })),
+                            ]}
+                            {...field}
+                            value={field.value || ''}
+                            onChange={e => field.onChange(e.target.value || null)}
                           />
                         )}
                       />
