@@ -257,64 +257,71 @@ export default function ProfilePage() {
     setSavingDetails(true)
     setMessage(null)
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    // Only send updatable fields (not id, created_at, etc.)
-    const updates: Record<string, unknown> = {
-      full_name: editCamper.full_name,
-      playa_name: editCamper.playa_name || null,
-      email: editCamper.email,
-      phone: editCamper.phone || null,
-      arrival_date: editCamper.arrival_date,
-      arrival_method: editCamper.arrival_method,
-      departure_date: editCamper.departure_date,
-      early_arrival: editCamper.early_arrival,
-      shelter_type: editCamper.shelter_type,
-      shelter_length_ft: editCamper.shelter_length_ft,
-      shelter_width_ft: editCamper.shelter_width_ft,
-      shelter_height_ft: editCamper.shelter_height_ft || null,
-      orientation_preference: editCamper.orientation_preference,
-      power_required: editCamper.power_required,
-      power_type: editCamper.power_type,
-      shade_required: editCamper.shade_required,
-      special_requests: editCamper.special_requests || null,
-      kitchen_participation: editCamper.kitchen_participation,
-      preferred_shift_types: editCamper.preferred_shift_types,
-      strike_participation: editCamper.strike_participation,
-      build_week_attending: editCamper.build_week_attending,
-      build_week_arrival_date: editCamper.build_week_attending ? editCamper.build_week_arrival_date : null,
-      tools_bringing: editCamper.tools_bringing || [],
-      vehicle_info: editCamper.vehicle_info || null,
-      skills: editCamper.skills,
-      custom_skills: editCamper.custom_skills || null,
-      emergency_contact: editCamper.emergency_contact || null,
-      medical_conditions: editCamper.medical_conditions || null,
-      medications: editCamper.medications || null,
-      allergies: editCamper.allergies || null,
-      dietary_restrictions: editCamper.dietary_restrictions || null,
-      burn_count: editCamper.burn_count || null,
-      what_attracted_you: editCamper.what_attracted_you || null,
-      referral_source: editCamper.referral_source || null,
-      character_references: editCamper.character_references || null,
-      first_burn_hopes: editCamper.first_burn_hopes || null,
-      volunteer_commitment: editCamper.volunteer_commitment,
-      sober_shifts: editCamper.sober_shifts,
-      background_check_consent: editCamper.background_check_consent,
-      sharing_tent_with: editCamper.sharing_tent_with || null,
+      // Only send updatable fields (not id, created_at, etc.)
+      const updates: Record<string, unknown> = {
+        full_name: editCamper.full_name,
+        playa_name: editCamper.playa_name || null,
+        email: editCamper.email,
+        phone: editCamper.phone || null,
+        arrival_date: editCamper.arrival_date,
+        arrival_method: editCamper.arrival_method,
+        departure_date: editCamper.departure_date,
+        early_arrival: editCamper.early_arrival,
+        shelter_type: editCamper.shelter_type,
+        shelter_length_ft: editCamper.shelter_length_ft,
+        shelter_width_ft: editCamper.shelter_width_ft,
+        shelter_height_ft: editCamper.shelter_height_ft || null,
+        orientation_preference: editCamper.orientation_preference,
+        power_required: editCamper.power_required,
+        power_type: editCamper.power_type,
+        shade_required: editCamper.shade_required,
+        special_requests: editCamper.special_requests || null,
+        kitchen_participation: editCamper.kitchen_participation,
+        preferred_shift_types: editCamper.preferred_shift_types,
+        strike_participation: editCamper.strike_participation,
+        build_week_attending: editCamper.build_week_attending,
+        build_week_arrival_date: editCamper.build_week_attending ? editCamper.build_week_arrival_date : null,
+        tools_bringing: editCamper.tools_bringing || [],
+        vehicle_info: editCamper.vehicle_info || null,
+        skills: editCamper.skills,
+        custom_skills: editCamper.custom_skills || null,
+        emergency_contact: editCamper.emergency_contact || null,
+        medical_conditions: editCamper.medical_conditions || null,
+        medications: editCamper.medications || null,
+        allergies: editCamper.allergies || null,
+        dietary_restrictions: editCamper.dietary_restrictions || null,
+        burn_count: editCamper.burn_count || null,
+        what_attracted_you: editCamper.what_attracted_you || null,
+        referral_source: editCamper.referral_source || null,
+        character_references: editCamper.character_references || null,
+        first_burn_hopes: editCamper.first_burn_hopes || null,
+        volunteer_commitment: editCamper.volunteer_commitment,
+        sober_shifts: editCamper.sober_shifts,
+        background_check_consent: editCamper.background_check_consent,
+        sharing_tent_with: editCamper.sharing_tent_with || null,
+      }
+
+      const { error } = await supabase
+        .from('campers')
+        .update(updates as never)
+        .eq('id', camper.id)
+        .select()
+
+      if (error) {
+        setMessage({ type: 'error', text: error.message })
+      } else {
+        setMessage({ type: 'success', text: 'Camper details saved!' })
+        // Update local state directly instead of re-fetching everything
+        setCamper({ ...camper, ...updates } as CamperRow)
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed unexpectedly' })
+    } finally {
+      setSavingDetails(false)
     }
-
-    const { error } = await supabase
-      .from('campers')
-      .update(updates as never)
-      .eq('id', camper.id)
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
-    } else {
-      setMessage({ type: 'success', text: 'Camper details saved!' })
-      fetchProfile()
-    }
-    setSavingDetails(false)
   }
 
   const uploadPhoto = async (file: File) => {
