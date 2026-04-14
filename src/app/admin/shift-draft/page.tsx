@@ -145,6 +145,7 @@ export default function AdminShiftDraftPage() {
     return () => {
       supabase.removeChannel(draftChannel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.id, draft?.status])
 
   // Timer for current pick
@@ -181,6 +182,7 @@ export default function AdminShiftDraftPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.status, draft?.current_round, draft?.current_pick_index, draft?.pick_time_limit_seconds, picks])
 
   const showMessage = (type: 'success' | 'error', text: string) => {

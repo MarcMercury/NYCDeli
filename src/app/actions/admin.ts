@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
+import { parse as csvParse } from 'csv-parse/sync'
 import type { CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
 
 export type AdminActionResult = {
@@ -327,32 +328,11 @@ interface CamperCSVRow {
 }
 
 function parseCSVText(text: string): string[][] {
-  const lines: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    if (ch === '"') { inQuotes = !inQuotes; current += ch }
-    else if (ch === '\n' && !inQuotes) { lines.push(current); current = '' }
-    else if (ch === '\r' && !inQuotes) { /* skip */ }
-    else { current += ch }
-  }
-  if (current.trim()) lines.push(current)
-
-  return lines.map(line => {
-    const fields: string[] = []
-    let field = '', q = false
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (ch === '"') {
-        if (q && line[i + 1] === '"') { field += '"'; i++ }
-        else { q = !q }
-      } else if (ch === ',' && !q) { fields.push(field); field = '' }
-      else { field += ch }
-    }
-    fields.push(field)
-    return fields
-  })
+  return csvParse(text, {
+    skip_empty_lines: true,
+    relax_column_count: true,
+    trim: true,
+  }) as string[][]
 }
 
 function parseTentDims(str: string): { shelter_type: string; length: number; width: number; height: number | null } {

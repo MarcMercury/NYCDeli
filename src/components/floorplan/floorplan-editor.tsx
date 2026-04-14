@@ -550,7 +550,7 @@ export function FloorplanEditor() {
   }, [selectedObjectId, objects])
 
   // Drag start callback (noop for now, could highlight drop zone)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   function handlePaletteDragStart(_template: ObjectTemplate) {
     // Could show visual feedback
   }

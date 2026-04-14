@@ -15,6 +15,9 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, helpText, options, placeholder, id, ...props }, ref) => {
     const generatedId = React.useId()
     const selectId = id || generatedId
+    const errorId = error ? `${selectId}-error` : undefined
+    const helpId = helpText && !error ? `${selectId}-help` : undefined
+    const describedBy = errorId || helpId || undefined
     
     return (
       <div className="w-full">
@@ -29,6 +32,8 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         )}
         <select
           id={selectId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={cn(
             "w-full px-4 py-2.5 text-black bg-white border-2 border-black appearance-none",
             "focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400",
@@ -53,10 +58,14 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           ))}
         </select>
         {(error || helpText) && (
-          <p className={cn(
-            "mt-1 text-xs",
-            error ? "text-red-600 font-medium" : "text-gray-600"
-          )}>
+          <p 
+            id={errorId || helpId}
+            className={cn(
+              "mt-1 text-xs",
+              error ? "text-red-600 font-medium" : "text-gray-600"
+            )}
+            role={error ? "alert" : undefined}
+          >
             {error || helpText}
           </p>
         )}

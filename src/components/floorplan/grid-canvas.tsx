@@ -484,7 +484,7 @@ export function GridCanvas({
             {/* Shade structure corner poles — clickable to select the shade */}
             {obj.object_type === 'shade_structure' && (
               <>
-                {[['top-0 left-0', '-top-1 -left-1'], ['top-0 right-0', '-top-1 -right-1'], ['bottom-0 left-0', '-bottom-1 -left-1'], ['bottom-0 right-0', '-bottom-1 -right-1']].map(([pos, offset], i) => (
+                {[['top-0 left-0', '-top-1 -left-1'], ['top-0 right-0', '-top-1 -right-1'], ['bottom-0 left-0', '-bottom-1 -left-1'], ['bottom-0 right-0', '-bottom-1 -right-1']].map(([pos, _offset], i) => (
                   <div
                     key={i}
                     className={cn('absolute bg-gray-700 border-2 border-gray-900 rounded-full cursor-move z-10', pos)}

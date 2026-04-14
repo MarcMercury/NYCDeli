@@ -6,7 +6,7 @@ import {
   Badge, Input, Alert, Button, Tabs, TabPanel
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatDate, formatTime, getStatusColor } from '@/lib/utils'
+import { cn, formatDate, formatTime } from '@/lib/utils'
 import type { KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 
 interface EnrichedAssignment extends ScheduleAssignment {

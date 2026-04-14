@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Card, CardHeader, CardTitle, CardContent,
-  Badge, Tabs, TabPanel, ProgressBar
+  Tabs, TabPanel, ProgressBar
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import ElectricalLoadTab from './electrical-load-tab'
@@ -28,7 +27,6 @@ import {
   createInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
-  STAGE_ICONS,
   CATEGORY_ICONS,
   RESOURCE_STATUS_COLORS,
   INVENTORY_CATEGORY_ICONS,
@@ -113,12 +111,12 @@ export default function BuildWeekPage() {
   const [activeTab, setActiveTab] = useState('roster')
   const [stages, setStages] = useState<BuildStageWithGoals[]>([])
   const [resources, setResources] = useState<BuildResource[]>([])
-  const [procedures, setProcedures] = useState<BuildProcedure[]>([])
+  const [_procedures, setProcedures] = useState<BuildProcedure[]>([])
   const [builders, setBuilders] = useState<Camper[]>([])
   const [roster, setRoster] = useState<RosterMember[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
-  const [resourceStatusFilter, setResourceStatusFilter] = useState<string>('all')
+  const [_expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
+  const [resourceStatusFilter, _setResourceStatusFilter] = useState<string>('all')
   const [updatingGoals, setUpdatingGoals] = useState<Record<string, boolean>>({})
   const [updatingResources, setUpdatingResources] = useState<Record<string, boolean>>({})
   const [expandedRef, setExpandedRef] = useState<Record<string, boolean>>({ schedule: true })
@@ -126,20 +124,22 @@ export default function BuildWeekPage() {
   const [editingResource, setEditingResource] = useState<BuildResource | null>(null)
   const [savingResource, setSavingResource] = useState(false)
   const [inventory, setInventory] = useState<BuildInventory[]>([])
-  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<string>('all')
-  const [showAddInventory, setShowAddInventory] = useState(false)
+  const [inventoryCategoryFilter, _setInventoryCategoryFilter] = useState<string>('all')
+  const [_showAddInventory, setShowAddInventory] = useState(false)
   const [editingInventory, setEditingInventory] = useState<BuildInventory | null>(null)
   const [savingInventory, setSavingInventory] = useState(false)
   const [updatingInventory, setUpdatingInventory] = useState<Record<string, boolean>>({})
   const [unifiedCategoryFilter, setUnifiedCategoryFilter] = useState<string>('all')
   const [unifiedStatusFilter, setUnifiedStatusFilter] = useState<string>('all')
-  const [addItemType, setAddItemType] = useState<'resource' | 'checklist' | null>(null)
+  const [_addItemType, setAddItemType] = useState<'resource' | 'checklist' | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
   const [scheduleItems, setScheduleItems] = useState<BuildScheduleItem[]>([])
   const [editingScheduleItem, setEditingScheduleItem] = useState<BuildScheduleItem | null>(null)
   const [showAddScheduleItem, setShowAddScheduleItem] = useState(false)
   const [savingScheduleItem, setSavingScheduleItem] = useState(false)
-  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>({})
+  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(BUILD_SCHEDULE_DAYS.map(d => [d, true]))
+  )
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))
@@ -382,22 +382,22 @@ export default function BuildWeekPage() {
     }
   }
 
-  const getStageProgress = (goals: BuildGoal[]) => {
+  const _getStageProgress = (goals: BuildGoal[]) => {
     if (goals.length === 0) return 0
     return Math.round((goals.filter(g => g.status === 'done').length / goals.length) * 100)
   }
 
-  const filteredResources =
+  const _filteredResources =
     resourceStatusFilter === 'all'
       ? resources
       : resources.filter(r => r.status === resourceStatusFilter)
 
-  const filteredInventory =
+  const _filteredInventory =
     inventoryCategoryFilter === 'all'
       ? inventory
       : inventory.filter(i => i.category === inventoryCategoryFilter)
 
-  const inventoryCategories = Array.from(new Set(inventory.map(i => i.category))).sort()
+  const _inventoryCategories = Array.from(new Set(inventory.map(i => i.category))).sort()
   const verifiedCount = inventory.filter(i => i.verified).length
 
   // Overall stats (combined schedule items + goals)
@@ -1338,7 +1338,7 @@ export default function BuildWeekPage() {
               const completedCount = completedSchedule + doneGoals
               const dayProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
-              const isExpanded = !!expandedScheduleDays[day]
+              const isExpanded = expandedScheduleDays[day] !== false
               const isPreBuild = day === 'pre_build'
               const isComplete = totalCount > 0 && completedCount === totalCount
 

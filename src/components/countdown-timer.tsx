@@ -39,7 +39,7 @@ function SprayPaintRat() {
   )
 }
 
-function CountdownDisplay({ values, placeholder }: {
+function CountdownDisplay({ values }: {
   values?: { days: number; hours: number; minutes: number; seconds: number };
   placeholder?: boolean;
 }) {
@@ -88,7 +88,7 @@ function CountdownDisplay({ values, placeholder }: {
 
             {/* Countdown numbers */}
             <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
-              {items.map(({ value, label }, i) => (
+              {items.map(({ value, label }) => (
                 <div key={label} className="flex flex-col items-center">
                   <div className="graffiti-number-block-compact">
                     <span className="graffiti-number-compact">

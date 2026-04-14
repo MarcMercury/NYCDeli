@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import OpenAI from 'openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, dailyCap } from '@/lib/rate-limit'
 import { sanitizeForPrompt } from '@/lib/openai'
 
 interface FrontageObject {
@@ -169,6 +169,9 @@ export async function POST(request: NextRequest) {
 
   const rl = rateLimit(`frontage:${authResult.user.id}`, 3, 60_000)
   if (!rl.success) return rl.response!
+
+  const dc = dailyCap('dalle', 50)
+  if (!dc.allowed) return dc.response!
 
   const apiKey = process.env.OPENAI_API_KEY
   const projectId = process.env.OPENAI_PROJECT_ID

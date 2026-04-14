@@ -13,6 +13,9 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, label, error, helpText, id, ...props }, ref) => {
     const generatedId = React.useId()
     const textareaId = id || generatedId
+    const errorId = error ? `${textareaId}-error` : undefined
+    const helpId = helpText && !error ? `${textareaId}-help` : undefined
+    const describedBy = errorId || helpId || undefined
     
     return (
       <div className="w-full">
@@ -27,6 +30,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         )}
         <textarea
           id={textareaId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={cn(
             "w-full px-4 py-2.5 text-black bg-white border-2 border-black resize-none",
             "focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400",
@@ -39,10 +44,14 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {(error || helpText) && (
-          <p className={cn(
-            "mt-1 text-xs",
-            error ? "text-red-600 font-medium" : "text-gray-600"
-          )}>
+          <p 
+            id={errorId || helpId}
+            className={cn(
+              "mt-1 text-xs",
+              error ? "text-red-600 font-medium" : "text-gray-600"
+            )}
+            role={error ? "alert" : undefined}
+          >
             {error || helpText}
           </p>
         )}

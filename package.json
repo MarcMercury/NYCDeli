@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.99.3",
     "@types/three": "^0.183.1",
     "clsx": "^2.1.1",
+    "csv-parse": "^6.2.1",
     "date-fns": "^4.1.0",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.577.0",

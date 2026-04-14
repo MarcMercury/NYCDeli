@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { chatCompletion, sanitizeCamperForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, dailyCap } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are the admin assistant for NYC Deli Rats, a ~70-person Burning Man theme camp. 
 You help camp leadership quickly evaluate applicants by summarizing their registration data into a concise, actionable overview.
@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
 
   const rl = rateLimit(`ai:applicant-summary:${authResult.user.id}`, 10, 60_000)
   if (!rl.success) return rl.response!
+
+  const dc = dailyCap('openai', 200)
+  if (!dc.allowed) return dc.response!
 
   let body: { camper: Record<string, unknown> }
   try {

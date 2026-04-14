@@ -286,8 +286,8 @@ function countSlots(categories: ShiftCategory[], role: string, time?: string): n
 
 export default function KitchenPage() {
   const [activeTab, setActiveTab] = useState('roles')
-  const [roles, setRoles] = useState<KitchenRole[]>([])
-  const [shifts, setShifts] = useState<ShiftWithAssignments[]>([])
+  const [_roles, setRoles] = useState<KitchenRole[]>([])
+  const [_shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
 
   // Draft state
@@ -429,7 +429,7 @@ export default function KitchenPage() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+     
     fetchData()
   }, [fetchData])
 
@@ -464,6 +464,7 @@ export default function KitchenPage() {
     return () => {
       supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.id, draft?.status])
 
   // Timer for current pick
@@ -500,6 +501,7 @@ export default function KitchenPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.status, draft?.current_round, draft?.current_pick_index, draft?.pick_time_limit_seconds, picks])
 
   // ======== Draft Derived State ========
@@ -575,7 +577,7 @@ export default function KitchenPage() {
   }
 
   /** Get the camper name who picked a specific position key */
-  const getPickedCamperForSlot = (category: string, role: string, time?: string) => {
+  const _getPickedCamperForSlot = (category: string, role: string, time?: string) => {
     const posKey = `${category}|${role}|${time ?? ''}`
     const pick = picks.find(p => p.status === 'picked' && `${p.shift_category}|${p.shift_role}|${p.shift_time ?? ''}` === posKey)
     if (!pick) return null

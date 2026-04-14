@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { 
-  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
+  Card, CardHeader, CardTitle, CardDescription, CardContent,
   Badge, Alert, Button, Input, Tabs, TabPanel, Select, Textarea
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
@@ -120,7 +120,7 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+     
     fetchData()
   }, [fetchData])
 

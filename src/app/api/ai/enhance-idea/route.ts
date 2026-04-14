@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { chatCompletion, sanitizeForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, dailyCap } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are a helpful assistant for NYC Deli Rats, a Burning Man theme camp.
 Given an idea submission title and body from a camper, help them improve and flesh out their idea.
@@ -19,6 +19,9 @@ export async function POST(request: NextRequest) {
 
   const rl = rateLimit(`ai:enhance-idea:${authResult.user.id}`, 10, 60_000)
   if (!rl.success) return rl.response!
+
+  const dc = dailyCap('openai', 200)
+  if (!dc.allowed) return dc.response!
 
   let body: { title: string; body: string; category: string }
   try {

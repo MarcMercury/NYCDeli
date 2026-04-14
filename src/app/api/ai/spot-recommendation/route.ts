@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { chatCompletion, sanitizeCamperForPrompt } from '@/lib/openai'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, dailyCap } from '@/lib/rate-limit'
 
 const SYSTEM_PROMPT = `You are the camp placement advisor for NYC Deli Rats, a Burning Man theme camp.
 Given a camper's shelter details and a list of available camp spots, recommend the TOP 3 best spots for them.
@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
 
   const rl = rateLimit(`ai:spot-rec:${authResult.user.id}`, 10, 60_000)
   if (!rl.success) return rl.response!
+
+  const dc = dailyCap('openai', 200)
+  if (!dc.allowed) return dc.response!
 
   let body: {
     camper: Record<string, unknown>

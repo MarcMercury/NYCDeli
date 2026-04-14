@@ -14,7 +14,7 @@ interface ObjectDetailProps {
   color: string
 }
 
-export function ObjectDetailSVG({ objectType, width, height, color }: ObjectDetailProps) {
+export function ObjectDetailSVG({ objectType, width, height, color: _color }: ObjectDetailProps) {
   // Don't render detail below minimum size
   if (width < 16 || height < 16) return null
 
@@ -478,7 +478,7 @@ function BikeParkingDetail({ width, height }: { width: number; height: number })
 /* ── Fuel / Propane Tank ───────────────────────────────────── */
 function FuelTankDetail({ width, height }: { width: number; height: number }) {
   const cx = width / 2
-  const cy = height / 2
+  const _cy = height / 2
   const isH = width >= height
   return (
     <svg className="absolute inset-0 pointer-events-none" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>

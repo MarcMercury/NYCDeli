@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { chatCompletion, sanitizeForPrompt } from '@/lib/openai'
 import { createTextTo3DTask, registerTaskOwner } from '@/lib/meshy'
 import { requireAuthAPI } from '@/lib/auth'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, dailyCap } from '@/lib/rate-limit'
 
 interface GenerateRequest {
   object_type: string
@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
 
   const rl = rateLimit(`3d-model:${authResult.user.id}`, 5, 60_000)
   if (!rl.success) return rl.response!
+
+  const dc = dailyCap('meshy', 50)
+  if (!dc.allowed) return dc.response!
 
   try {
     const body = (await request.json()) as GenerateRequest

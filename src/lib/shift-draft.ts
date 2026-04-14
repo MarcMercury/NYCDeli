@@ -5,7 +5,7 @@ import type {
   ShiftDraftPickRow,
   ShiftDraftOrderWithCamper,
   DraftStatus,
-  DraftPickStatus,
+
 } from '@/types/database'
 
 // ==========================================

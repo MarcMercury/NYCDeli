@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useRef, useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import React, { useRef, useEffect, useMemo, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html, Environment, ContactShadows, Text } from '@react-three/drei'
+import { OrbitControls, useGLTF, Html, ContactShadows, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow, RoofShape } from '@/types/database'
 
@@ -596,7 +596,7 @@ function ReeferTruck3D({ widthM, depthM, heightM, color }: { widthM: number; dep
 }
 
 // ─── Fire Pit ───────────────────────────────────────────────
-function FirePit3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+function FirePit3D({ widthM, depthM, heightM, color: _color }: { widthM: number; depthM: number; heightM: number; color: string }) {
   const radius = Math.min(widthM, depthM) * 0.42
   return (
     <group>
@@ -749,7 +749,7 @@ function Stage3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: n
 }
 
 // ─── Bike Parking ───────────────────────────────────────────
-function BikeParking3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+function BikeParking3D({ widthM, depthM: _depthM, heightM, color: _color }: { widthM: number; depthM: number; heightM: number; color: string }) {
   const rackCount = Math.max(2, Math.round(widthM / 0.35))
   return (
     <group>
@@ -788,7 +788,7 @@ function BikeParking3D({ widthM, depthM, heightM, color }: { widthM: number; dep
 }
 
 // ─── Fuel / Propane Tank ────────────────────────────────────
-function FuelTank3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+function FuelTank3D({ widthM, depthM, heightM: _heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
   const threeColor = hexToThreeColor(color)
   const r = Math.min(widthM, depthM) * 0.4
   return (

@@ -53,3 +53,41 @@ export function getClientKey(request: Request): string {
   const ip = forwarded?.split(',')[0]?.trim() || 'unknown'
   return ip
 }
+
+// --- Daily spending caps for AI API routes ---
+
+const dailyCounts = new Map<string, { count: number; date: string }>()
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10) // YYYY-MM-DD in UTC
+}
+
+/**
+ * Check daily usage cap for a given service.
+ * @param service Identifier for the service (e.g. 'openai', 'meshy', 'dalle')
+ * @param maxPerDay Max calls allowed per day
+ * @returns { allowed: boolean, used: number, response?: Response }
+ */
+export function dailyCap(service: string, maxPerDay: number): { allowed: boolean; used: number; response?: Response } {
+  const today = todayKey()
+  const entry = dailyCounts.get(service)
+
+  if (!entry || entry.date !== today) {
+    dailyCounts.set(service, { count: 1, date: today })
+    return { allowed: true, used: 1 }
+  }
+
+  entry.count++
+  if (entry.count > maxPerDay) {
+    return {
+      allowed: false,
+      used: entry.count,
+      response: Response.json(
+        { error: `Daily limit reached for ${service}. Try again tomorrow.` },
+        { status: 429 }
+      ),
+    }
+  }
+
+  return { allowed: true, used: entry.count }
+}

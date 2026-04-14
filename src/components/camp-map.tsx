@@ -72,7 +72,7 @@ export function CampMap() {
   const [viewMode, setViewMode] = useState<'2d' | '3d-webgl'>('2d')
 
   // 3D model generation state
-  const [generating3D, setGenerating3D] = useState<string | null>(null) // object ID being generated
+  const [_generating3D, setGenerating3D] = useState<string | null>(null) // object ID being generated
   const [modelGenProgress, setModelGenProgress] = useState<string | null>(null)
 
   // Load all data
@@ -204,7 +204,7 @@ export function CampMap() {
       setPanOffset({ x, y })
       setHasInitialPan(true)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [config, hasInitialPan])
 
   // Jump to a specific object on the map
@@ -484,7 +484,7 @@ export function CampMap() {
 
   // My reservation (supports tent sharing — find the spot where I'm one of the campers)
   const myReservation = camper ? spots.find(s => s.reservations.some(r => r.camper_id === camper.id)) : undefined
-  const myReservationRecord = camper && myReservation
+  const _myReservationRecord = camper && myReservation
     ? myReservation.reservations.find(r => r.camper_id === camper.id)
     : undefined
 

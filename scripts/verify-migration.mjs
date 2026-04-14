@@ -1,6 +1,3 @@
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-
 const projectRef = 'hjmqwueengqqubzolycn';
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
 

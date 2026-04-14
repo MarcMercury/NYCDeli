@@ -52,7 +52,6 @@ function parseCSV(text) {
 }
 
 const rows = parseCSV(csvContent);
-const headers = rows[0];
 const dataRows = rows.slice(1);
 
 // Extract sharing info from CSV
@@ -98,8 +97,6 @@ function normalize(s) {
 
 // Try to find a camper match for a sharing text
 function findMatch(sharingText, campers, selfEmail) {
-  const text = sharingText.toLowerCase();
-  
   // Skip non-sharing answers
   const skipPatterns = [
     /^no[.,!]?$/i, /^nope/i, /^n\/a/i, /^none/i, /^na$/i, /^n$/i,

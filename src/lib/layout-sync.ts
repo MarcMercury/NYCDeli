@@ -57,7 +57,7 @@ const INVENTORY_CATEGORY_MAP: Partial<Record<FloorplanObjectType, InventoryCateg
 }
 
 /** Map a floorplan object type to its build_resources category */
-const RESOURCE_CATEGORY_MAP: Partial<Record<FloorplanObjectType, BuildCategory>> = {
+const _RESOURCE_CATEGORY_MAP: Partial<Record<FloorplanObjectType, BuildCategory>> = {
   generator:          'electrical',
   swamp_cooler:       'electrical',
   kitchen:            'kitchen',
