@@ -59,11 +59,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings (ke
 -- schedule_assignments.status — filtered by status frequently
 CREATE INDEX IF NOT EXISTS idx_schedule_assignments_status ON schedule_assignments (status);
 
--- camp_reservations unique primary per spot
-CREATE UNIQUE INDEX IF NOT EXISTS idx_one_primary_per_spot
-  ON camp_reservations (spot_id)
-  WHERE is_primary = true AND status = 'reserved';
-
 -- deli_ideas — prevent is_read/read_at contradiction
 ALTER TABLE deli_ideas
   DROP CONSTRAINT IF EXISTS ideas_read_consistency;
