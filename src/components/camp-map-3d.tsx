@@ -1300,27 +1300,57 @@ function MapObject3D({
   )
 }
 
+// ─── Grid restricted to camp boundary ──────────────────────────
+function BoundaryGrid({ widthM, depthM, gridSize }: { widthM: number; depthM: number; gridSize: number }) {
+  const gridTexture = useMemo(() => {
+    const cellPx = 64
+    const cols = Math.max(1, Math.round(widthM / gridSize))
+    const rows = Math.max(1, Math.round(depthM / gridSize))
+    const canvasW = cols * cellPx
+    const canvasH = rows * cellPx
+    const canvas = document.createElement('canvas')
+    canvas.width = canvasW
+    canvas.height = canvasH
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#f5e6c8'
+    ctx.fillRect(0, 0, canvasW, canvasH)
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)'
+    ctx.lineWidth = 1
+    for (let c = 0; c <= cols; c++) {
+      const x = c * cellPx
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvasH); ctx.stroke()
+    }
+    for (let r = 0; r <= rows; r++) {
+      const y = r * cellPx
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvasW, y); ctx.stroke()
+    }
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.wrapS = THREE.ClampToEdgeWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.minFilter = THREE.LinearFilter
+    return tex
+  }, [widthM, depthM, gridSize])
+
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+      <planeGeometry args={[widthM, depthM]} />
+      <meshStandardMaterial map={gridTexture} roughness={0.9} metalness={0} />
+    </mesh>
+  )
+}
+
 // ─── Ground Plane ──────────────────────────────────────────────
 function GroundPlane({ widthM, depthM, gridSize }: { widthM: number; depthM: number; gridSize: number }) {
   return (
     <group>
-      {/* Main ground */}
+      {/* Outer flat ground (no grid) */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[widthM * 1.5, depthM * 1.5]} />
+        <planeGeometry args={[widthM * 3, depthM * 3]} />
         <meshStandardMaterial color="#e8d5a3" roughness={1} metalness={0} />
       </mesh>
 
-      {/* Camp boundary */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[widthM, depthM]} />
-        <meshStandardMaterial color="#f5e6c8" roughness={0.9} metalness={0} />
-      </mesh>
-
-      {/* Grid lines */}
-      <gridHelper
-        args={[Math.max(widthM, depthM) * 1.2, Math.round(Math.max(widthM, depthM) / gridSize), '#00000022', '#00000011']}
-        position={[0, 0.01, 0]}
-      />
+      {/* Camp boundary with grid lines */}
+      <BoundaryGrid widthM={widthM} depthM={depthM} gridSize={gridSize} />
     </group>
   )
 }
