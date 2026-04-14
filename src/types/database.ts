@@ -5,6 +5,7 @@ export type ShelterType = 'tent' | 'shiftpod' | 'rv' | 'vehicle' | 'other'
 export type ArrivalMethod = 'car' | 'bus' | 'other'
 export type PowerType = 'none' | 'low' | 'medium' | 'high'
 export type OrientationPreference = 'north' | 'south' | 'east' | 'west' | 'any'
+export type TentOpeningSide = 'length' | 'width' | 'both'
 export type ShiftType = 'prep' | 'service' | 'cleanup' | 'any'
 export type TaskStatus = 'pending' | 'active' | 'done'
 export type ScheduleStatus = 'scheduled' | 'confirmed' | 'completed' | 'no-show'
@@ -42,6 +43,10 @@ export interface CamperRow {
   shelter_width_ft: number
   shelter_height_ft: number | null
   orientation_preference: OrientationPreference | null
+  bringing_vehicle: boolean
+  tent_make_model: string | null
+  tent_entrance_count: number | null
+  tent_opening_side: TentOpeningSide | null
   power_required: boolean
   power_type: PowerType
   shade_required: boolean
@@ -94,6 +99,10 @@ export interface CamperInsert {
   shelter_width_ft: number
   shelter_height_ft?: number | null
   orientation_preference?: OrientationPreference | null
+  bringing_vehicle?: boolean
+  tent_make_model?: string | null
+  tent_entrance_count?: number | null
+  tent_opening_side?: TentOpeningSide | null
   power_required?: boolean
   power_type?: PowerType
   shade_required?: boolean
@@ -146,6 +155,10 @@ export interface CamperUpdate {
   shelter_width_ft?: number
   shelter_height_ft?: number | null
   orientation_preference?: OrientationPreference | null
+  bringing_vehicle?: boolean
+  tent_make_model?: string | null
+  tent_entrance_count?: number | null
+  tent_opening_side?: TentOpeningSide | null
   power_required?: boolean
   power_type?: PowerType
   shade_required?: boolean
@@ -1178,7 +1191,7 @@ export interface BuildInventoryRow {
   updated_at: string
 }
 
-export type BuildScheduleDay = 'pre_build' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+export type BuildScheduleDay = 'pre_build' | 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 export type BuildScheduleCategory = 'delivery' | 'infrastructure' | 'shade' | 'kitchen' | 'electrical' | 'plumbing' | 'layout' | 'decoration' | 'logistics' | 'safety' | 'other'
 
 export interface BuildScheduleItemRow {

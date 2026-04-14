@@ -10,6 +10,7 @@ export const shelterTypes = ['tent', 'shiftpod', 'rv', 'other'] as const
 export const arrivalMethods = ['car', 'bus', 'other'] as const
 export const powerTypes = ['none', 'low', 'medium', 'high'] as const
 export const orientationPreferences = ['north', 'south', 'east', 'west', 'any'] as const
+export const tentOpeningSides = ['length', 'width', 'both'] as const
 export const shiftTypes = ['prep', 'service', 'cleanup', 'any'] as const
 export const skillTags = [
   'construction', 'electrical', 'cooking', 'logistics',
@@ -49,6 +50,10 @@ export const shelterSchema = z.object({
     .optional()
     .nullable(),
   orientation_preference: z.enum(orientationPreferences).optional().nullable(),
+  bringing_vehicle: z.boolean(),
+  tent_make_model: z.string().max(100, "Keep the make/model under 100 characters.").optional().nullable(),
+  tent_entrance_count: z.number().int().min(1, "At least one entrance, please.").max(4, "Four entrances max.").optional().nullable(),
+  tent_opening_side: z.enum(tentOpeningSides).optional().nullable(),
 })
 
 // Infrastructure Section

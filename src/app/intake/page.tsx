@@ -9,7 +9,7 @@ import {
   Card, CardHeader, CardTitle, CardContent, CardFooter,
   Alert, Stepper
 } from '@/components/ui'
-import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, orientationPreferences, skillTags } from '@/lib/validations'
+import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, orientationPreferences, tentOpeningSides, skillTags } from '@/lib/validations'
 import { getRandomLoadingMessage, pageCopy } from '@/lib/tone'
 import { createClient } from '@/lib/supabase/client'
 import type { Step } from '@/components/ui/stepper'
@@ -51,6 +51,10 @@ export default function IntakePage() {
       shelter_width_ft: 10,
       shelter_height_ft: null,
       orientation_preference: 'any',
+      bringing_vehicle: false,
+      tent_make_model: '',
+      tent_entrance_count: 1,
+      tent_opening_side: null,
       power_required: false,
       power_type: 'none',
       special_requests: '',
@@ -89,7 +93,7 @@ export default function IntakePage() {
     const fieldsToValidate: (keyof IntakeFormData)[][] = [
       ['full_name', 'playa_name', 'email', 'phone', 'password', 'confirmPassword'],
       ['arrival_date', 'arrival_method', 'departure_date', 'early_arrival'],
-      ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference'],
+      ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference', 'bringing_vehicle', 'tent_make_model', 'tent_entrance_count', 'tent_opening_side'],
       ['power_required', 'power_type', 'special_requests'],
       ['kitchen_participation', 'strike_participation'],
       ['skills', 'custom_skills'],
@@ -172,6 +176,9 @@ export default function IntakePage() {
         tools_bringing: camperFields.tools_bringing || [],
         vehicle_info: camperFields.vehicle_info || null,
         custom_skills: camperFields.custom_skills || null,
+        tent_make_model: camperFields.tent_make_model || null,
+        tent_entrance_count: camperFields.tent_entrance_count || null,
+        tent_opening_side: camperFields.tent_opening_side || null,
       }
       
       const { error } = await supabase
@@ -465,21 +472,87 @@ export default function IntakePage() {
                     )}
                   />
                   <Controller
-                    name="orientation_preference"
+                    name="bringing_vehicle"
                     control={control}
                     render={({ field }) => (
-                      <Select
-                        label="Door Orientation Preference"
-                        options={orientationPreferences.map(o => ({ 
-                          value: o, 
-                          label: o.charAt(0).toUpperCase() + o.slice(1)
-                        }))}
-                        error={errors.orientation_preference?.message}
-                        {...field}
-                        value={field.value || 'any'}
+                      <Checkbox
+                        label="Are you bringing a vehicle to playa?"
+                        checked={field.value}
+                        onChange={field.onChange}
                       />
                     )}
                   />
+
+                  <div className="border-t-2 border-black pt-6 mt-2">
+                    <h3 className="font-black uppercase text-sm mb-4">Tent Configuration</h3>
+                    <div className="space-y-6">
+                      <Controller
+                        name="tent_make_model"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            label="Tent Make/Model"
+                            placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
+                            error={errors.tent_make_model?.message}
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        )}
+                      />
+                      <Controller
+                        name="tent_entrance_count"
+                        control={control}
+                        render={({ field }) => (
+                          <Input
+                            label="How many entrances does your tent have?"
+                            type="number"
+                            min={1}
+                            max={4}
+                            step={1}
+                            error={errors.tent_entrance_count?.message}
+                            {...field}
+                            value={field.value ?? 1}
+                            onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          />
+                        )}
+                      />
+                      <Controller
+                        name="tent_opening_side"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            label="What side of your tent is the main opening on?"
+                            options={[
+                              { value: '', label: 'Select one...' },
+                              ...tentOpeningSides.map(s => ({
+                                value: s,
+                                label: s === 'length' ? 'Length side' : s === 'width' ? 'Width side' : 'Both sides'
+                              }))
+                            ]}
+                            error={errors.tent_opening_side?.message}
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        )}
+                      />
+                      <Controller
+                        name="orientation_preference"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            label="Which direction should your tent opening face in camp?"
+                            options={orientationPreferences.map(o => ({ 
+                              value: o, 
+                              label: o.charAt(0).toUpperCase() + o.slice(1)
+                            }))}
+                            error={errors.orientation_preference?.message}
+                            {...field}
+                            value={field.value || 'any'}
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
                 </>
               )}
 

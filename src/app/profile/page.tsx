@@ -10,7 +10,7 @@ import {
   Tabs, TabPanel
 } from '@/components/ui'
 import { cn, formatDate, formatTime } from '@/lib/utils'
-import { shelterTypes, arrivalMethods, powerTypes, orientationPreferences, shiftTypes, skillTags } from '@/lib/validations'
+import { shelterTypes, arrivalMethods, powerTypes, orientationPreferences, tentOpeningSides, shiftTypes, skillTags } from '@/lib/validations'
 import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole, KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 import type { Tab } from '@/components/ui/tabs'
 
@@ -275,6 +275,10 @@ export default function ProfilePage() {
         shelter_width_ft: editCamper.shelter_width_ft,
         shelter_height_ft: editCamper.shelter_height_ft || null,
         orientation_preference: editCamper.orientation_preference,
+        bringing_vehicle: editCamper.bringing_vehicle ?? false,
+        tent_make_model: editCamper.tent_make_model || null,
+        tent_entrance_count: editCamper.tent_entrance_count || null,
+        tent_opening_side: editCamper.tent_opening_side || null,
         power_required: editCamper.power_required,
         power_type: editCamper.power_type,
         shade_required: editCamper.shade_required,
@@ -743,6 +747,43 @@ export default function ProfilePage() {
                     onChange={(e) => updateField('orientation_preference', e.target.value as CamperRow['orientation_preference'])}
                     options={orientationPreferences.map(o => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
                   />
+
+                  <div className="border-t-2 border-black pt-4 mt-2">
+                    <h3 className="font-black uppercase text-sm mb-4">Vehicle &amp; Tent Details</h3>
+                    <div className="space-y-4">
+                      <Checkbox
+                        label="Are you bringing a vehicle to playa?"
+                        checked={editCamper.bringing_vehicle ?? false}
+                        onChange={(e) => updateField('bringing_vehicle', e.target.checked)}
+                      />
+                      <Input
+                        label="Tent Make/Model"
+                        value={editCamper.tent_make_model || ''}
+                        onChange={(e) => updateField('tent_make_model', e.target.value || null)}
+                        placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
+                      />
+                      <Input
+                        label="Number of Entrances"
+                        type="number"
+                        value={editCamper.tent_entrance_count ?? ''}
+                        onChange={(e) => updateField('tent_entrance_count', e.target.value ? parseInt(e.target.value) : null)}
+                        min={1} max={4} step={1}
+                      />
+                      <Select
+                        label="Which side of your tent is the main opening on?"
+                        value={editCamper.tent_opening_side || ''}
+                        onChange={(e) => updateField('tent_opening_side', e.target.value as CamperRow['tent_opening_side'] || null)}
+                        options={[
+                          { value: '', label: 'Not set' },
+                          ...tentOpeningSides.map(s => ({
+                            value: s,
+                            label: s === 'length' ? 'Length side' : s === 'width' ? 'Width side' : 'Both sides'
+                          }))
+                        ]}
+                      />
+                    </div>
+                  </div>
+
                   <Select
                     label="Sharing Tent With"
                     value={editCamper.sharing_tent_with || ''}
