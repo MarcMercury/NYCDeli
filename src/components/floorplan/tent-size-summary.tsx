@@ -201,6 +201,40 @@ interface CamperInfo {
   sharingWith: string | null  // matched partner name, or null
 }
 
+/* ── A "tent need" = one tent required (solo camper or sharing pair) */
+interface TentNeed {
+  /** Display label (solo name or "A & B") */
+  label: string
+  /** Short side (ft) — null for Unknown */
+  shortSide: number | null
+  /** Long side (ft) — null for Unknown */
+  longSide: number | null
+  isRV: boolean
+  bucket: BucketLabel
+  campers: CamperInfo[]
+}
+
+/* ── A layout spot available for allocation */
+interface SpotInfo {
+  id: string
+  label: string
+  shortSide: number
+  longSide: number
+  bucket: BucketLabel
+}
+
+/* ── Allocation result per tent need */
+interface Allocation {
+  need: TentNeed
+  spot: SpotInfo | null          // null = unplaced
+}
+
+/* ── Can a spot physically fit a tent? ──────────────────────────── */
+function spotFitsTent(spot: SpotInfo, need: TentNeed): boolean {
+  if (need.shortSide == null || need.longSide == null) return false
+  return spot.shortSide >= need.shortSide && spot.longSide >= need.longSide
+}
+
 /* ── Props ─────────────────────────────────────────────────────── */
 interface TentSizeSummaryProps {
   objects: FloorplanObjectRow[]
@@ -366,71 +400,141 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
     return () => { supabase.removeChannel(channel) }
   }, [loadFromSupabase])
 
-  // ── Compute need counts (sharing pairs = 1 tent, not 2) ────────
-  const { campersByBucket, needByBucket, totalCampers } = useMemo(() => {
-    const byBucket = new Map<BucketLabel, CamperInfo[]>()
-    for (const b of ALL_BUCKETS) byBucket.set(b, [])
-    for (const c of csvCampers) byBucket.get(c.bucket)!.push(c)
-
-    // For each bucket, need = solo + sharing-pairs
-    const need = new Map<BucketLabel, number>()
+  // ── Build tent needs (one per solo camper or sharing pair) ───────
+  const { tentNeeds, spots, allocations, unplaced, shortageByBucket, totalNeeded, totalPlaced } = useMemo(() => {
+    // --- 1. Build tent needs from campers ---
     const pairNames = new Set<string>()
     for (const [a, b] of sharingPairs) { pairNames.add(a); pairNames.add(b) }
 
-    for (const bucket of ALL_BUCKETS) {
-      const list = byBucket.get(bucket)!
-      const soloCount = list.filter(c => !pairNames.has(c.name)).length
+    const needs: TentNeed[] = []
+    const usedInPair = new Set<string>()
 
-      // Count pairs where the "best" (non-unknown) bucket matches this bucket
-      let pairCount = 0
-      for (const [a, b] of sharingPairs) {
-        const ca = csvCampers.find(c => c.name === a)
-        const cb = csvCampers.find(c => c.name === b)
-        // Pick the pair's bucket: prefer non-Unknown
-        let pairBucket = ca?.bucket ?? 'Unknown'
-        if (pairBucket === 'Unknown' && cb) pairBucket = cb.bucket
-        if (pairBucket === bucket) pairCount++
+    // Sharing pairs → 1 tent per pair (use the larger tent dimensions)
+    for (const [a, b] of sharingPairs) {
+      const ca = csvCampers.find(c => c.name === a)
+      const cb = csvCampers.find(c => c.name === b)
+      if (!ca || !cb) continue
+      usedInPair.add(a)
+      usedInPair.add(b)
+
+      // Pick the larger tent dims (by area), prefer known over unknown
+      let w: number | null = null, l: number | null = null, isRV = false
+      const areaA = (ca.w ?? 0) * (ca.l ?? 0)
+      const areaB = (cb.w ?? 0) * (cb.l ?? 0)
+      if (areaA >= areaB && ca.w != null && ca.l != null) {
+        w = ca.w; l = ca.l; isRV = ca.isRV
+      } else if (cb.w != null && cb.l != null) {
+        w = cb.w; l = cb.l; isRV = cb.isRV
+      } else if (ca.w != null && ca.l != null) {
+        w = ca.w; l = ca.l; isRV = ca.isRV
       }
 
-      need.set(bucket, soloCount + pairCount)
+      const shortSide = w != null && l != null ? Math.min(w, l) : null
+      const longSide = w != null && l != null ? Math.max(w, l) : null
+      const bucket = toBucket(shortSide, longSide, isRV)
+
+      needs.push({
+        label: `${ca.name} & ${cb.name}`,
+        shortSide, longSide, isRV, bucket,
+        campers: [ca, cb],
+      })
     }
 
-    return { campersByBucket: byBucket, needByBucket: need, totalCampers: csvCampers.length }
-  }, [csvCampers, sharingPairs])
+    // Solo campers → 1 tent each
+    for (const c of csvCampers) {
+      if (usedInPair.has(c.name)) continue
+      const shortSide = c.w != null && c.l != null ? Math.min(c.w, c.l) : null
+      const longSide = c.w != null && c.l != null ? Math.max(c.w, c.l) : null
+      needs.push({
+        label: c.name,
+        shortSide, longSide, isRV: c.isRV, bucket: c.bucket,
+        campers: [c],
+      })
+    }
 
-  // ── Count layout tent objects by bucket ────────────────────────
-  const haveByBucket = useMemo(() => {
+    // --- 2. Build available spots from layout objects ---
     const tentObjects = objects.filter(o => o.object_type === 'tent')
-    const have = new Map<BucketLabel, number>()
-    for (const b of ALL_BUCKETS) have.set(b, 0)
-    for (const obj of tentObjects) {
-      const bucket = classifySpot(obj)
-      have.set(bucket, (have.get(bucket) ?? 0) + 1)
+    const spotList: SpotInfo[] = tentObjects.map(obj => {
+      const s = Math.min(obj.width_ft, obj.height_ft)
+      const l = Math.max(obj.width_ft, obj.height_ft)
+      return {
+        id: obj.id,
+        label: obj.label || `${obj.width_ft}×${obj.height_ft}`,
+        shortSide: s,
+        longSide: l,
+        bucket: classifySpot(obj),
+      }
+    })
+
+    // --- 3. Greedy best-fit allocation ---
+    // Sort needs: largest (by area) first → hardest to place first
+    const sortedNeeds = [...needs]
+      .filter(n => !n.isRV && n.shortSide != null && n.longSide != null)
+      .sort((a, b) => (b.shortSide! * b.longSide!) - (a.shortSide! * a.longSide!))
+
+    const rvNeeds = needs.filter(n => n.isRV)
+    const unknownNeeds = needs.filter(n => !n.isRV && (n.shortSide == null || n.longSide == null))
+
+    const availableSpots = new Set(spotList.map((_, i) => i))
+    const allocs: Allocation[] = []
+
+    for (const need of sortedNeeds) {
+      // Find the smallest fitting spot (minimize wasted space)
+      let bestIdx: number | null = null
+      let bestArea = Infinity
+
+      for (const si of availableSpots) {
+        const spot = spotList[si]
+        if (spotFitsTent(spot, need)) {
+          const area = spot.shortSide * spot.longSide
+          if (area < bestArea) {
+            bestArea = area
+            bestIdx = si
+          }
+        }
+      }
+
+      if (bestIdx !== null) {
+        allocs.push({ need, spot: spotList[bestIdx] })
+        availableSpots.delete(bestIdx)
+      } else {
+        allocs.push({ need, spot: null })
+      }
     }
-    return have
-  }, [objects])
 
-  const statusColor = (need: number, have: number) => {
-    if (need === 0) return 'text-gray-400'
-    if (have >= need) return 'text-emerald-600'
-    if (have >= need * 0.75) return 'text-yellow-600'
-    return 'text-red-600'
-  }
+    // RV and Unknown needs are not allocated to tent spots
+    for (const need of [...rvNeeds, ...unknownNeeds]) {
+      allocs.push({ need, spot: null })
+    }
 
-  const statusBg = (need: number, have: number) => {
-    if (need === 0) return 'bg-gray-50 border-gray-200'
-    if (have >= need) return 'bg-emerald-50 border-emerald-300'
-    if (have >= need * 0.75) return 'bg-yellow-50 border-yellow-300'
-    return 'bg-red-50 border-red-300'
-  }
+    const placed = allocs.filter(a => a.spot !== null && !a.need.isRV)
+    const unplacedList = allocs.filter(a => a.spot === null && !a.need.isRV && a.need.shortSide != null && a.need.longSide != null)
 
-  // Totals (tent buckets only, excluding RV/Unknown)
-  const totalNeedTent = ALL_BUCKETS
-    .filter(b => b !== 'RV' && b !== 'Unknown')
-    .reduce((sum, b) => sum + (needByBucket.get(b) ?? 0), 0)
-  const totalHaveTent = ALL_BUCKETS
-    .filter(b => b !== 'RV' && b !== 'Unknown')
-    .reduce((sum, b) => sum + (haveByBucket.get(b) ?? 0), 0)
+    // --- 4. Compute shortage: what minimum extra spots are needed ---
+    // For each unplaced need, determine the smallest bucket that would fit it
+    const shortage = new Map<BucketLabel, number>()
+    for (const b of ALL_BUCKETS) shortage.set(b, 0)
+    for (const a of unplacedList) {
+      const bucket = a.need.bucket
+      shortage.set(bucket, (shortage.get(bucket) ?? 0) + 1)
+    }
+
+    const tentNeedsCount = sortedNeeds.length
+    const tentPlacedCount = placed.length
+
+    return {
+      tentNeeds: needs,
+      spots: spotList,
+      allocations: allocs,
+      unplaced: unplacedList,
+      shortageByBucket: shortage,
+      totalNeeded: tentNeedsCount,
+      totalPlaced: tentPlacedCount,
+    }
+  }, [csvCampers, sharingPairs, objects])
+
+  // Count remaining unused spots
+  const unusedSpots = spots.length - totalPlaced
 
   return (
     <Card className="border-2 border-black">
@@ -439,8 +543,8 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
           <CardTitle className="text-sm flex items-center gap-2">
             ⛺ Tent Size Summary
             {!loading && (
-              <Badge className={totalHaveTent >= totalNeedTent ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>
-                {totalHaveTent}/{totalNeedTent}
+              <Badge className={totalPlaced >= totalNeeded ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>
+                {totalPlaced}/{totalNeeded} placed
               </Badge>
             )}
           </CardTitle>
@@ -461,60 +565,105 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
                 </p>
               )}
 
-              {/* Grid of buckets */}
+              {/* Overall status */}
+              <div className={`px-2 py-1.5 border text-xs font-bold ${
+                unplaced.length === 0 ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-red-50 border-red-300 text-red-800'
+              }`}>
+                {unplaced.length === 0
+                  ? `✓ All ${totalNeeded} tent${totalNeeded !== 1 ? 's' : ''} can be accommodated` 
+                  : `⚠ ${unplaced.length} tent${unplaced.length !== 1 ? 's' : ''} cannot fit — need more spots`}
+                {unusedSpots > 0 && (
+                  <span className="ml-1 font-normal text-gray-500">({unusedSpots} unused spot{unusedSpots !== 1 ? 's' : ''})</span>
+                )}
+              </div>
+
+              {/* Shortage breakdown — what more is needed */}
+              {unplaced.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Additional spots needed:</p>
+                  {ALL_BUCKETS.filter(b => b !== 'RV' && b !== 'Unknown' && (shortageByBucket.get(b) ?? 0) > 0).map(bucket => (
+                    <div key={bucket} className="flex items-center justify-between px-2 py-1 border border-red-200 bg-red-50 text-xs">
+                      <span className="font-black text-[11px]">{bucket}</span>
+                      <span className="text-red-700 font-bold">+{shortageByBucket.get(bucket)} more</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Allocation by bucket */}
               <div className="space-y-1.5">
                 {ALL_BUCKETS.map((bucket) => {
-                  const need = needByBucket.get(bucket) ?? 0
-                  const have = haveByBucket.get(bucket) ?? 0
+                  const bucketNeeds = tentNeeds.filter(n => n.bucket === bucket)
+                  const bucketPlaced = allocations.filter(a => a.need.bucket === bucket && a.spot !== null)
+                  const bucketUnplaced = allocations.filter(a => a.need.bucket === bucket && a.spot === null && !a.need.isRV && a.need.shortSide != null)
                   const isExpanded = expandedBucket === bucket
-                  const camperList = campersByBucket.get(bucket) ?? []
+                  const isInfoBucket = bucket === 'RV' || bucket === 'Unknown'
 
-                  if (need === 0 && have === 0 && camperList.length === 0) return null
+                  if (bucketNeeds.length === 0) return null
+
+                  const need = isInfoBucket ? 0 : bucketNeeds.length
+                  const placed = bucketPlaced.length
 
                   return (
                     <div key={bucket}>
                       <button
                         onClick={() => setExpandedBucket(isExpanded ? null : bucket)}
-                        className={`w-full text-left px-2 py-1.5 border text-xs flex items-center justify-between ${statusBg(bucket === 'RV' || bucket === 'Unknown' ? 0 : need, have)}`}
+                        className={`w-full text-left px-2 py-1.5 border text-xs flex items-center justify-between ${
+                          isInfoBucket ? 'bg-gray-50 border-gray-200'
+                          : bucketUnplaced.length === 0 ? 'bg-emerald-50 border-emerald-300'
+                          : 'bg-red-50 border-red-300'
+                        }`}
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-black text-[11px] min-w-[60px]">{bucket}</span>
-                          <span className={`font-bold ${statusColor(bucket === 'RV' || bucket === 'Unknown' ? 0 : need, have)}`}>
-                            {bucket === 'RV' ? `${camperList.length} camper${camperList.length !== 1 ? 's' : ''}` :
-                             bucket === 'Unknown' ? `${camperList.length} camper${camperList.length !== 1 ? 's' : ''}` :
-                             `Need: ${need}  Have: ${have}`}
+                          <span className={`font-bold ${
+                            isInfoBucket ? 'text-gray-500'
+                            : bucketUnplaced.length === 0 ? 'text-emerald-600'
+                            : 'text-red-600'
+                          }`}>
+                            {isInfoBucket
+                              ? `${bucketNeeds.length} camper${bucketNeeds.length !== 1 ? 's' : ''}`
+                              : `${placed}/${need} placed`}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {bucket !== 'RV' && bucket !== 'Unknown' && need > 0 && (
+                          {!isInfoBucket && need > 0 && (
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              have >= need ? 'bg-emerald-200 text-emerald-800' :
-                              have > 0 ? 'bg-yellow-200 text-yellow-800' :
-                              'bg-red-200 text-red-800'
+                              bucketUnplaced.length === 0 ? 'bg-emerald-200 text-emerald-800'
+                              : 'bg-red-200 text-red-800'
                             }`}>
-                              {have >= need ? '✓' : `-${need - have}`}
+                              {bucketUnplaced.length === 0 ? '✓' : `-${bucketUnplaced.length}`}
                             </span>
                           )}
                           <span className="text-gray-400">{isExpanded ? '▾' : '▸'}</span>
                         </div>
                       </button>
 
-                      {/* Expanded camper list */}
-                      {isExpanded && camperList.length > 0 && (
-                        <div className="ml-2 mt-1 border-l-2 border-gray-200 pl-2 space-y-0.5 max-h-[200px] overflow-y-auto">
-                          {camperList.map((c, idx) => (
-                            <div key={idx} className="text-[10px] text-gray-600 flex justify-between">
-                              <span>
-                                {c.name}
-                                {c.sharingWith && (
-                                  <span className="text-blue-500 ml-1">🤝 {c.sharingWith}</span>
-                                )}
-                              </span>
-                              <span className="text-gray-400 ml-2 whitespace-nowrap">
-                                {c.w != null && c.l != null ? `${c.w}×${c.l}` : '—'}
-                              </span>
-                            </div>
-                          ))}
+                      {/* Expanded — show each tent need and its allocation */}
+                      {isExpanded && bucketNeeds.length > 0 && (
+                        <div className="ml-2 mt-1 border-l-2 border-gray-200 pl-2 space-y-0.5 max-h-[250px] overflow-y-auto">
+                          {allocations.filter(a => a.need.bucket === bucket).map((a, idx) => {
+                            const n = a.need
+                            const dims = n.shortSide != null && n.longSide != null ? `${n.shortSide}×${n.longSide}` : '—'
+                            const isPlaced = a.spot !== null
+                            const isInfo = n.isRV || (n.shortSide == null && n.longSide == null)
+                            return (
+                              <div key={idx} className={`text-[10px] flex justify-between ${
+                                isInfo ? 'text-gray-500' : isPlaced ? 'text-gray-600' : 'text-red-600 font-semibold'
+                              }`}>
+                                <span className="flex items-center gap-1">
+                                  {!isInfo && (isPlaced ? <span className="text-emerald-500">✓</span> : <span className="text-red-500">✗</span>)}
+                                  {n.label}
+                                </span>
+                                <span className="ml-2 whitespace-nowrap flex items-center gap-1">
+                                  <span className="text-gray-400">{dims}</span>
+                                  {isPlaced && a.spot && (
+                                    <span className="text-emerald-500 text-[9px]">→ {a.spot.label}</span>
+                                  )}
+                                </span>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -522,15 +671,31 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
                 })}
               </div>
 
+              {/* Unplaced campers list */}
+              {unplaced.length > 0 && (
+                <div className="border-t pt-1.5 mt-2">
+                  <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1">Cannot fit in layout:</p>
+                  <div className="space-y-0.5 max-h-[150px] overflow-y-auto">
+                    {unplaced.map((a, idx) => (
+                      <div key={idx} className="text-[10px] text-red-600 flex justify-between px-1">
+                        <span>✗ {a.need.label}</span>
+                        <span className="text-red-400">{a.need.shortSide}×{a.need.longSide} ({a.need.bucket})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Totals */}
               <div className="border-t pt-1.5 mt-2 flex justify-between text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                <span>Tent spots needed: {totalNeedTent}</span>
-                <span>Layout has: {totalHaveTent}</span>
+                <span>Tents needed: {totalNeeded}</span>
+                <span>Placed: {totalPlaced}</span>
+                <span>Layout spots: {spots.length}</span>
               </div>
               <div className="flex justify-between text-[10px] text-gray-400">
-                <span>RV: {campersByBucket.get('RV')?.length ?? 0}</span>
-                <span>Unknown: {campersByBucket.get('Unknown')?.length ?? 0}</span>
-                <span>Campers: {totalCampers}</span>
+                <span>RV: {tentNeeds.filter(n => n.isRV).length}</span>
+                <span>Unknown: {tentNeeds.filter(n => !n.isRV && n.shortSide == null).length}</span>
+                <span>Campers: {csvCampers.length}</span>
               </div>
             </>
           )}
