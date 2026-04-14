@@ -567,10 +567,30 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
             <>
               {/* Sharing pairs count */}
               {sharingPairs.length > 0 && (
-                <p className="text-[10px] text-blue-600 font-medium">
-                  🤝 {sharingPairs.length} sharing pair{sharingPairs.length !== 1 ? 's' : ''} detected ({sharingPairs.length * 2} campers → {sharingPairs.length} tent{sharingPairs.length !== 1 ? 's' : ''})
-                </p>
+                <div className="bg-blue-50 border border-blue-200 px-2 py-1.5 space-y-0.5">
+                  <p className="text-[10px] text-blue-700 font-bold">
+                    🤝 {sharingPairs.length} sharing pair{sharingPairs.length !== 1 ? 's' : ''} ({sharingPairs.length * 2} campers → {sharingPairs.length} tent{sharingPairs.length !== 1 ? 's' : ''}, saving {sharingPairs.length} tent{sharingPairs.length !== 1 ? 's' : ''})
+                  </p>
+                  <div className="text-[9px] text-blue-600 space-y-0 max-h-[80px] overflow-y-auto">
+                    {tentNeeds.filter(n => n.campers.length > 1).map((n, i) => {
+                      const dims = n.shortSide != null && n.longSide != null ? ` (${n.shortSide}×${n.longSide})` : ''
+                      return <div key={i}>{n.label}{dims}</div>
+                    })}
+                  </div>
+                </div>
               )}
+
+              {/* Tent count math breakdown */}
+              <div className="bg-gray-50 border border-gray-200 px-2 py-1.5 text-[10px] text-gray-600 space-y-0.5">
+                <div className="font-bold text-gray-700 uppercase tracking-wider text-[9px] mb-0.5">How tent count is calculated:</div>
+                <div className="flex justify-between"><span>{csvCampers.length} total campers</span></div>
+                <div className="flex justify-between"><span>− {tentNeeds.filter(n => n.isRV).length} RV / no tent needed</span></div>
+                <div className="flex justify-between"><span>− {tentNeeds.filter(n => !n.isRV && n.shortSide == null).length} unknown tent size</span></div>
+                <div className="flex justify-between"><span>− {sharingPairs.length} saved by sharing (2 campers → 1 tent)</span></div>
+                <div className="flex justify-between border-t border-gray-300 pt-0.5 font-bold text-gray-800">
+                  <span>= {totalNeeded} tents needed</span>
+                </div>
+              </div>
 
               {/* Overall status */}
               <div className={`px-2 py-1.5 border text-xs font-bold ${
