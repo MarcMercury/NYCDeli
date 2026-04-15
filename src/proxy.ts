@@ -1,11 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that don't require auth at all
-const publicRoutes = ['/', '/login', '/register', '/pending', '/intake', '/api/auth']
+// Routes that don't require auth at all — no Supabase calls needed
+const publicRoutes = ['/', '/login', '/register', '/pending', '/intake']
 
-// Routes that require admin role
+// Routes that require admin role (need profile query)
 const adminRoutes = ['/admin']
+
+// Routes where pending users must be redirected (need profile query)
+const roleCheckRoutes = [
+  '/campers', '/events', '/ideas', '/kitchen', '/layout', '/layout-view',
+  '/map', '/profile', '/resources', '/schedule', '/shift-draft',
+  '/build-week', '/camp-selection',
+]
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.some(route => 
@@ -19,7 +26,13 @@ function isAdminRoute(pathname: string) {
   )
 }
 
-export async function proxy(request: NextRequest) {
+function needsRoleCheck(pathname: string) {
+  return isAdminRoute(pathname) || roleCheckRoutes.some(route =>
+    pathname === route || pathname.startsWith(route + '/')
+  )
+}
+
+function createSupabaseMiddlewareClient(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -43,20 +56,25 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Refresh the session
-  const { data: { user } } = await supabase.auth.getUser()
+  return { supabase, getResponse: () => supabaseResponse }
+}
 
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Public routes: allow through
+  // 1. Public routes: pass through with NO Supabase calls
   if (isPublicRoute(pathname)) {
-    return supabaseResponse
+    return NextResponse.next()
   }
 
-  // Static assets and API routes (non-auth) pass through
-  if (pathname.startsWith('/_next') || pathname.startsWith('/Images') || pathname.includes('.')) {
-    return supabaseResponse
+  // 2. API routes handle their own auth — skip middleware entirely
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next()
   }
+
+  // 3. For protected routes: create client and check auth (1 Supabase call)
+  const { supabase, getResponse } = createSupabaseMiddlewareClient(request)
+  const { data: { user } } = await supabase.auth.getUser()
 
   // No user? Redirect to login
   if (!user) {
@@ -65,32 +83,38 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Check user profile for role-based access
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  // 4. Only query user_profiles when we actually need the role
+  if (needsRoleCheck(pathname)) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
 
-  // Pending users can only see /pending and public routes
-  if (profile?.role === 'pending' && pathname !== '/pending') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/pending'
-    return NextResponse.redirect(url)
+    // Pending users can only see /pending and public routes
+    if (profile?.role === 'pending' && pathname !== '/pending') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/pending'
+      return NextResponse.redirect(url)
+    }
+
+    // Admin routes require admin role
+    if (isAdminRoute(pathname) && profile?.role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
-  // Admin routes require admin role
-  if (isAdminRoute(pathname) && profile?.role !== 'admin') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
-  }
-
-  return supabaseResponse
+  return getResponse()
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|Images/).*)',
+    /*
+     * Match only page routes that need protection.
+     * Exclude: static files, images, API routes, Next.js internals.
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|Images/|Files/|Campers/|api/).*)',
   ],
 }
