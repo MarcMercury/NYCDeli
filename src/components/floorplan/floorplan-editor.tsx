@@ -243,15 +243,19 @@ export function FloorplanEditor() {
     const container = canvasContainerRef.current
     if (!container) return
 
-    // Enable export mode for readable labels (no truncation, larger fonts)
-    flushSync(() => setExporting(true))
+    const prevScale = scale
+    // Boost scale 3x and enable export mode for much larger, readable objects
+    flushSync(() => {
+      setScale(prevScale * 3)
+      setExporting(true)
+    })
 
     try {
       const { toPng } = await import('html-to-image')
-      // Capture at current scale but high pixelRatio for crisp output
+      // Capture at boosted scale with high pixelRatio for crisp output
       const dataUrl = await toPng(container, {
         backgroundColor: '#ffffff',
-        pixelRatio: 4,
+        pixelRatio: 2,
         // Capture the full scrollable content, not just the visible viewport
         width: container.scrollWidth,
         height: container.scrollHeight,
@@ -267,8 +271,11 @@ export function FloorplanEditor() {
     } catch {
       setError('Export failed — install html-to-image package for PNG export')
     } finally {
-      // Exit export mode
-      flushSync(() => setExporting(false))
+      // Restore original scale and exit export mode
+      flushSync(() => {
+        setScale(prevScale)
+        setExporting(false)
+      })
     }
   }
 

@@ -263,15 +263,16 @@ export function GridCanvas({
     frontageSides.includes(side) ? '4px solid #22c55e' : '4px solid #000'
 
   return (
-    <div className="relative" style={{ padding: hasBorderLabels ? '24px' : 0 }}>
+    <div className="relative" style={{ padding: hasBorderLabels ? (exporting ? '48px' : '24px') : 0 }}>
       {/* Border labels rendered outside the canvas */}
       {borderLabels?.north && (
         <div
           className="absolute left-0 right-0 top-0 flex justify-center pointer-events-none"
-          style={{ height: 24 }}
+          style={{ height: exporting ? 48 : 24 }}
         >
           <span className={cn(
-            'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+            'px-3 py-1 font-black uppercase tracking-widest whitespace-nowrap',
+            exporting ? 'text-2xl px-6 py-2' : 'text-xs',
             frontageSides.includes('north') ? 'bg-green-500 text-white' : 'bg-black text-white'
           )}>
             {borderLabels.north}{frontageSides.includes('north') ? ' ★ FRONTAGE' : ''}
@@ -281,10 +282,11 @@ export function GridCanvas({
       {borderLabels?.south && (
         <div
           className="absolute left-0 right-0 bottom-0 flex justify-center pointer-events-none"
-          style={{ height: 24 }}
+          style={{ height: exporting ? 48 : 24 }}
         >
           <span className={cn(
-            'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+            'px-3 py-1 font-black uppercase tracking-widest whitespace-nowrap',
+            exporting ? 'text-2xl px-6 py-2' : 'text-xs',
             frontageSides.includes('south') ? 'bg-green-500 text-white' : 'bg-black text-white'
           )}>
             {borderLabels.south}{frontageSides.includes('south') ? ' ★ FRONTAGE' : ''}
@@ -294,11 +296,12 @@ export function GridCanvas({
       {borderLabels?.west && (
         <div
           className="absolute left-0 top-0 bottom-0 flex items-center pointer-events-none"
-          style={{ width: 24 }}
+          style={{ width: exporting ? 48 : 24 }}
         >
           <span
             className={cn(
-              'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+              'px-3 py-1 font-black uppercase tracking-widest whitespace-nowrap',
+              exporting ? 'text-2xl px-6 py-2' : 'text-xs',
               frontageSides.includes('west') ? 'bg-green-500 text-white' : 'bg-black text-white'
             )}
             style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
@@ -310,11 +313,12 @@ export function GridCanvas({
       {borderLabels?.east && (
         <div
           className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none"
-          style={{ width: 24 }}
+          style={{ width: exporting ? 48 : 24 }}
         >
           <span
             className={cn(
-              'px-3 py-1 text-xs font-black uppercase tracking-widest whitespace-nowrap',
+              'px-3 py-1 font-black uppercase tracking-widest whitespace-nowrap',
+              exporting ? 'text-2xl px-6 py-2' : 'text-xs',
               frontageSides.includes('east') ? 'bg-green-500 text-white' : 'bg-black text-white'
             )}
             style={{ writingMode: 'vertical-rl' }}
@@ -354,7 +358,10 @@ export function GridCanvas({
         Array.from({ length: Math.floor(widthFt / gridSizeFt) + 1 }, (_, i) => (
           <div
             key={`xt-${i}`}
-            className="absolute text-[8px] text-gray-400 font-mono select-none pointer-events-none"
+            className={cn(
+              "absolute text-gray-400 font-mono select-none pointer-events-none",
+              exporting ? "text-sm font-bold" : "text-[8px]"
+            )}
             style={{ left: i * gridSizeFt * scale - 4, top: 2 }}
           >
             {i * gridSizeFt}
@@ -366,7 +373,10 @@ export function GridCanvas({
           i > 0 && (
             <div
               key={`yl-${i}`}
-              className="absolute text-[8px] text-gray-400 font-mono select-none pointer-events-none"
+              className={cn(
+                "absolute text-gray-400 font-mono select-none pointer-events-none",
+                exporting ? "text-sm font-bold" : "text-[8px]"
+              )}
               style={{ left: 2, top: i * gridSizeFt * scale - 5 }}
             >
               {i * gridSizeFt}
@@ -498,14 +508,16 @@ export function GridCanvas({
             {/* Label */}
             {showLabels && (exporting || obj.width_ft * scale > 24) && !isDistanceMarker && (
               <div className={cn(
-                "absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-px",
-                exporting ? "overflow-visible z-10" : "overflow-hidden"
+                "absolute inset-0 flex flex-col items-center justify-center pointer-events-none",
+                exporting ? "p-1" : "p-px overflow-hidden"
               )}>
-                <span className={exporting ? "text-[12px] leading-none" : "text-[8px] leading-none"}>{template?.icon || '📦'}</span>
+                <span className={exporting ? "text-base leading-none" : "text-[8px] leading-none"}>{template?.icon || '📦'}</span>
                 <span
                   className={cn(
-                    "font-black uppercase tracking-wider text-center leading-tight text-black/80 px-px",
-                    exporting ? "text-[11px] whitespace-nowrap drop-shadow-[0_0_2px_rgba(255,255,255,1)]" : "text-[7px] truncate max-w-full"
+                    "font-black uppercase tracking-wider text-center leading-tight px-px",
+                    exporting
+                      ? "text-sm text-black bg-white/90 px-1 py-0.5 rounded-sm"
+                      : "text-[7px] text-black/80 truncate max-w-full"
                   )}
                 >
                   {obj.label || template?.label || obj.object_type}
@@ -514,7 +526,7 @@ export function GridCanvas({
                 {obj.object_type === 'neighbor_zone' && obj.properties?.neighbor_name && (
                   <span className={cn(
                     "text-gray-600 italic",
-                    exporting ? "text-[10px] whitespace-nowrap" : "text-[7px] truncate max-w-full"
+                    exporting ? "text-xs bg-white/90 px-1 rounded-sm" : "text-[7px] truncate max-w-full"
                   )}>
                     {obj.properties.neighbor_name}
                   </span>
@@ -523,7 +535,7 @@ export function GridCanvas({
                 {obj.object_type === 'road' && obj.properties?.road_name && (
                   <span className={cn(
                     "text-gray-600 font-bold",
-                    exporting ? "text-[10px] whitespace-nowrap" : "text-[7px] truncate max-w-full"
+                    exporting ? "text-xs bg-white/90 px-1 rounded-sm" : "text-[7px] truncate max-w-full"
                   )}>
                     {obj.properties.road_name}
                   </span>
@@ -532,7 +544,7 @@ export function GridCanvas({
                 {obj.object_type === 'pc_container' && obj.properties?.pc_number && (
                   <span className={cn(
                     "bg-amber-700 text-white px-1 rounded-sm mt-0.5",
-                    exporting ? "text-[10px]" : "text-[7px]"
+                    exporting ? "text-xs" : "text-[7px]"
                   )}>
                     PC#{obj.properties.pc_number}
                   </span>
@@ -541,7 +553,7 @@ export function GridCanvas({
                 {obj.object_type === 'sign' && obj.properties?.sign_text && (
                   <span className={cn(
                     "text-gray-800 font-bold",
-                    exporting ? "text-[10px] whitespace-nowrap" : "text-[7px] truncate max-w-full"
+                    exporting ? "text-xs bg-white/90 px-1 rounded-sm" : "text-[7px] truncate max-w-full"
                   )}>
                     {obj.properties.sign_text}
                   </span>
@@ -549,7 +561,7 @@ export function GridCanvas({
                 {obj.properties?.reservable && (
                   <span className={cn(
                     "bg-green-500 text-white px-1 rounded-sm mt-0.5",
-                    exporting ? "text-[10px]" : "text-[7px]"
+                    exporting ? "text-xs" : "text-[7px]"
                   )}>
                     RESERVABLE
                   </span>
@@ -557,7 +569,7 @@ export function GridCanvas({
                 {hasChildren && (
                   <span className={cn(
                     "bg-purple-500 text-white px-1 rounded-sm mt-0.5",
-                    exporting ? "text-[10px]" : "text-[7px]"
+                    exporting ? "text-xs" : "text-[7px]"
                   )}>
                     HAS SUB-AREAS
                   </span>
@@ -566,7 +578,7 @@ export function GridCanvas({
                 {obj.object_type === 'fire_lane' && (
                   <span className={cn(
                     "bg-red-500 text-white px-1 rounded-sm mt-0.5",
-                    exporting ? "text-[10px]" : "text-[7px]"
+                    exporting ? "text-xs" : "text-[7px]"
                   )}>
                     {Math.min(obj.width_ft, obj.height_ft)}ft WIDE
                   </span>
