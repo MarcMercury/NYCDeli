@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   Tabs, TabPanel, ProgressBar
 } from '@/components/ui'
@@ -723,13 +724,16 @@ export default function BuildWeekPage() {
                                   {/* Item name */}
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-1.5">
-                                      <span className={cn(
-                                        'text-sm truncate',
-                                        item.status === 'discard' && 'line-through',
-                                        item.status === 'verified' && 'line-through text-gray-400',
-                                      )}>
+                                      <Link
+                                        href={`/build-week/inventory/${item.id}`}
+                                        className={cn(
+                                          'text-sm truncate hover:text-blue-600 hover:underline',
+                                          item.status === 'discard' && 'line-through',
+                                          item.status === 'verified' && 'line-through text-gray-400',
+                                        )}
+                                      >
                                         {item.name}
-                                      </span>
+                                      </Link>
                                       {item.source === 'resource' && item.originalResource?.priority === 'critical' && (
                                         <span className="text-[10px] font-bold text-red-600 flex-shrink-0">CRITICAL</span>
                                       )}
@@ -900,13 +904,16 @@ export default function BuildWeekPage() {
                                 {/* Mobile: stacked layout */}
                                 <div className="sm:hidden space-y-1.5">
                                   <div className="flex items-center gap-2">
-                                    <span className={cn(
-                                      'text-sm font-bold flex-1',
-                                      item.status === 'discard' && 'line-through',
-                                      item.status === 'verified' && 'line-through text-gray-400',
-                                    )}>
+                                    <Link
+                                      href={`/build-week/inventory/${item.id}`}
+                                      className={cn(
+                                        'text-sm font-bold flex-1 hover:text-blue-600 hover:underline',
+                                        item.status === 'discard' && 'line-through',
+                                        item.status === 'verified' && 'line-through text-gray-400',
+                                      )}
+                                    >
                                       {item.name}
-                                    </span>
+                                    </Link>
                                     <span className="text-[10px] text-gray-400">
                                       {item.source === 'resource' ? 'Material' : 'Checklist'}
                                     </span>

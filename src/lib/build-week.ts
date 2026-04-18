@@ -62,6 +62,17 @@ export async function fetchBuildResources(): Promise<BuildResource[]> {
   return (data as BuildResource[]) || []
 }
 
+export async function fetchBuildResourceById(id: string): Promise<BuildResource | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_resources')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return data as BuildResource
+}
+
 export async function fetchBuildProcedures(): Promise<BuildProcedure[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -269,6 +280,17 @@ export async function fetchBuildInventory(): Promise<BuildInventory[]> {
     .order('sort_order')
   if (error) throw error
   return (data as BuildInventory[]) || []
+}
+
+export async function fetchInventoryItemById(id: string): Promise<BuildInventory | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_inventory')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return data as BuildInventory
 }
 
 export async function createInventoryItem(item: {
