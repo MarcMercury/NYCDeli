@@ -13,6 +13,7 @@ import { cn, formatDate, formatTime } from '@/lib/utils'
 import { shelterTypes, arrivalMethods, powerTypes, orientationPreferences, tentOpeningSides, shiftTypes, skillTags } from '@/lib/validations'
 import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole, KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 import type { Tab } from '@/components/ui/tabs'
+import PackingListTab from '@/components/packing-list-tab'
 
 interface EnrichedAssignment extends ScheduleAssignment {
   shift?: KitchenShift & { role?: KitchenRole }
@@ -21,6 +22,7 @@ interface EnrichedAssignment extends ScheduleAssignment {
 
 const profileTabs: Tab[] = [
   { id: 'about', label: 'About Me & Photos' },
+  { id: 'packing-list', label: 'My Packing List' },
   { id: 'details', label: 'Camper Details' },
   { id: 'my-schedule', label: 'My Schedule' },
   { id: 'all-schedule', label: 'All Schedule' },
@@ -53,9 +55,7 @@ export default function ProfilePage() {
   // AI bio state
   const [bioGenerating, setBioGenerating] = useState(false)
 
-  // AI packing list state
-  const [packingList, setPackingList] = useState<string | null>(null)
-  const [packingLoading, setPackingLoading] = useState(false)
+
 
   // Schedule state
   const [allAssignments, setAllAssignments] = useState<EnrichedAssignment[]>([])
@@ -207,27 +207,7 @@ export default function ProfilePage() {
     setBioGenerating(false)
   }
 
-  const generatePackingList = async () => {
-    if (!camper) return
-    setPackingLoading(true)
-    setPackingList(null)
-    try {
-      const res = await fetch('/api/ai/packing-list', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ camper }),
-      })
-      const data = await res.json()
-      if (res.ok && data.packingList) {
-        setPackingList(data.packingList)
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to generate packing list' })
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error generating packing list' })
-    }
-    setPackingLoading(false)
-  }
+
 
   const handleChangePassword = async () => {
     if (newPwd !== confirmPwd) {
@@ -448,7 +428,7 @@ export default function ProfilePage() {
         </Alert>
       )}
 
-      <Tabs tabs={canViewDetails ? profileTabs : [profileTabs[0], profileTabs[2], profileTabs[3]]} activeTab={activeTab} onChange={setActiveTab} className="mb-0" />
+      <Tabs tabs={canViewDetails ? profileTabs : profileTabs.filter(t => t.id !== 'details')} activeTab={activeTab} onChange={setActiveTab} className="mb-0" />
 
       {/* ───── TAB 1: About Me & Photos (publicly viewable) ───── */}
       <TabPanel tabId="about" activeTab={activeTab}>
@@ -580,41 +560,26 @@ export default function ProfilePage() {
             </Button>
           </CardFooter>
         </Card>
+      </TabPanel>
 
-        {/* AI Packing List */}
-        {camper && (
-          <Card className="mb-6 border-2 border-purple-200">
-            <CardHeader>
-              <CardTitle>🎒 AI Packing List</CardTitle>
-              <CardDescription>
-                Get a personalized packing list based on your shelter type, skills, and camp duties.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {packingList ? (
-                <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{ __html: packingList.replace(/^### (.*$)/gm, '<h3 class="font-bold text-base mt-4 mb-2">$1</h3>').replace(/^## (.*$)/gm, '<h2 class="font-bold text-lg mt-4 mb-2">$1</h2>').replace(/^- (.*$)/gm, '<div class="flex items-start gap-2 ml-2"><span>•</span><span>$1</span></div>') }}
-                />
-              ) : (
-                <p className="text-sm text-gray-400 italic">
-                  {packingLoading ? '⏳ Generating your personalized list...' : 'Click below to generate a packing list tailored to your burn setup.'}
-                </p>
-              )}
+      {/* ───── TAB 2: My Packing List ───── */}
+      <TabPanel tabId="packing-list" activeTab={activeTab}>
+        {!camper ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-gray-500">
+                Complete your{' '}
+                <a href="/intake" className="font-bold text-black underline">registration</a>{' '}
+                to access your packing list.
+              </p>
             </CardContent>
-            <CardFooter>
-              <Button
-                onClick={generatePackingList}
-                disabled={packingLoading}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                {packingLoading ? '⏳ Generating...' : packingList ? '🔄 Regenerate' : '✨ Generate My Packing List'}
-              </Button>
-            </CardFooter>
           </Card>
+        ) : (
+          <PackingListTab camper={camper} />
         )}
       </TabPanel>
 
-      {/* ───── TAB 2: Camper Details (private — owner + admins only) ───── */}
+      {/* ───── TAB 3: Camper Details (private — owner + admins only) ───── */}
       {canViewDetails && (
         <TabPanel tabId="details" activeTab={activeTab}>
           {!camper ? (
@@ -1057,7 +1022,7 @@ export default function ProfilePage() {
           )}
         </TabPanel>
       )}
-      {/* ───── TAB 3: My Schedule ───── */}
+      {/* ───── TAB 4: My Schedule ───── */}
       <TabPanel tabId="my-schedule" activeTab={activeTab}>
         {!camper ? (
           <Alert variant="warning">
@@ -1092,7 +1057,7 @@ export default function ProfilePage() {
         )}
       </TabPanel>
 
-      {/* ───── TAB 4: All Schedule ───── */}
+      {/* ───── TAB 5: All Schedule ───── */}
       <TabPanel tabId="all-schedule" activeTab={activeTab}>
         <Card>
           <CardHeader>

@@ -11,7 +11,10 @@ The list should include:
 3. PERSONAL COMFORT items (based on their dietary needs, medical considerations flag)
 4. NICE-TO-HAVE items that would make their specific burn better
 
-Format the output as clean markdown with headers and bullet points.
+You MUST respond with valid JSON only — no markdown, no extra text.
+Return a JSON array of objects with this exact structure:
+[{"category": "Category Name", "item": "Item description"}]
+
 Keep it practical and Burning Man-specific. Reference playa conditions (dust, heat, cold nights, no water).
 Do NOT include items the camp provides communally (kitchen gear, shade structures, generators).
 Be specific — "1-gallon insulated water jug" not just "water container".
@@ -62,11 +65,21 @@ Vehicle: ${c.vehicle_info || 'None — limited space'}
 Generate the personalized packing list.`
 
   try {
-    const packingList = await chatCompletion(SYSTEM_PROMPT, userPrompt, {
-      maxTokens: 1024,
+    const raw = await chatCompletion(SYSTEM_PROMPT, userPrompt, {
+      maxTokens: 1500,
       temperature: 0.6,
     })
-    return Response.json({ packingList })
+    // Parse the JSON response
+    let items: { category: string; item: string }[]
+    try {
+      // Handle potential markdown code block wrapping
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim()
+      items = JSON.parse(cleaned)
+    } catch {
+      // Fallback: return raw text if parsing fails
+      return Response.json({ packingList: raw, items: [] })
+    }
+    return Response.json({ items })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to generate packing list'
     return Response.json({ error: message }, { status: 500 })

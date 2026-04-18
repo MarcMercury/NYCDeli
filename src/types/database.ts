@@ -1440,3 +1440,38 @@ export interface ArchivedApplicantUpdate {
 export interface ShiftDraftOrderWithCamper extends ShiftDraftOrderRow {
   camper: Pick<CamperRow, 'id' | 'full_name' | 'playa_name' | 'email'> | null
 }
+
+// ==========================================
+// Packing List Items
+// ==========================================
+
+export interface PackingListItemRow {
+  id: string
+  camper_id: string
+  category: string
+  item: string
+  packed: boolean
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PackingListItemInsert {
+  camper_id: string
+  category?: string
+  item: string
+  packed?: boolean
+  notes?: string | null
+  sort_order?: number
+}
+
+export interface PackingListItemUpdate {
+  category?: string
+  item?: string
+  packed?: boolean
+  notes?: string | null
+  sort_order?: number
+}
+
+export type PackingListItem = PackingListItemRow
