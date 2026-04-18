@@ -1616,11 +1616,16 @@ export default function ResourcesPage() {
   useEffect(() => {
     const hash = window.location.hash.replace('#', '')
     if (hash) {
-      const matchingResource = RESOURCES.find(r => r.slug === hash)
-      if (matchingResource) {
-        setActiveCategory(matchingResource.category)
-        setOpenSlug(hash)
-        scrolledRef.current = false
+      // Check if hash matches a category key first
+      if (hash in CATEGORIES) {
+        setActiveCategory(hash as ResourceCategory)
+      } else {
+        const matchingResource = RESOURCES.find(r => r.slug === hash)
+        if (matchingResource) {
+          setActiveCategory(matchingResource.category)
+          setOpenSlug(hash)
+          scrolledRef.current = false
+        }
       }
     }
   }, [])
