@@ -319,7 +319,12 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
             </Button>
           ) : (
             <>
-              <Button onClick={() => setShowAddForm(!showAddForm)} variant="secondary" className="text-sm">
+              <Button onClick={() => {
+                setShowAddForm(!showAddForm)
+                if (!showAddForm && items.length > 0 && !newCategory) {
+                  setNewCategory(items[0].category)
+                }
+              }} variant="secondary" className="text-sm">
                 {showAddForm ? '✕ Cancel' : '+ Add Item'}
               </Button>
               <Button onClick={exportCSV} variant="secondary" className="text-sm">
@@ -351,12 +356,20 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                 className="flex-1"
                 autoFocus
               />
-              <Input
-                placeholder="Category"
+              <Select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
-                className="sm:w-40"
+                options={[
+                  ...Array.from(new Set(items.map(i => i.category))).sort((a, b) => {
+                    const idxA = (PACKING_CATEGORIES as readonly string[]).indexOf(a)
+                    const idxB = (PACKING_CATEGORIES as readonly string[]).indexOf(b)
+                    if (idxA >= 0 && idxB >= 0) return idxA - idxB
+                    if (idxA >= 0) return -1
+                    if (idxB >= 0) return 1
+                    return a.localeCompare(b)
+                  }).map(c => ({ value: c, label: c })),
+                ]}
+                className="sm:w-48"
               />
               <Select
                 value={newPriority}
