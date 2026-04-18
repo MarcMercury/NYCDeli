@@ -8,7 +8,7 @@ import {
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
-import { updateCamperAction, deleteCamperAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction } from '@/app/actions/admin'
+import { updateCamperAction, deleteCamperAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
 import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
 
@@ -46,6 +46,9 @@ export default function AdminPage() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [editingPosition, setEditingPosition] = useState<{ pos: DraftShiftPosition; catIdx: number; posIdx: number } | null>(null)
   const [editForm, setEditForm] = useState<{ role: string; time: string; description: string }>({ role: '', time: '', description: '' })
+  const [resetPwUserId, setResetPwUserId] = useState<string | null>(null)
+  const [resetPwValue, setResetPwValue] = useState('')
+  const [resetPwLoading, setResetPwLoading] = useState(false)
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
@@ -1091,17 +1094,75 @@ export default function AdminPage() {
                             {user.last_sign_in_at ? formatDate(user.last_sign_in_at) : '—'}
                           </td>
                           <td className="p-3">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedUser(user)
-                                setSelectedCamper(user.camper ? { ...user.camper } : null)
-                              }}
-                            >
-                              View
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedUser(user)
+                                  setSelectedCamper(user.camper ? { ...user.camper } : null)
+                                }}
+                              >
+                                View
+                              </Button>
+                              {resetPwUserId === user.id ? (
+                                <form
+                                  className="flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onSubmit={async (e) => {
+                                    e.preventDefault()
+                                    if (!resetPwValue || resetPwValue.length < 8) {
+                                      setMessage({ type: 'error', text: 'Password must be at least 8 characters' })
+                                      return
+                                    }
+                                    setResetPwLoading(true)
+                                    const result = await adminResetPasswordAction(user.id, resetPwValue)
+                                    setResetPwLoading(false)
+                                    if (result.success) {
+                                      setMessage({ type: 'success', text: `Password reset for ${user.email}` })
+                                    } else {
+                                      setMessage({ type: 'error', text: result.error || 'Failed to reset password' })
+                                    }
+                                    setResetPwUserId(null)
+                                    setResetPwValue('')
+                                  }}
+                                >
+                                  <Input
+                                    type="password"
+                                    placeholder="New password"
+                                    value={resetPwValue}
+                                    onChange={(e) => setResetPwValue(e.target.value)}
+                                    className="h-8 w-32 text-xs"
+                                    autoFocus
+                                  />
+                                  <Button size="sm" type="submit" disabled={resetPwLoading}>
+                                    {resetPwLoading ? '...' : 'Set'}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    type="button"
+                                    onClick={() => { setResetPwUserId(null); setResetPwValue('') }}
+                                  >
+                                    ✕
+                                  </Button>
+                                </form>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setResetPwUserId(user.id)
+                                    setResetPwValue('')
+                                  }}
+                                  title="Reset password"
+                                >
+                                  Reset PW
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
