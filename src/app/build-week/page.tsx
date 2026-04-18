@@ -138,9 +138,8 @@ export default function BuildWeekPage() {
   const [editingScheduleItem, setEditingScheduleItem] = useState<BuildScheduleItem | null>(null)
   const [showAddScheduleItem, setShowAddScheduleItem] = useState(false)
   const [savingScheduleItem, setSavingScheduleItem] = useState(false)
-  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(BUILD_SCHEDULE_DAYS.map(d => [d, true]))
-  )
+  const [expandedScheduleDays, setExpandedScheduleDays] = useState<Record<string, boolean>>({})
+
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }))

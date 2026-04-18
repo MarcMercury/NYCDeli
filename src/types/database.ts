@@ -1445,12 +1445,14 @@ export interface ShiftDraftOrderWithCamper extends ShiftDraftOrderRow {
 // Packing List Items
 // ==========================================
 
+export type PackingItemStatus = 'need' | 'ordered' | 'have' | 'packed'
+
 export interface PackingListItemRow {
   id: string
   camper_id: string
   category: string
   item: string
-  packed: boolean
+  status: PackingItemStatus
   priority: 'must' | 'nice' | 'optional'
   notes: string | null
   sort_order: number
@@ -1462,7 +1464,7 @@ export interface PackingListItemInsert {
   camper_id: string
   category?: string
   item: string
-  packed?: boolean
+  status?: PackingItemStatus
   priority?: 'must' | 'nice' | 'optional'
   notes?: string | null
   sort_order?: number
@@ -1471,7 +1473,7 @@ export interface PackingListItemInsert {
 export interface PackingListItemUpdate {
   category?: string
   item?: string
-  packed?: boolean
+  status?: PackingItemStatus
   priority?: 'must' | 'nice' | 'optional'
   notes?: string | null
   sort_order?: number

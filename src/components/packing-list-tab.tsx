@@ -8,16 +8,26 @@ import {
   updatePackingListItemAction,
   deletePackingListItemAction,
   bulkInsertPackingListAction,
-  togglePackedAction,
+  updateStatusAction,
 } from '@/app/actions/packing-list'
 import { BASE_PACKING_LIST, PACKING_CATEGORIES } from '@/lib/base-packing-list'
-import type { PackingListItemRow, CamperRow } from '@/types/database'
+import type { PackingListItemRow, PackingItemStatus, CamperRow } from '@/types/database'
 
 interface PackingListTabProps {
   camper: CamperRow
 }
 
 type PriorityFilter = 'all' | 'must' | 'nice' | 'optional'
+type StatusFilter = 'all' | PackingItemStatus
+
+const STATUS_FLOW: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed']
+
+const STATUS_CONFIG = {
+  need: { label: 'Need', icon: '⬜', color: 'bg-gray-100 text-gray-700 border-gray-300', barColor: 'bg-gray-300' },
+  ordered: { label: 'Ordered', icon: '📦', color: 'bg-amber-100 text-amber-800 border-amber-300', barColor: 'bg-amber-400' },
+  have: { label: 'Have', icon: '✅', color: 'bg-blue-100 text-blue-800 border-blue-300', barColor: 'bg-blue-400' },
+  packed: { label: 'Packed', icon: '🎒', color: 'bg-green-100 text-green-800 border-green-300', barColor: 'bg-green-500' },
+} as const
 
 const PRIORITY_COLORS = {
   must: 'bg-red-100 text-red-800 border-red-200',
@@ -37,10 +47,15 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   const [populating, setPopulating] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // Filter
+  // Filters
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  // Collapsed categories
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
 
   // Add item form
+  const [showAddForm, setShowAddForm] = useState(false)
   const [newItem, setNewItem] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [newPriority, setNewPriority] = useState<'must' | 'nice' | 'optional'>('must')
@@ -79,11 +94,22 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     )
     if (result.success && result.items) {
       setItems(result.items)
-      setMessage({ type: 'success', text: `Loaded ${result.items.length} items from the camp packing guide. Customize it for your burn!` })
+      setMessage({ type: 'success', text: `Loaded ${result.items.length} items! Tap status buttons to track your progress.` })
     } else {
       setMessage({ type: 'error', text: result.error || 'Failed to load base packing list' })
     }
     setPopulating(false)
+  }
+
+  const cycleStatus = async (item: PackingListItemRow) => {
+    const currentIdx = STATUS_FLOW.indexOf(item.status)
+    const nextStatus = STATUS_FLOW[(currentIdx + 1) % STATUS_FLOW.length]
+    // Optimistic update
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: nextStatus } : i))
+    const result = await updateStatusAction(item.id, nextStatus)
+    if (!result.success) {
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: item.status } : i))
+    }
   }
 
   const addItem = async () => {
@@ -100,6 +126,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
       setItems(prev => [...prev, result.item!])
       setNewItem('')
       setNewCategory('')
+      setShowAddForm(false)
     } else {
       setMessage({ type: 'error', text: result.error || 'Failed to add item' })
     }
@@ -130,10 +157,6 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     }
   }
 
-  const cancelEdit = () => {
-    setEditingId(null)
-  }
-
   const deleteItem = async (itemId: string) => {
     const result = await deletePackingListItemAction(itemId)
     if (result.success) {
@@ -143,17 +166,19 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     }
   }
 
-  const togglePacked = async (item: PackingListItemRow) => {
-    const result = await togglePackedAction(item.id, !item.packed)
-    if (result.success && result.item) {
-      setItems(prev => prev.map(i => i.id === item.id ? result.item! : i))
-    }
+  const toggleCategory = (cat: string) => {
+    setCollapsedCats(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
   }
 
   const exportCSV = () => {
-    const header = 'Category,Item,Priority,Packed,Notes'
+    const header = 'Category,Item,Priority,Status,Notes'
     const rows = items.map(i =>
-      [i.category, i.item, PRIORITY_LABELS[i.priority] || i.priority, i.packed ? 'Yes' : 'No', i.notes || '']
+      [i.category, i.item, PRIORITY_LABELS[i.priority] || i.priority, STATUS_CONFIG[i.status]?.label || i.status, i.notes || '']
         .map(v => `"${v.replace(/"/g, '""')}"`)
         .join(',')
     )
@@ -168,11 +193,13 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   }
 
   // Filter items
-  const filteredItems = priorityFilter === 'all'
-    ? items
-    : items.filter(i => i.priority === priorityFilter)
+  const filteredItems = items.filter(i => {
+    if (priorityFilter !== 'all' && i.priority !== priorityFilter) return false
+    if (statusFilter !== 'all' && i.status !== statusFilter) return false
+    return true
+  })
 
-  // Group filtered items by category, preserving PACKING_CATEGORIES order
+  // Group by category
   const grouped = filteredItems.reduce<Record<string, PackingListItemRow[]>>((acc, item) => {
     const cat = item.category || 'Uncategorized'
     if (!acc[cat]) acc[cat] = []
@@ -180,7 +207,6 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     return acc
   }, {})
 
-  // Sort categories: known categories first in order, then unknowns alphabetically
   const sortedCategories = Object.keys(grouped).sort((a, b) => {
     const idxA = (PACKING_CATEGORIES as readonly string[]).indexOf(a)
     const idxB = (PACKING_CATEGORIES as readonly string[]).indexOf(b)
@@ -190,10 +216,14 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     return a.localeCompare(b)
   })
 
+  // Stats
+  const statusCounts = {
+    need: items.filter(i => i.status === 'need').length,
+    ordered: items.filter(i => i.status === 'ordered').length,
+    have: items.filter(i => i.status === 'have').length,
+    packed: items.filter(i => i.status === 'packed').length,
+  }
   const totalItems = items.length
-  const packedItems = items.filter(i => i.packed).length
-  const mustItems = items.filter(i => i.priority === 'must')
-  const mustPacked = mustItems.filter(i => i.packed).length
 
   if (loading) {
     return (
@@ -210,67 +240,75 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {message && (
         <Alert variant={message.type === 'success' ? 'success' : 'error'}>
           {message.text}
         </Alert>
       )}
 
-      {/* Header + Controls */}
+      {/* Header Card */}
       <Card className="border-2 border-yellow-300">
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle>🎒 My Packing List</CardTitle>
           <CardDescription>
             {items.length === 0
-              ? 'Load the curated NYC Deli Rats camp packing guide, then customize it for your burn. Remove what you don\'t need, add your own items, and check things off as you pack!'
-              : 'Check off items as you pack. Edit, add, or remove anything. Export when ready.'
+              ? 'Load the camp packing guide, then customize it. Tap status buttons to track each item through your packing journey!'
+              : 'Tap an item\'s status to advance it: Need → Ordered → Have → Packed'
             }
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {totalItems > 0 && (
-            <div className="space-y-3">
-              {/* Overall progress */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-600">
-                    {packedItems} of {totalItems} items packed
-                  </span>
-                  <span className="text-sm font-bold">
-                    {Math.round((packedItems / totalItems) * 100)}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 border border-black">
-                  <div
-                    className="bg-yellow-400 h-full rounded-full transition-all duration-300"
-                    style={{ width: `${(packedItems / totalItems) * 100}%` }}
-                  />
-                </div>
-              </div>
-              {/* Essentials progress */}
-              {mustItems.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-red-600">
-                      Essentials: {mustPacked} of {mustItems.length}
-                    </span>
-                    <span className="text-xs font-bold text-red-600">
-                      {Math.round((mustPacked / mustItems.length) * 100)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-red-100 rounded-full h-2 border border-red-200">
-                    <div
-                      className="bg-red-400 h-full rounded-full transition-all duration-300"
-                      style={{ width: `${(mustPacked / mustItems.length) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+
+        {totalItems > 0 && (
+          <CardContent className="pt-0 pb-3">
+            {/* Status summary - 4 tappable stat boxes */}
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {STATUS_FLOW.map(s => {
+                const cfg = STATUS_CONFIG[s]
+                const count = statusCounts[s]
+                const isActive = statusFilter === s
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(isActive ? 'all' : s)}
+                    className={`rounded-lg p-2 text-center border-2 transition-all ${
+                      isActive ? 'border-black ring-2 ring-black/10 scale-[1.02]' : 'border-transparent hover:border-gray-200'
+                    } ${cfg.color}`}
+                  >
+                    <div className="text-lg leading-none">{cfg.icon}</div>
+                    <div className="text-xl font-black leading-tight">{count}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide">{cfg.label}</div>
+                  </button>
+                )
+              })}
             </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-wrap gap-2">
+
+            {/* Stacked progress bar */}
+            <div className="w-full bg-gray-200 rounded-full h-3 border border-black overflow-hidden flex">
+              {STATUS_FLOW.filter(s => s !== 'need').map(s => {
+                const pct = totalItems > 0 ? (statusCounts[s] / totalItems) * 100 : 0
+                return pct > 0 ? (
+                  <div
+                    key={s}
+                    className={`${STATUS_CONFIG[s].barColor} h-full transition-all duration-500`}
+                    style={{ width: `${pct}%` }}
+                    title={`${STATUS_CONFIG[s].label}: ${statusCounts[s]}`}
+                  />
+                ) : null
+              })}
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-gray-400">
+                {statusCounts.packed} of {totalItems} packed
+              </span>
+              <span className="text-[10px] font-bold text-gray-500">
+                {totalItems > 0 ? Math.round((statusCounts.packed / totalItems) * 100) : 0}%
+              </span>
+            </div>
+          </CardContent>
+        )}
+
+        <CardFooter className="flex flex-wrap gap-2 pt-0">
           {items.length === 0 ? (
             <Button
               onClick={loadBaseList}
@@ -281,220 +319,198 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
             </Button>
           ) : (
             <>
+              <Button onClick={() => setShowAddForm(!showAddForm)} variant="secondary" className="text-sm">
+                {showAddForm ? '✕ Cancel' : '+ Add Item'}
+              </Button>
+              <Button onClick={exportCSV} variant="secondary" className="text-sm">
+                📥 Export CSV
+              </Button>
               <Button
                 onClick={loadBaseList}
                 disabled={populating}
                 variant="secondary"
-                className="text-sm"
+                className="text-sm text-gray-400"
               >
-                {populating ? '⏳ Resetting...' : '🔄 Reset to Base List'}
-              </Button>
-              <Button onClick={exportCSV} variant="secondary" className="text-sm">
-                📥 Export CSV
+                {populating ? '⏳...' : '🔄 Reset List'}
               </Button>
             </>
           )}
         </CardFooter>
       </Card>
 
-      {items.length > 0 && populating && (
-        <Alert variant="warning">
-          Resetting will replace your current list with the base camp guide. Custom items and edits will be lost.
-        </Alert>
+      {/* Add Item Form (toggled) */}
+      {showAddForm && (
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                placeholder="Item name"
+                value={newItem}
+                onChange={(e) => setNewItem(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
+                className="flex-1"
+                autoFocus
+              />
+              <Input
+                placeholder="Category"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
+                className="sm:w-40"
+              />
+              <Select
+                value={newPriority}
+                onChange={(e) => setNewPriority(e.target.value as 'must' | 'nice' | 'optional')}
+                options={[
+                  { value: 'must', label: 'Essential' },
+                  { value: 'nice', label: 'Recommended' },
+                  { value: 'optional', label: 'Optional' },
+                ]}
+                className="sm:w-32"
+              />
+              <Button onClick={addItem} disabled={adding || !newItem.trim()}>
+                {adding ? '...' : 'Add'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
+      {/* Priority filter pills */}
       {items.length > 0 && (
-        <>
-          {/* Priority Filter */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-gray-600">Filter:</span>
-            {(['all', 'must', 'nice', 'optional'] as PriorityFilter[]).map(f => (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-gray-400">Priority:</span>
+          {(['all', 'must', 'nice', 'optional'] as PriorityFilter[]).map(f => {
+            const count = f === 'all' ? items.length : items.filter(i => i.priority === f).length
+            return (
               <button
                 key={f}
                 onClick={() => setPriorityFilter(f)}
-                className={`px-3 py-1 text-xs font-bold border-2 rounded-full transition-colors ${
+                className={`px-2.5 py-0.5 text-xs font-bold border rounded-full transition-colors ${
                   priorityFilter === f
                     ? 'bg-black text-white border-black'
-                    : f === 'must' ? 'border-red-300 text-red-700 hover:bg-red-50'
-                    : f === 'nice' ? 'border-blue-300 text-blue-700 hover:bg-blue-50'
-                    : f === 'optional' ? 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    : f === 'must' ? 'border-red-200 text-red-600 hover:bg-red-50'
+                    : f === 'nice' ? 'border-blue-200 text-blue-600 hover:bg-blue-50'
+                    : f === 'optional' ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {f === 'all' ? `All (${items.length})` :
-                 f === 'must' ? `Essential (${items.filter(i => i.priority === 'must').length})` :
-                 f === 'nice' ? `Recommended (${items.filter(i => i.priority === 'nice').length})` :
-                 `Optional (${items.filter(i => i.priority === 'optional').length})`}
+                {f === 'all' ? `All ${count}` : `${PRIORITY_LABELS[f]} ${count}`}
               </button>
-            ))}
-          </div>
-
-          {/* Add Item Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Add Item</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Input
-                  placeholder="Item name"
-                  value={newItem}
-                  onChange={(e) => setNewItem(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
-                  className="flex-1"
-                />
-                <Input
-                  placeholder="Category"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
-                  className="sm:w-44"
-                />
-                <Select
-                  value={newPriority}
-                  onChange={(e) => setNewPriority(e.target.value as 'must' | 'nice' | 'optional')}
-                  options={[
-                    { value: 'must', label: 'Essential' },
-                    { value: 'nice', label: 'Recommended' },
-                    { value: 'optional', label: 'Optional' },
-                  ]}
-                  className="sm:w-36"
-                />
-                <Button onClick={addItem} disabled={adding || !newItem.trim()}>
-                  {adding ? '...' : '+ Add'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+            )
+          })}
+        </div>
       )}
 
-      {/* Packing List by Category */}
+      {/* Category cards */}
       {sortedCategories.map(category => {
         const categoryItems = grouped[category]
+        const catPacked = categoryItems.filter(i => i.status === 'packed').length
+        const isCollapsed = collapsedCats.has(category)
+        const allDone = catPacked === categoryItems.length
+
         return (
-          <Card key={category}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{category}</CardTitle>
-                <Badge variant={
-                  categoryItems.every(i => i.packed) ? 'success' :
-                  categoryItems.some(i => i.packed) ? 'warning' : 'default'
-                }>
-                  {categoryItems.filter(i => i.packed).length}/{categoryItems.length}
+          <Card key={category} className={allDone ? 'opacity-70' : ''}>
+            <button
+              onClick={() => toggleCategory(category)}
+              className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-gray-50 rounded-t-lg transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">{isCollapsed ? '▶' : '▼'}</span>
+                <span className="font-semibold text-sm">{category}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Mini status dots */}
+                <div className="hidden sm:flex items-center gap-1 text-[10px] text-gray-400">
+                  {categoryItems.filter(i => i.status === 'packed').length > 0 && (
+                    <span>🎒{categoryItems.filter(i => i.status === 'packed').length}</span>
+                  )}
+                  {categoryItems.filter(i => i.status === 'have').length > 0 && (
+                    <span>✅{categoryItems.filter(i => i.status === 'have').length}</span>
+                  )}
+                  {categoryItems.filter(i => i.status === 'ordered').length > 0 && (
+                    <span>📦{categoryItems.filter(i => i.status === 'ordered').length}</span>
+                  )}
+                </div>
+                <Badge variant={allDone ? 'success' : catPacked > 0 ? 'warning' : 'default'}>
+                  {catPacked}/{categoryItems.length}
                 </Badge>
               </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ul className="divide-y divide-gray-100">
-                {categoryItems.map(item => (
-                  <li key={item.id} className="py-2">
-                    {editingId === item.id ? (
-                      /* Edit mode */
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <Input
-                            value={editItem}
-                            onChange={(e) => setEditItem(e.target.value)}
-                            placeholder="Item name"
-                            className="flex-1"
-                          />
-                          <Input
-                            value={editCategory}
-                            onChange={(e) => setEditCategory(e.target.value)}
-                            placeholder="Category"
-                            className="w-36"
-                          />
-                          <Select
-                            value={editPriority}
-                            onChange={(e) => setEditPriority(e.target.value as 'must' | 'nice' | 'optional')}
-                            options={[
-                              { value: 'must', label: 'Essential' },
-                              { value: 'nice', label: 'Recommended' },
-                              { value: 'optional', label: 'Optional' },
-                            ]}
-                            className="w-36"
-                          />
-                        </div>
-                        <Input
-                          value={editNotes}
-                          onChange={(e) => setEditNotes(e.target.value)}
-                          placeholder="Notes (optional)"
-                        />
-                        <div className="flex gap-2">
-                          <Button onClick={saveEdit} className="text-xs px-3 py-1">
-                            Save
-                          </Button>
-                          <Button onClick={cancelEdit} variant="secondary" className="text-xs px-3 py-1">
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Display mode */
-                      <div className="flex items-center gap-3 group">
-                        <button
-                          onClick={() => togglePacked(item)}
-                          className={`flex-shrink-0 w-5 h-5 border-2 rounded transition-colors ${
-                            item.packed
-                              ? 'bg-green-500 border-green-600 text-white'
-                              : 'border-gray-300 hover:border-yellow-400'
-                          }`}
-                          aria-label={item.packed ? 'Mark as not packed' : 'Mark as packed'}
-                        >
-                          {item.packed && (
-                            <svg className="w-full h-full" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={item.packed ? 'line-through text-gray-400' : ''}>
-                              {item.item}
-                            </span>
-                            <span className={`inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded border ${PRIORITY_COLORS[item.priority] || PRIORITY_COLORS.must}`}>
-                              {PRIORITY_LABELS[item.priority] || 'Essential'}
-                            </span>
+            </button>
+            {!isCollapsed && (
+              <CardContent className="pt-0 pb-2">
+                <ul className="divide-y divide-gray-50">
+                  {categoryItems.map(item => (
+                    <li key={item.id} className="py-1.5">
+                      {editingId === item.id ? (
+                        <div className="space-y-2 py-1">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Input value={editItem} onChange={(e) => setEditItem(e.target.value)} placeholder="Item" className="flex-1" />
+                            <Input value={editCategory} onChange={(e) => setEditCategory(e.target.value)} placeholder="Category" className="sm:w-32" />
+                            <Select
+                              value={editPriority}
+                              onChange={(e) => setEditPriority(e.target.value as 'must' | 'nice' | 'optional')}
+                              options={[{ value: 'must', label: 'Essential' }, { value: 'nice', label: 'Recommended' }, { value: 'optional', label: 'Optional' }]}
+                              className="sm:w-32"
+                            />
                           </div>
-                          {item.notes && (
-                            <p className="text-xs text-gray-400 mt-0.5">{item.notes}</p>
-                          )}
+                          <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" />
+                          <div className="flex gap-2">
+                            <Button onClick={saveEdit} className="text-xs px-3 py-1">Save</Button>
+                            <Button onClick={() => setEditingId(null)} variant="secondary" className="text-xs px-3 py-1">Cancel</Button>
+                          </div>
                         </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          {/* Status button - tap to cycle */}
                           <button
-                            onClick={() => startEdit(item)}
-                            className="text-xs px-2 py-1 text-gray-500 hover:text-black hover:bg-gray-100 rounded"
-                            aria-label="Edit item"
+                            onClick={() => cycleStatus(item)}
+                            className={`flex-shrink-0 w-[70px] px-1.5 py-1 text-[11px] font-bold rounded-md border transition-all hover:scale-105 active:scale-95 ${STATUS_CONFIG[item.status].color}`}
+                            title={`Click to change status (current: ${STATUS_CONFIG[item.status].label})`}
                           >
-                            ✏️
+                            {STATUS_CONFIG[item.status].icon} {STATUS_CONFIG[item.status].label}
                           </button>
-                          <button
-                            onClick={() => deleteItem(item.id)}
-                            className="text-xs px-2 py-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                            aria-label="Delete item"
-                          >
-                            🗑️
-                          </button>
+
+                          {/* Item name + priority + notes */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-sm ${item.status === 'packed' ? 'line-through text-gray-400' : ''}`}>
+                                {item.item}
+                              </span>
+                              <span className={`text-[9px] font-bold px-1 py-0.5 rounded border ${PRIORITY_COLORS[item.priority]}`}>
+                                {PRIORITY_LABELS[item.priority]}
+                              </span>
+                            </div>
+                            {item.notes && (
+                              <p className="text-[11px] text-gray-400 truncate">{item.notes}</p>
+                            )}
+                          </div>
+
+                          {/* Actions - visible on hover */}
+                          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            <button onClick={() => startEdit(item)} className="text-xs p-1 text-gray-400 hover:text-black rounded" aria-label="Edit">✏️</button>
+                            <button onClick={() => deleteItem(item.id)} className="text-xs p-1 text-gray-400 hover:text-red-600 rounded" aria-label="Delete">🗑️</button>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            )}
           </Card>
         )
       })}
 
+      {/* Empty state */}
       {items.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-4xl mb-4">🎒</p>
             <p className="text-gray-600 text-lg font-bold mb-2">Ready to start packing?</p>
             <p className="text-gray-400 text-sm max-w-md mx-auto">
-              Load the curated camp packing guide with {BASE_PACKING_LIST.length} items across {PACKING_CATEGORIES.length} categories.
-              Each item is tagged as Essential, Recommended, or Optional. Customize it to fit your burn!
+              Load the camp guide with {BASE_PACKING_LIST.length} items across {PACKING_CATEGORIES.length} categories.
+              Track each item from Need → Ordered → Have → Packed!
             </p>
           </CardContent>
         </Card>
@@ -503,7 +519,13 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
       {filteredItems.length === 0 && items.length > 0 && (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-gray-400">No items match the current filter.</p>
+            <p className="text-gray-400">No items match the current filters.</p>
+            <button
+              onClick={() => { setPriorityFilter('all'); setStatusFilter('all') }}
+              className="text-sm text-blue-500 hover:underline mt-1"
+            >
+              Clear filters
+            </button>
           </CardContent>
         </Card>
       )}

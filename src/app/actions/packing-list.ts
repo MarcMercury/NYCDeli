@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { requireApproved } from '@/lib/auth'
-import type { PackingListItemInsert, PackingListItemUpdate, PackingListItemRow } from '@/types/database'
+import type { PackingListItemInsert, PackingListItemUpdate, PackingListItemRow, PackingItemStatus } from '@/types/database'
 
 export type PackingListActionResult = {
   success: boolean
@@ -116,7 +116,7 @@ export async function bulkInsertPackingListAction(
     category: entry.category || 'Uncategorized',
     item: entry.item,
     priority: entry.priority || 'must',
-    packed: false,
+    status: 'need',
     notes: entry.notes || null,
     sort_order: idx,
   }))
@@ -130,16 +130,22 @@ export async function bulkInsertPackingListAction(
   return { success: true, items: data as PackingListItemRow[] }
 }
 
-export async function togglePackedAction(
+export async function updateStatusAction(
   itemId: string,
-  packed: boolean
+  status: PackingItemStatus
 ): Promise<PackingListActionResult> {
   await requireApproved()
+
+  const validStatuses: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed']
+  if (!validStatuses.includes(status)) {
+    return { success: false, error: 'Invalid status' }
+  }
+
   const supabase = await createClient()
 
   const { data: item, error } = await supabase
     .from('packing_list_items')
-    .update({ packed } as never)
+    .update({ status } as never)
     .eq('id', itemId)
     .select()
     .single()

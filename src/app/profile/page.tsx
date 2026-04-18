@@ -22,8 +22,8 @@ interface EnrichedAssignment extends ScheduleAssignment {
 
 const profileTabs: Tab[] = [
   { id: 'about', label: 'About Me & Photos' },
-  { id: 'packing-list', label: 'My Packing List' },
   { id: 'details', label: 'Camper Details' },
+  { id: 'packing-list', label: 'My Packing List' },
   { id: 'my-schedule', label: 'My Schedule' },
   { id: 'all-schedule', label: 'All Schedule' },
 ]
