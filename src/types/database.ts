@@ -1451,6 +1451,7 @@ export interface PackingListItemRow {
   category: string
   item: string
   packed: boolean
+  priority: 'must' | 'nice' | 'optional'
   notes: string | null
   sort_order: number
   created_at: string
@@ -1462,6 +1463,7 @@ export interface PackingListItemInsert {
   category?: string
   item: string
   packed?: boolean
+  priority?: 'must' | 'nice' | 'optional'
   notes?: string | null
   sort_order?: number
 }
@@ -1470,6 +1472,7 @@ export interface PackingListItemUpdate {
   category?: string
   item?: string
   packed?: boolean
+  priority?: 'must' | 'nice' | 'optional'
   notes?: string | null
   sort_order?: number
 }

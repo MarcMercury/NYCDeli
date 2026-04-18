@@ -96,7 +96,7 @@ export async function deletePackingListItemAction(
 
 export async function bulkInsertPackingListAction(
   camperId: string,
-  items: { category: string; item: string }[]
+  items: { category: string; item: string; priority?: 'must' | 'nice' | 'optional'; notes?: string }[]
 ): Promise<PackingListActionResult> {
   await requireApproved()
   const supabase = await createClient()
@@ -115,7 +115,9 @@ export async function bulkInsertPackingListAction(
     camper_id: camperId,
     category: entry.category || 'Uncategorized',
     item: entry.item,
+    priority: entry.priority || 'must',
     packed: false,
+    notes: entry.notes || null,
     sort_order: idx,
   }))
 
