@@ -1331,6 +1331,60 @@ export default function BuildWeekPage() {
             </button>
           </div>
 
+          {/* Build Week 2026 logistics overview */}
+          <div className="mb-4 border-2 border-black bg-white">
+            <div className="bg-black text-white px-3 py-2">
+              <span className="text-[11px] uppercase tracking-wider font-bold">
+                Build Week 2026 — Sun 8/23 → Fri 8/28
+              </span>
+            </div>
+            <div className="px-3 py-3 space-y-3 text-xs leading-relaxed">
+              <div>
+                <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
+                  🏠 Housing — 3 Fernley AirBnBs (2-night minimum)
+                </div>
+                <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                  <li>Houses booked <span className="font-semibold">Sun 8/23 4pm → Tue 8/25 10am</span>.</li>
+                  <li>All builders must be in a Build House by <span className="font-semibold">Build Monday night</span>.</li>
+                  <li>
+                    Wishlist:{' '}
+                    <a
+                      href="https://www.airbnb.com/wishlists/invite/f1daef94-aefc-471e-9ae1-bcdc10d58991?s=67&unique_share_id=6580efa4-1a72-4028-b808-bb74d3eda2cc"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      Fernley AirBnBs ↗
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
+                  ✈️ Arrival — fly into Reno on Build Sunday if you can
+                </div>
+                <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                  <li>Builders arrive between <span className="font-semibold">Build Sunday and Build Monday</span>.</li>
+                  <li>Earlier Sunday flights = extra time for shopping, vehicle prep, and easier RNO→Fernley shuttle.</li>
+                  <li>Try to cluster on shared flights so the 15-passenger van can shuttle groups.</li>
+                  <li>Flight + availability poll is going out — fill it in even if you already have tickets.</li>
+                  <li>Small survey team goes <span className="font-semibold">on-playa Build Monday</span>; everyone else <span className="font-semibold">Build Tuesday AM</span>.</li>
+                </ul>
+              </div>
+
+              <div>
+                <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
+                  🍽️ Food — camp feeds builders through Build Friday night
+                </div>
+                <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                  <li><span className="font-semibold">Sun → Wed AM:</span> Fernley takeout + home breakfasts at the AirBnBs.</li>
+                  <li><span className="font-semibold">Wed PM → Fri night:</span> catered by Swing City (HUBS sister camp) — full kitchen, all dietary preferences.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-3">
             {BUILD_SCHEDULE_DAYS.map(day => {
               const dayItems = scheduleItems.filter(item => item.day === day)
