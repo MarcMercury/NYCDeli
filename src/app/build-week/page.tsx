@@ -1333,11 +1333,18 @@ export default function BuildWeekPage() {
 
           {/* Build Week 2026 logistics overview */}
           <div className="mb-4 border-2 border-black bg-white">
-            <div className="bg-black text-white px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setExpandedRef(prev => ({ ...prev, buildWeekOverview: !prev.buildWeekOverview }))}
+              className="w-full bg-black text-white px-3 py-2 flex items-center justify-between hover:bg-gray-800 transition-colors"
+              aria-expanded={!!expandedRef.buildWeekOverview}
+            >
               <span className="text-[11px] uppercase tracking-wider font-bold">
                 Build Week 2026 — Sun 8/23 → Fri 8/28
               </span>
-            </div>
+              <span className="text-xs">{expandedRef.buildWeekOverview ? '▾' : '▸'}</span>
+            </button>
+            {expandedRef.buildWeekOverview && (
             <div className="px-3 py-3 space-y-3 text-xs leading-relaxed">
               <div>
                 <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
@@ -1383,6 +1390,7 @@ export default function BuildWeekPage() {
                 </ul>
               </div>
             </div>
+            )}
           </div>
 
           <div className="space-y-3">

@@ -427,18 +427,17 @@ export const INVENTORY_CATEGORY_ICONS: Record<string, string> = {
 // ==========================================
 
 export const BUILD_SCHEDULE_DAYS = [
-  'pre_build', 'saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+  'pre_build', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
 ] as const
 
 export const BUILD_SCHEDULE_DAY_LABELS: Record<string, string> = {
   pre_build: 'PRE-Build Week',
-  saturday: 'Saturday',
-  sunday: 'Sunday',
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
+  sunday: 'Build Sunday — Aug 23',
+  monday: 'Build Monday — Aug 24',
+  tuesday: 'Build Tuesday — Aug 25',
+  wednesday: 'Build Wednesday — Aug 26',
+  thursday: 'Build Thursday — Aug 27',
+  friday: 'Build Friday — Aug 28',
 }
 
 export const SCHEDULE_CATEGORY_ICONS: Record<string, string> = {

@@ -1194,7 +1194,7 @@ export interface BuildInventoryRow {
   updated_at: string
 }
 
-export type BuildScheduleDay = 'pre_build' | 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+export type BuildScheduleDay = 'pre_build' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 export type BuildScheduleCategory = 'delivery' | 'infrastructure' | 'shade' | 'kitchen' | 'electrical' | 'plumbing' | 'layout' | 'decoration' | 'logistics' | 'safety' | 'other'
 
 export interface BuildScheduleItemRow {
