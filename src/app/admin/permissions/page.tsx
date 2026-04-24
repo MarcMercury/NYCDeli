@@ -9,24 +9,38 @@ import {
 import { updateUserRoleAction } from '@/app/actions/admin'
 import type { UserProfileRow, UserRole } from '@/types/database'
 
+type CamperInfo = { full_name: string | null; playa_name: string | null }
+
 export default function PermissionsPage() {
   const [profiles, setProfiles] = useState<UserProfileRow[]>([])
+  const [campersByEmail, setCampersByEmail] = useState<Map<string, CamperInfo>>(new Map())
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const fetchProfiles = useCallback(async () => {
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .in('role', ['user', 'admin'])
-      .order('email')
+    const [profilesRes, campersRes] = await Promise.all([
+      supabase
+        .from('user_profiles')
+        .select('*')
+        .in('role', ['user', 'admin'])
+        .order('email'),
+      supabase.from('campers').select('email, full_name, playa_name'),
+    ])
 
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    if (profilesRes.error) {
+      setMessage({ type: 'error', text: profilesRes.error.message })
     } else {
-      setProfiles(data || [])
+      setProfiles(profilesRes.data || [])
+    }
+
+    if (campersRes.data) {
+      const map = new Map<string, CamperInfo>()
+      for (const c of campersRes.data as Array<{ email: string | null; full_name: string | null; playa_name: string | null }>) {
+        if (c.email) map.set(c.email.toLowerCase(), { full_name: c.full_name, playa_name: c.playa_name })
+      }
+      setCampersByEmail(map)
     }
     setLoading(false)
   }, [])
@@ -46,9 +60,15 @@ export default function PermissionsPage() {
     }
   }
 
-  const filteredProfiles = profiles.filter(p =>
-    p.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProfiles = profiles.filter(p => {
+    const term = searchTerm.toLowerCase()
+    if (!term) return true
+    if (p.email.toLowerCase().includes(term)) return true
+    const camper = campersByEmail.get(p.email.toLowerCase())
+    if (camper?.full_name?.toLowerCase().includes(term)) return true
+    if (camper?.playa_name?.toLowerCase().includes(term)) return true
+    return false
+  })
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -87,7 +107,7 @@ export default function PermissionsPage() {
 
       <div className="mb-6">
         <Input
-          placeholder="Search by email..."
+          placeholder="Search by name or email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -99,6 +119,7 @@ export default function PermissionsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b-2 border-black bg-gray-50">
+                  <th className="text-left px-4 py-3 text-sm font-bold uppercase tracking-wider">Name</th>
                   <th className="text-left px-4 py-3 text-sm font-bold uppercase tracking-wider">Email</th>
                   <th className="text-left px-4 py-3 text-sm font-bold uppercase tracking-wider">Current Role</th>
                   <th className="text-left px-4 py-3 text-sm font-bold uppercase tracking-wider">Approved</th>
@@ -108,14 +129,24 @@ export default function PermissionsPage() {
               <tbody>
                 {filteredProfiles.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-gray-400">
+                    <td colSpan={5} className="text-center py-8 text-gray-400">
                       No approved users found.
                     </td>
                   </tr>
                 ) : (
-                  filteredProfiles.map(profile => (
+                  filteredProfiles.map(profile => {
+                    const camper = campersByEmail.get(profile.email.toLowerCase())
+                    const displayName = camper?.full_name
+                      ? camper.playa_name
+                        ? `${camper.full_name} ("${camper.playa_name}")`
+                        : camper.full_name
+                      : null
+                    return (
                     <tr key={profile.id} className="border-b border-gray-200 hover:bg-yellow-50 transition-colors">
-                      <td className="px-4 py-3 font-medium">{profile.email}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {displayName || <span className="text-gray-400 italic">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{profile.email}</td>
                       <td className="px-4 py-3">{getRoleBadge(profile.role)}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {profile.approved_at
@@ -142,7 +173,8 @@ export default function PermissionsPage() {
                         )}
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>
