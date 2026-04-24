@@ -37,7 +37,7 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithCamper | null>(null)
   const [selectedCamper, setSelectedCamper] = useState<Camper | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [userFilter, setUserFilter] = useState<'all' | 'linked' | 'unlinked' | 'admin' | 'pending'>('all')
+  const [userFilter, setUserFilter] = useState<'all' | 'linked' | 'unlinked' | 'admin' | 'builder' | 'pending'>('all')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // Kitchen shift editor state
   const [shiftCategories, setShiftCategories] = useState<DraftShiftCategory[]>([])
@@ -139,6 +139,7 @@ export default function AdminPage() {
       case 'linked': return !!u.camper
       case 'unlinked': return !u.camper
       case 'admin': return u.role === 'admin'
+      case 'builder': return u.role === 'builder'
       case 'pending': return u.role === 'pending'
       default: return true
     }
@@ -427,7 +428,8 @@ export default function AdminPage() {
                         options={[
                           { value: 'pending', label: 'Pending' },
                           { value: 'user', label: 'User (Approved)' },
-                          { value: 'admin', label: 'Admin' },
+                          { value: 'builder', label: 'Builder (Build Week access)' },
+                          { value: 'admin', label: 'Admin (full access)' },
                         ]}
                         value={selectedUser.role}
                         onChange={(e) => updateUserRole(selectedUser.id, e.target.value as UserRole)}
@@ -1008,7 +1010,7 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>All Users & Campers ({filteredUsers.length})</CardTitle>
                   <div className="flex gap-1 flex-wrap">
-                    {(['all', 'linked', 'unlinked', 'admin', 'pending'] as const).map(f => (
+                    {(['all', 'linked', 'unlinked', 'admin', 'builder', 'pending'] as const).map(f => (
                       <button
                         key={f}
                         onClick={() => setUserFilter(f)}
@@ -1094,7 +1096,19 @@ export default function AdminPage() {
                             {user.last_sign_in_at ? formatDate(user.last_sign_in_at) : '—'}
                           </td>
                           <td className="p-3">
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Select
+                                options={[
+                                  { value: 'pending', label: 'Pending' },
+                                  { value: 'user', label: 'User' },
+                                  { value: 'builder', label: 'Builder' },
+                                  { value: 'admin', label: 'Admin' },
+                                ]}
+                                value={user.role}
+                                onChange={(e) => updateUserRole(user.id, e.target.value as UserRole)}
+                                className="h-8 text-xs"
+                                title="Access level — User: basic tabs · Builder: + Build Week · Admin: + Admin"
+                              />
                               <Button
                                 size="sm"
                                 variant="secondary"
