@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Card, CardContent,
-  Badge, Alert, Button, Input
+  Badge, Alert, Button, Input, Select
 } from '@/components/ui'
 import { updateUserRoleAction } from '@/app/actions/admin'
 import type { UserProfileRow, UserRole } from '@/types/database'
@@ -24,7 +24,7 @@ export default function PermissionsPage() {
       supabase
         .from('user_profiles')
         .select('*')
-        .in('role', ['user', 'admin'])
+        .in('role', ['user', 'builder', 'admin'])
         .order('email'),
       supabase.from('campers').select('email, full_name, playa_name'),
     ])
@@ -74,6 +74,8 @@ export default function PermissionsPage() {
     switch (role) {
       case 'admin':
         return <Badge variant="info">Admin</Badge>
+      case 'builder':
+        return <Badge variant="warning">Builder</Badge>
       case 'user':
         return <Badge variant="success">User</Badge>
       default:
@@ -154,23 +156,17 @@ export default function PermissionsPage() {
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {profile.role === 'user' ? (
-                          <Button
-                            size="sm"
-                            onClick={() => updateRole(profile.id, 'admin')}
-                            className="bg-black text-yellow-400 hover:bg-gray-800"
-                          >
-                            Make Admin
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => updateRole(profile.id, 'user')}
-                          >
-                            Remove Admin
-                          </Button>
-                        )}
+                        <Select
+                          options={[
+                            { value: 'user', label: 'User' },
+                            { value: 'builder', label: 'Builder' },
+                            { value: 'admin', label: 'Admin' },
+                          ]}
+                          value={profile.role}
+                          onChange={(e) => updateRole(profile.id, e.target.value as UserRole)}
+                          className="h-8 text-xs inline-block w-auto"
+                          title="Access level — User: basic tabs · Builder: + Build Week · Admin: + Admin"
+                        />
                       </td>
                     </tr>
                     )
@@ -185,8 +181,9 @@ export default function PermissionsPage() {
       <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-400 text-sm">
         <p className="font-bold uppercase tracking-wider mb-1">⚠️ About Roles</p>
         <ul className="space-y-1 text-gray-700">
-          <li><strong>User:</strong> Full read/write access to all camp pages (spots, kitchen, schedule, events, etc.)</li>
-          <li><strong>Admin:</strong> Everything a User can do, plus access to the Admin dashboard, applicant review, and permission management</li>
+          <li><strong>User:</strong> Full read/write access to camp pages (spots, kitchen, schedule, events, etc.). Does NOT see Build Week or Admin tabs.</li>
+          <li><strong>Builder:</strong> Everything a User can do, plus the Build Week tab (schedule, inventory, electrical load, layout sync, shade guide).</li>
+          <li><strong>Admin:</strong> Everything a Builder can do, plus the Admin dashboard, applicant review, and permission management.</li>
         </ul>
       </div>
     </div>
