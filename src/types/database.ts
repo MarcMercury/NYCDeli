@@ -743,6 +743,8 @@ export interface CampReservationUpdate {
 }
 
 // Deli Idea Forum Types
+export type DeliPostType = 'idea' | 'question'
+
 export interface DeliIdeaRow {
   id: string
   created_at: string
@@ -750,18 +752,23 @@ export interface DeliIdeaRow {
   user_id: string
   author_name: string
   author_email: string
+  post_type: DeliPostType
   category: string
   title: string
   body: string
   is_read: boolean
   read_at: string | null
   read_by: string | null
+  admin_response: string | null
+  responded_at: string | null
+  responded_by: string | null
 }
 
 export interface DeliIdeaInsert {
   user_id: string
   author_name: string
   author_email: string
+  post_type?: DeliPostType
   category?: string
   title: string
   body: string
@@ -774,6 +781,9 @@ export interface DeliIdeaUpdate {
   is_read?: boolean
   read_at?: string | null
   read_by?: string | null
+  admin_response?: string | null
+  responded_at?: string | null
+  responded_by?: string | null
 }
 
 // Convenience types

@@ -8,7 +8,7 @@ import {
   Badge, Alert, Button, Input, Textarea, Select,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import type { DeliIdeaRow } from '@/types/database'
+import type { DeliIdeaRow, DeliPostType } from '@/types/database'
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -21,8 +21,44 @@ const CATEGORIES = [
   { value: 'other', label: 'Other' },
 ]
 
+const POST_TYPE_META: Record<DeliPostType, {
+  emoji: string
+  label: string
+  plural: string
+  tagline: string
+  formTitle: string
+  formDesc: string
+  titlePlaceholder: string
+  bodyPlaceholder: string
+  submitLabel: string
+}> = {
+  idea: {
+    emoji: '💡',
+    label: 'Idea',
+    plural: 'Ideas',
+    tagline: 'Got an idea for camp? Drop it here. Every voice matters.',
+    formTitle: 'Submit Your Idea',
+    formDesc: "What's on your mind? Suggestions, improvements, wild ideas — all welcome.",
+    titlePlaceholder: 'Short summary of your idea...',
+    bodyPlaceholder: 'Describe your idea in detail...',
+    submitLabel: 'Submit Idea',
+  },
+  question: {
+    emoji: '❓',
+    label: 'Question',
+    plural: 'Questions',
+    tagline: 'Need an answer from camp leads? Ask here. We\'ll respond when we can.',
+    formTitle: 'Ask a Question',
+    formDesc: 'Ask camp leads/admins anything. Replies appear right on your question (no chat — for chat use WhatsApp).',
+    titlePlaceholder: 'Short version of your question...',
+    bodyPlaceholder: 'Add any context that will help us answer...',
+    submitLabel: 'Submit Question',
+  },
+}
+
 export default function IdeasPage() {
-  const [ideas, setIdeas] = useState<DeliIdeaRow[]>([])
+  const [activeType, setActiveType] = useState<DeliPostType>('idea')
+  const [posts, setPosts] = useState<DeliIdeaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
@@ -34,7 +70,9 @@ export default function IdeasPage() {
   const [enhanced, setEnhanced] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
-  const fetchMyIdeas = useCallback(async () => {
+  const meta = POST_TYPE_META[activeType]
+
+  const fetchMyPosts = useCallback(async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -45,30 +83,36 @@ export default function IdeasPage() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }) as unknown as { data: DeliIdeaRow[] | null }
 
-    setIdeas(data || [])
+    setPosts(data || [])
     setLoading(false)
   }, [])
 
   useEffect(() => {
-    startTransition(() => { fetchMyIdeas() })
-  }, [fetchMyIdeas])
+    startTransition(() => { fetchMyPosts() })
+  }, [fetchMyPosts])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setMessage(null)
 
-    const result = await submitIdeaAction({ title, body, category })
+    const result = await submitIdeaAction({ title, body, category, postType: activeType })
 
     if (result.success) {
-      setMessage({ type: 'success', text: 'Idea submitted! Thanks for your input.' })
+      setMessage({
+        type: 'success',
+        text: activeType === 'question'
+          ? 'Question submitted! Camp leads will respond here.'
+          : 'Idea submitted! Thanks for your input.',
+      })
       setTitle('')
       setBody('')
       setCategory('general')
+      setEnhanced(null)
       setShowForm(false)
-      fetchMyIdeas()
+      fetchMyPosts()
     } else {
-      setMessage({ type: 'error', text: result.error || 'Failed to submit idea' })
+      setMessage({ type: 'error', text: result.error || 'Failed to submit' })
     }
     setSubmitting(false)
   }
@@ -115,6 +159,21 @@ export default function IdeasPage() {
     return colors[value] || colors.general
   }
 
+  const switchTab = (next: DeliPostType) => {
+    if (next === activeType) return
+    setActiveType(next)
+    setShowForm(false)
+    setMessage(null)
+    setEnhanced(null)
+  }
+
+  const filtered = posts.filter(p => (p.post_type ?? 'idea') === activeType)
+  const ideaCount = posts.filter(p => (p.post_type ?? 'idea') === 'idea').length
+  const questionCount = posts.filter(p => p.post_type === 'question').length
+  const unansweredQuestions = posts.filter(
+    p => p.post_type === 'question' && !p.admin_response,
+  ).length
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
@@ -137,16 +196,42 @@ export default function IdeasPage() {
       <section className="bg-yellow-400 border-b-4 border-black py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-black mb-2">
-            💡 Deli Idea Forum
+            💡 Deli Forum
           </h1>
           <p className="text-lg text-black/70 font-bold">
-            Got an idea for camp? Drop it here. Every voice matters.
+            Ideas &amp; Questions for camp leads. (For real-time chatter, use WhatsApp.)
           </p>
         </div>
       </section>
 
       <section className="py-8 px-4">
         <div className="max-w-4xl mx-auto">
+          {/* Type tabs */}
+          <div className="flex gap-2 mb-6 border-b-2 border-black">
+            {(['idea', 'question'] as DeliPostType[]).map(t => {
+              const m = POST_TYPE_META[t]
+              const isActive = activeType === t
+              const count = t === 'idea' ? ideaCount : questionCount
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => switchTab(t)}
+                  className={cn(
+                    'px-4 py-2 font-black uppercase tracking-wider text-sm border-2 border-b-0 rounded-t-lg transition-colors',
+                    isActive
+                      ? 'bg-yellow-400 border-black text-black'
+                      : 'bg-white border-gray-300 text-gray-500 hover:text-black',
+                  )}
+                >
+                  {m.emoji} {m.plural} ({count})
+                </button>
+              )
+            })}
+          </div>
+
+          <p className="text-sm text-gray-600 mb-6">{meta.tagline}</p>
+
           {message && (
             <Alert variant={message.type === 'success' ? 'success' : 'error'} className="mb-6">
               {message.text}
@@ -159,15 +244,13 @@ export default function IdeasPage() {
               onClick={() => setShowForm(true)}
               className="mb-8"
             >
-              ✏️ Submit an Idea
+              {activeType === 'question' ? '❓ Ask a Question' : '✏️ Submit an Idea'}
             </Button>
           ) : (
             <Card className="mb-8 border-2 border-yellow-400">
               <CardHeader>
-                <CardTitle>Submit Your Idea</CardTitle>
-                <CardDescription>
-                  What&apos;s on your mind? Suggestions, improvements, wild ideas — all welcome.
-                </CardDescription>
+                <CardTitle>{meta.formTitle}</CardTitle>
+                <CardDescription>{meta.formDesc}</CardDescription>
               </CardHeader>
               <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
@@ -184,10 +267,10 @@ export default function IdeasPage() {
 
                   <div>
                     <label className="block text-sm font-bold uppercase tracking-wider text-gray-600 mb-1">
-                      Title
+                      {activeType === 'question' ? 'Question' : 'Title'}
                     </label>
                     <Input
-                      placeholder="Short summary of your idea..."
+                      placeholder={meta.titlePlaceholder}
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       maxLength={200}
@@ -197,10 +280,10 @@ export default function IdeasPage() {
 
                   <div>
                     <label className="block text-sm font-bold uppercase tracking-wider text-gray-600 mb-1">
-                      Description
+                      {activeType === 'question' ? 'Details / Context' : 'Description'}
                     </label>
                     <Textarea
-                      placeholder="Describe your idea in detail..."
+                      placeholder={meta.bodyPlaceholder}
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
                       rows={5}
@@ -210,29 +293,31 @@ export default function IdeasPage() {
                     <p className="text-xs text-gray-400 mt-1">{body.length}/5000</p>
                   </div>
 
-                  {/* AI Enhance */}
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Button
-                        type="button"
-                        onClick={enhanceWithAi}
-                        disabled={enhancing || !title.trim() || !body.trim()}
-                        className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1"
-                      >
-                        {enhancing ? '⏳ Thinking...' : '✨ AI Enhance My Idea'}
-                      </Button>
-                      <span className="text-xs text-gray-400">Get suggestions to flesh out your idea</span>
-                    </div>
-                    {enhanced && (
-                      <div className="mt-3 bg-white border border-purple-100 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
-                        {enhanced}
+                  {/* AI Enhance — ideas only */}
+                  {activeType === 'idea' && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Button
+                          type="button"
+                          onClick={enhanceWithAi}
+                          disabled={enhancing || !title.trim() || !body.trim()}
+                          className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1"
+                        >
+                          {enhancing ? '⏳ Thinking...' : '✨ AI Enhance My Idea'}
+                        </Button>
+                        <span className="text-xs text-gray-400">Get suggestions to flesh out your idea</span>
                       </div>
-                    )}
-                  </div>
+                      {enhanced && (
+                        <div className="mt-3 bg-white border border-purple-100 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                          {enhanced}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter className="flex gap-2">
                   <Button type="submit" disabled={submitting}>
-                    {submitting ? 'Submitting...' : 'Submit Idea'}
+                    {submitting ? 'Submitting...' : meta.submitLabel}
                   </Button>
                   <Button
                     type="button"
@@ -246,54 +331,94 @@ export default function IdeasPage() {
             </Card>
           )}
 
-          {/* My submitted ideas */}
-          <h2 className="text-xl font-black uppercase tracking-wider mb-4">
-            Your Submitted Ideas ({ideas.length})
+          {/* My submitted posts */}
+          <h2 className="text-xl font-black uppercase tracking-wider mb-1">
+            Your {meta.plural} ({filtered.length})
           </h2>
+          {activeType === 'question' && unansweredQuestions > 0 && (
+            <p className="text-xs text-orange-600 font-bold mb-4">
+              {unansweredQuestions} awaiting reply
+            </p>
+          )}
+          {activeType !== 'question' && <div className="mb-4" />}
 
-          {ideas.length === 0 ? (
+          {filtered.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-gray-500">
-                You haven&apos;t submitted any ideas yet. Be the first!
+                {activeType === 'question'
+                  ? "You haven't asked any questions yet."
+                  : "You haven't submitted any ideas yet. Be the first!"}
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
-              {ideas.map(idea => (
-                <Card key={idea.id} className={cn(
-                  idea.is_read && 'border-green-300'
-                )}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{idea.title}</CardTitle>
-                        <CardDescription>
-                          {new Date(idea.created_at).toLocaleDateString('en-US', {
-                            month: 'short', day: 'numeric', year: 'numeric',
-                            hour: 'numeric', minute: '2-digit',
-                          })}
-                        </CardDescription>
+              {filtered.map(post => {
+                const isQuestion = post.post_type === 'question'
+                const hasResponse = !!post.admin_response
+                return (
+                  <Card key={post.id} className={cn(
+                    isQuestion && hasResponse && 'border-green-400 border-2',
+                    !isQuestion && post.is_read && 'border-green-300',
+                  )}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{post.title}</CardTitle>
+                          <CardDescription>
+                            {new Date(post.created_at).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric', year: 'numeric',
+                              hour: 'numeric', minute: '2-digit',
+                            })}
+                          </CardDescription>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <span className={cn(
+                            'text-xs font-bold px-2 py-1 rounded',
+                            getCategoryColor(post.category)
+                          )}>
+                            {getCategoryLabel(post.category)}
+                          </span>
+                          {isQuestion ? (
+                            hasResponse ? (
+                              <Badge variant="success">Answered</Badge>
+                            ) : (
+                              <Badge variant="warning">Awaiting reply</Badge>
+                            )
+                          ) : (
+                            post.is_read ? (
+                              <Badge variant="success">Read</Badge>
+                            ) : (
+                              <Badge variant="warning">Pending</Badge>
+                            )
+                          )}
+                        </div>
                       </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <span className={cn(
-                          'text-xs font-bold px-2 py-1 rounded',
-                          getCategoryColor(idea.category)
-                        )}>
-                          {getCategoryLabel(idea.category)}
-                        </span>
-                        {idea.is_read ? (
-                          <Badge variant="success">Read</Badge>
-                        ) : (
-                          <Badge variant="warning">Pending</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{idea.body}</p>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm whitespace-pre-wrap">{post.body}</p>
+
+                      {isQuestion && hasResponse && (
+                        <div className="mt-4 bg-green-50 border-l-4 border-green-500 rounded p-3">
+                          <p className="text-xs font-black uppercase tracking-wider text-green-800 mb-1">
+                            ✅ Camp Lead Response
+                            {post.responded_at && (
+                              <span className="ml-2 font-normal text-green-700/70 normal-case tracking-normal">
+                                {new Date(post.responded_at).toLocaleDateString('en-US', {
+                                  month: 'short', day: 'numeric',
+                                  hour: 'numeric', minute: '2-digit',
+                                })}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap text-green-900">
+                            {post.admin_response}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </div>

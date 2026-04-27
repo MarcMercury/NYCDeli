@@ -369,7 +369,7 @@ export default function AdminPage() {
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
                 <p className="text-3xl font-black">💡</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Idea Forum</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Forum (Ideas &amp; Q&apos;s)</p>
               </CardContent>
             </Card>
           </Link>
