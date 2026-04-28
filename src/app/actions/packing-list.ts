@@ -26,6 +26,67 @@ export async function getPackingListAction(camperId: string): Promise<PackingLis
   return { success: true, items: data as PackingListItemRow[] }
 }
 
+export async function syncMissingBaseItemsAction(
+  camperId: string,
+  baseItems: { category: string; item: string; priority?: 'must' | 'nice' | 'optional'; notes?: string }[]
+): Promise<PackingListActionResult> {
+  await requireApproved()
+  const supabase = await createClient()
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('packing_list_items')
+    .select('*')
+    .eq('camper_id', camperId)
+
+  if (fetchError) return { success: false, error: fetchError.message }
+
+  const existingItems = (existing as PackingListItemRow[]) || []
+  // If list is empty, do not auto-populate; user must click "Load Camp Packing Guide"
+  if (existingItems.length === 0) {
+    return { success: true, items: [] }
+  }
+
+  const existingKeys = new Set(
+    existingItems.map(i => `${(i.category || '').toLowerCase()}|${i.item.toLowerCase()}`)
+  )
+
+  const missing = baseItems.filter(
+    b => !existingKeys.has(`${(b.category || '').toLowerCase()}|${b.item.toLowerCase()}`)
+  )
+
+  if (missing.length === 0) {
+    return { success: true, items: existingItems }
+  }
+
+  const startSort = existingItems.length
+  const rows = missing.map((entry, idx) => ({
+    camper_id: camperId,
+    category: entry.category || 'Uncategorized',
+    item: entry.item,
+    priority: entry.priority || 'must',
+    status: 'need',
+    notes: entry.notes || null,
+    sort_order: startSort + idx,
+  }))
+
+  const { error: insertError } = await supabase
+    .from('packing_list_items')
+    .insert(rows as never[])
+
+  if (insertError) return { success: false, error: insertError.message }
+
+  // Return refreshed list
+  const { data: refreshed, error: refreshError } = await supabase
+    .from('packing_list_items')
+    .select('*')
+    .eq('camper_id', camperId)
+    .order('category')
+    .order('sort_order')
+
+  if (refreshError) return { success: false, error: refreshError.message }
+  return { success: true, items: refreshed as PackingListItemRow[] }
+}
+
 export async function addPackingListItemAction(
   data: PackingListItemInsert
 ): Promise<PackingListActionResult> {

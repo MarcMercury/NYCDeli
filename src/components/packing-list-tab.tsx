@@ -9,6 +9,7 @@ import {
   deletePackingListItemAction,
   bulkInsertPackingListAction,
   updateStatusAction,
+  syncMissingBaseItemsAction,
 } from '@/app/actions/packing-list'
 import { BASE_PACKING_LIST, PACKING_CATEGORIES } from '@/lib/base-packing-list'
 import type { PackingListItemRow, PackingItemStatus, CamperRow } from '@/types/database'
@@ -72,7 +73,25 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   const fetchItems = useCallback(async () => {
     const result = await getPackingListAction(camper.id)
     if (result.success && result.items) {
-      setItems(result.items)
+      // Sync any missing items from the base list (e.g. newly added categories)
+      if (result.items.length > 0) {
+        const syncResult = await syncMissingBaseItemsAction(
+          camper.id,
+          BASE_PACKING_LIST.map(entry => ({
+            category: entry.category,
+            item: entry.item,
+            priority: entry.priority,
+            notes: entry.notes,
+          }))
+        )
+        if (syncResult.success && syncResult.items) {
+          setItems(syncResult.items)
+        } else {
+          setItems(result.items)
+        }
+      } else {
+        setItems(result.items)
+      }
     }
     setLoading(false)
   }, [camper.id])
