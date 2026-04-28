@@ -60,7 +60,6 @@ const tabs: Tab[] = [
   { id: 'schedule', label: 'Schedule' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'electrical', label: 'Electrical Load' },
-  { id: 'layout-sync', label: 'Layout Sync' },
   { id: 'shade', label: 'Shade Guide' },
 ]
 
@@ -178,6 +177,13 @@ export default function BuildWeekPage() {
 
   useEffect(() => {
     fetchData()
+  }, [fetchData])
+
+  // Reload inventory/resources after a layout sync creates new rows
+  useEffect(() => {
+    const handler = () => { fetchData() }
+    window.addEventListener('inventory:refresh', handler)
+    return () => window.removeEventListener('inventory:refresh', handler)
   }, [fetchData])
 
   const GOAL_STATUS_CYCLE: Record<TaskStatus, TaskStatus> = {
@@ -588,6 +594,26 @@ export default function BuildWeekPage() {
 
         {/* ═══════════  INVENTORY  ═══════════ */}
         <TabPanel tabId="inventory" activeTab={activeTab}>
+          {/* ── Layout Sync (collapsible) ── */}
+          <div className="mb-4 border-2 border-black bg-white">
+            <button
+              onClick={() => setExpandedRef(prev => ({ ...prev, layoutSync: !prev.layoutSync }))}
+              className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 transition-colors text-left"
+            >
+              <span className="text-sm">🗺️</span>
+              <span className="font-bold text-sm uppercase tracking-wide flex-1">Layout Sync</span>
+              <span className="text-[10px] text-gray-500">
+                Verify map objects are tracked in inventory
+              </span>
+              <span className="text-gray-300">{expandedRef.layoutSync ? '▾' : '▸'}</span>
+            </button>
+            {expandedRef.layoutSync && (
+              <div className="p-3 border-t border-gray-200">
+                <LayoutSyncTab />
+              </div>
+            )}
+          </div>
+
           {/* ── Summary strip ── */}
           <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-gray-400">
             <span>{resources.length + inventory.length} items</span>
@@ -1561,11 +1587,6 @@ export default function BuildWeekPage() {
         {/* ═══════  ELECTRICAL LOAD  ═══════ */}
         <TabPanel tabId="electrical" activeTab={activeTab}>
           <ElectricalLoadTab />
-        </TabPanel>
-
-        {/* ═══════  LAYOUT SYNC  ═══════ */}
-        <TabPanel tabId="layout-sync" activeTab={activeTab}>
-          <LayoutSyncTab />
         </TabPanel>
 
         {/* Schedule Item Form Modal */}
