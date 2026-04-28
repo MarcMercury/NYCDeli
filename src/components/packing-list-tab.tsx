@@ -51,8 +51,9 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
-  // Collapsed categories
+  // Collapsed categories (start with all collapsed)
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
+  const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false)
 
   // Add item form
   const [showAddForm, setShowAddForm] = useState(false)
@@ -79,6 +80,15 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   useEffect(() => {
     fetchItems()
   }, [fetchItems])
+
+  // Collapse all categories by default once items first load
+  useEffect(() => {
+    if (!hasInitializedCollapse && items.length > 0) {
+      const allCats = new Set(items.map(i => i.category || 'Uncategorized'))
+      setCollapsedCats(allCats)
+      setHasInitializedCollapse(true)
+    }
+  }, [items, hasInitializedCollapse])
 
   const loadBaseList = async () => {
     setPopulating(true)

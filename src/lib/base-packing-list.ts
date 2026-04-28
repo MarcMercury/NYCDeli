@@ -314,6 +314,11 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   // ═══════════════════════════════════════════
   { category: 'Emergency & Safety', item: 'Emergency toilet (5-gal bucket + lid + bags)', priority: 'nice', notes: 'In case of rain lockdown — as seen in recent years' },
   { category: 'Emergency & Safety', item: 'Personal ashtray (Altoid tin)', priority: 'nice', notes: 'If you smoke — full-size Altoid tin works well' },
+
+  // ═══════════════════════════════════════════
+  // BUILD WEEK
+  // ═══════════════════════════════════════════
+  { category: 'Build Week', item: 'Closed Toed Work Shoes', priority: 'must' },
 ]
 
 // Get unique categories in display order
@@ -339,4 +344,5 @@ export const PACKING_CATEGORIES = [
   'Gifting & Community',
   'Vehicle & Travel',
   'Emergency & Safety',
+  'Build Week',
 ] as const
