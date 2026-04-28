@@ -38,22 +38,22 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   // ═══════════════════════════════════════════
   // SHELTER & SLEEP
   // ═══════════════════════════════════════════
-  { category: 'Shelter & Sleep', item: 'Tent / Shiftpod / Hexayurt', priority: 'must', notes: 'The less mesh the better — should close completely. Leave room for costumes!' },
-  { category: 'Shelter & Sleep', item: 'Shade structure (Aluminet preferred)', priority: 'must', notes: 'Reflects 70% of heat with airflow. Without shade, tents are ovens by 8 AM.' },
-  { category: 'Shelter & Sleep', item: 'Lag bolts 3/8"x14" or heavy rebar stakes', priority: 'must', notes: 'Standard stakes fail in 60mph winds. Lag bolts + impact driver are far more effective.' },
-  { category: 'Shelter & Sleep', item: 'Rebar end covers (tennis balls or caps)', priority: 'must', notes: 'Safety requirement — cut across the logo on tennis balls to find them next year' },
-  { category: 'Shelter & Sleep', item: 'Impact driver (for lag bolts)', priority: 'must' },
-  { category: 'Shelter & Sleep', item: 'Sleeping bag (rated for 40°F)', priority: 'must' },
-  { category: 'Shelter & Sleep', item: 'Sleeping pad or cot', priority: 'must', notes: 'Put padding between you and air mattress — air gets cold/hot with temp swings' },
-  { category: 'Shelter & Sleep', item: 'Pillows (double-cased to keep out dust)', priority: 'must' },
-  { category: 'Shelter & Sleep', item: 'Warm blankets', priority: 'must', notes: 'Insulation blanket between air mattress & bedding is key' },
-  { category: 'Shelter & Sleep', item: 'Dust rug/mat for tent entrance', priority: 'must', notes: 'Artificial turf or rug traps dust before it enters' },
-  { category: 'Shelter & Sleep', item: 'Battery-powered fan or evaporative cooler', priority: 'nice', notes: 'Rechargeable fan is a game-changer for sleep' },
-  { category: 'Shelter & Sleep', item: 'Small brush/dustpan for tent', priority: 'nice' },
-  { category: 'Shelter & Sleep', item: 'Battery-powered handheld vacuum', priority: 'nice', notes: 'Game-changer for keeping sleeping area livable' },
-  { category: 'Shelter & Sleep', item: 'Tarp/plastic sheet to cover bed', priority: 'nice', notes: 'Dust WILL get in no matter what — this protects your bedding' },
-  { category: 'Shelter & Sleep', item: 'Full-length mirror', priority: 'nice', notes: 'Great for checking outfits. Secure it so it doesn\'t break.' },
-  { category: 'Shelter & Sleep', item: 'Small personal mirror', priority: 'must' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Tent / Shiftpod / Hexayurt', priority: 'must', notes: 'The less mesh the better — should close completely. Leave room for costumes!' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Shade structure (Aluminet preferred)', priority: 'must', notes: 'Reflects 70% of heat with airflow. Without shade, tents are ovens by 8 AM.' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Lag bolts 3/8"x14" or heavy rebar stakes', priority: 'must', notes: 'Standard stakes fail in 60mph winds. Lag bolts + impact driver are far more effective.' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Rebar end covers (tennis balls or caps)', priority: 'must', notes: 'Safety requirement — cut across the logo on tennis balls to find them next year' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Impact driver (for lag bolts)', priority: 'must' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Sleeping bag (rated for 40°F)', priority: 'must' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Sleeping pad or cot', priority: 'must', notes: 'Put padding between you and air mattress — air gets cold/hot with temp swings' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Pillows (double-cased to keep out dust)', priority: 'must' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Warm blankets', priority: 'must', notes: 'Insulation blanket between air mattress & bedding is key' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Dust rug/mat for tent entrance', priority: 'must', notes: 'Artificial turf or rug traps dust before it enters' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Battery-powered fan or evaporative cooler', priority: 'nice', notes: 'Rechargeable fan is a game-changer for sleep' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Small brush/dustpan for tent', priority: 'nice' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Battery-powered handheld vacuum', priority: 'nice', notes: 'Game-changer for keeping sleeping area livable' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Tarp/plastic sheet to cover bed', priority: 'nice', notes: 'Dust WILL get in no matter what — this protects your bedding' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Full-length mirror', priority: 'nice', notes: 'Great for checking outfits. Secure it so it doesn\'t break.' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Small personal mirror', priority: 'must' },
 
   // ═══════════════════════════════════════════
   // CLOTHING - DAYWEAR
@@ -279,17 +279,17 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   { category: 'Tools & Hardware', item: 'Compass', priority: 'optional', notes: 'Navigate during whiteouts or pick a random adventure direction' },
 
   // ═══════════════════════════════════════════
-  // CAMP SETUP & HOME
+  // CAMP SETUP & HOME (part of Shelter, Sleep & Camp Setup)
   // ═══════════════════════════════════════════
-  { category: 'Camp Setup & Home', item: 'Carpet / floor mat for tent', priority: 'nice', notes: 'Keeps dust down. Roll up and shake out at home — acts like a MOOP magnet.' },
-  { category: 'Camp Setup & Home', item: 'Clear hanging wardrobe organizer', priority: 'nice', notes: 'Hang clean clothing inside' },
-  { category: 'Camp Setup & Home', item: 'Collapsible clothing rack', priority: 'nice' },
-  { category: 'Camp Setup & Home', item: 'Small plastic drawer unit (3-4 drawer)', priority: 'nice', notes: 'Keep by bed for organizing small stuff' },
-  { category: 'Camp Setup & Home', item: 'Clear shoe organizer (over-door)', priority: 'nice', notes: 'Great for goggles, lip balm, sunscreen, etc.' },
-  { category: 'Camp Setup & Home', item: 'Chairs (arm chair + chaise)', priority: 'nice' },
-  { category: 'Camp Setup & Home', item: 'Folding table', priority: 'nice' },
-  { category: 'Camp Setup & Home', item: 'Small white board', priority: 'nice', notes: 'Place outside tent for notes and agenda' },
-  { category: 'Camp Setup & Home', item: 'Tapestries / decorations', priority: 'nice', notes: 'Make your space a little Shangri-La' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Carpet / floor mat for tent', priority: 'nice', notes: 'Keeps dust down. Roll up and shake out at home — acts like a MOOP magnet.' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Clear hanging wardrobe organizer', priority: 'nice', notes: 'Hang clean clothing inside' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Collapsible clothing rack', priority: 'nice' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Small plastic drawer unit (3-4 drawer)', priority: 'nice', notes: 'Keep by bed for organizing small stuff' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Clear shoe organizer (over-door)', priority: 'nice', notes: 'Great for goggles, lip balm, sunscreen, etc.' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Chairs (arm chair + chaise)', priority: 'nice' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Folding table', priority: 'nice' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Small white board', priority: 'nice', notes: 'Place outside tent for notes and agenda' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Tapestries / decorations', priority: 'nice', notes: 'Make your space a little Shangri-La' },
 
   // ═══════════════════════════════════════════
   // GIFTING & COMMUNITY
@@ -325,7 +325,7 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
 export const PACKING_CATEGORIES = [
   'Tickets & Documentation',
   'Water & Hydration',
-  'Shelter & Sleep',
+  'Shelter, Sleep & Camp Setup',
   'Clothing - Daywear',
   'Clothing - Cold Weather',
   'Footwear & Accessories',
@@ -340,7 +340,6 @@ export const PACKING_CATEGORIES = [
   'Lighting & Visibility',
   'Electronics & Power',
   'Tools & Hardware',
-  'Camp Setup & Home',
   'Gifting & Community',
   'Vehicle & Travel',
   'Emergency & Safety',

@@ -33,6 +33,19 @@ export async function syncMissingBaseItemsAction(
   await requireApproved()
   const supabase = await createClient()
 
+  // One-time category renames so existing rows match the new base list grouping
+  const CATEGORY_REMAP: Record<string, string> = {
+    'Shelter & Sleep': 'Shelter, Sleep & Camp Setup',
+    'Camp Setup & Home': 'Shelter, Sleep & Camp Setup',
+  }
+  for (const [oldCat, newCat] of Object.entries(CATEGORY_REMAP)) {
+    await supabase
+      .from('packing_list_items')
+      .update({ category: newCat } as never)
+      .eq('camper_id', camperId)
+      .eq('category', oldCat)
+  }
+
   const { data: existing, error: fetchError } = await supabase
     .from('packing_list_items')
     .select('*')
