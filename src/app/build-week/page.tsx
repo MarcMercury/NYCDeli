@@ -232,6 +232,8 @@ export default function BuildWeekPage() {
       const newResource = await createBuildResource(data)
       setResources(prev => [...prev, newResource])
       setShowAddResource(false)
+      setShowAddInventory(false)
+      setAddItemType(null)
     } catch {
       // Silently fail
     } finally {
@@ -353,6 +355,8 @@ export default function BuildWeekPage() {
       const newItem = await createInventoryItem(data)
       setInventory(prev => [...prev, newItem])
       setShowAddInventory(false)
+      setShowAddResource(false)
+      setAddItemType(null)
     } catch {
       // Silently fail
     } finally {
