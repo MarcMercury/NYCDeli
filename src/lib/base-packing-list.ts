@@ -27,13 +27,13 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   // ═══════════════════════════════════════════
   // WATER & HYDRATION
   // ═══════════════════════════════════════════
-  { category: 'Water & Hydration', item: 'Water supply (1.5-2 gal/person/day)', priority: 'must', notes: 'For drinking, cleaning, and light hygiene. Freeze some jugs for cooler travel.' },
-  { category: 'Water & Hydration', item: 'Hydration pack (CamelBak 2-3L)', priority: 'must', notes: 'Should be comfortable for all-day wear' },
-  { category: 'Water & Hydration', item: 'Reusable cup with lid & carabiner', priority: 'must', notes: 'Clip to belt. Lid prevents dust. Other camps won\'t have cups for you.' },
-  { category: 'Water & Hydration', item: 'Electrolyte powder/tabs (Liquid IV, Nuun)', priority: 'must', notes: 'Add to every refill to prevent heat exhaustion' },
-  { category: 'Water & Hydration', item: 'Coconut water', priority: 'nice', notes: 'Great for staying hydrated' },
-  { category: 'Water & Hydration', item: 'Pedialyte', priority: 'nice', notes: 'Great for hangovers and staying well hydrated' },
-  { category: 'Water & Hydration', item: 'Emergen-C packets', priority: 'must' },
+  { category: 'Water, Hydration & Drinks', item: 'Water supply (1.5-2 gal/person/day)', priority: 'must', notes: 'For drinking, cleaning, and light hygiene. Freeze some jugs for cooler travel.' },
+  { category: 'Water, Hydration & Drinks', item: 'Hydration pack (CamelBak 2-3L)', priority: 'must', notes: 'Should be comfortable for all-day wear' },
+  { category: 'Water, Hydration & Drinks', item: 'Reusable cup with lid & carabiner', priority: 'must', notes: 'Clip to belt. Lid prevents dust. Other camps won\'t have cups for you.' },
+  { category: 'Water, Hydration & Drinks', item: 'Electrolyte powder/tabs (Liquid IV, Nuun)', priority: 'must', notes: 'Add to every refill to prevent heat exhaustion' },
+  { category: 'Water, Hydration & Drinks', item: 'Coconut water', priority: 'nice', notes: 'Great for staying hydrated' },
+  { category: 'Water, Hydration & Drinks', item: 'Pedialyte', priority: 'nice', notes: 'Great for hangovers and staying well hydrated' },
+  { category: 'Water, Hydration & Drinks', item: 'Emergen-C packets', priority: 'must' },
 
   // ═══════════════════════════════════════════
   // SHELTER & SLEEP
@@ -110,34 +110,34 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   // ═══════════════════════════════════════════
   // PERSONAL CARE & HYGIENE
   // ═══════════════════════════════════════════
-  { category: 'Personal Care & Hygiene', item: 'Baby wipes / body wipes (lots)', priority: 'must', notes: '"Playa showers" — bring more than you think you need' },
-  { category: 'Personal Care & Hygiene', item: 'Toiletries (toothbrush, toothpaste, deodorant)', priority: 'must', notes: 'Try to bring biodegradable products' },
-  { category: 'Personal Care & Hygiene', item: 'Shampoo & conditioner', priority: 'must', notes: 'Biodegradable preferred' },
-  { category: 'Personal Care & Hygiene', item: 'Towels (2, quick-dry)', priority: 'must' },
-  { category: 'Personal Care & Hygiene', item: 'Heavy-duty moisturizer/lotion', priority: 'must', notes: 'Bring several — by bed, in bag, etc.' },
-  { category: 'Personal Care & Hygiene', item: 'Hand sanitizer (60%+ alcohol)', priority: 'must', notes: 'Keep a small one on you at all times. Use before every meal.' },
-  { category: 'Personal Care & Hygiene', item: 'Vinegar spray bottle (1:4 vinegar:water)', priority: 'must', notes: 'Neutralizes alkaline playa dust on skin/feet. Follow with heavy lotion.' },
-  { category: 'Personal Care & Hygiene', item: 'Lubricating eye drops / saline', priority: 'must', notes: 'Dust is extremely drying — use 3-4 times a day even without contacts' },
-  { category: 'Personal Care & Hygiene', item: 'Nasal saline spray', priority: 'must', notes: 'Use 3-4 times daily. Essential for dust recovery.' },
-  { category: 'Personal Care & Hygiene', item: 'Kleenex / tissue packs', priority: 'must', notes: 'Port-o-potties run out of TP constantly. Only 1-ply in portos!' },
-  { category: 'Personal Care & Hygiene', item: 'Ear plugs', priority: 'must', notes: 'For sound camps and sleeping — Burning Man is loud everywhere' },
-  { category: 'Personal Care & Hygiene', item: 'Eye shades for sleeping', priority: 'must', notes: 'You will need these no matter how deeply you sleep' },
-  { category: 'Personal Care & Hygiene', item: 'Biodegradable soap', priority: 'must' },
-  { category: 'Personal Care & Hygiene', item: 'Bag Balm / O\'Keeffe\'s for hands & feet', priority: 'nice', notes: 'Apply before playa and once daily. Prevents dehydration and cracking.' },
-  { category: 'Personal Care & Hygiene', item: 'Neti pot & saline', priority: 'nice', notes: 'Cleanses nasal passages — not table salt, use proper saline' },
-  { category: 'Personal Care & Hygiene', item: 'Essential oils (peppermint, eucalyptus)', priority: 'nice', notes: 'Drop in dust mask for easier breathing. Great gifting item too.' },
-  { category: 'Personal Care & Hygiene', item: 'Throat lozenges', priority: 'nice', notes: 'You breathe in a lot of dust — these help a lot' },
-  { category: 'Personal Care & Hygiene', item: 'Vitamins / multivitamins', priority: 'nice' },
-  { category: 'Personal Care & Hygiene', item: 'TP (single-ply, extra rolls)', priority: 'nice', notes: 'Septic-safe single-ply only. Porto\'s run out all the time.' },
-  { category: 'Personal Care & Hygiene', item: 'Gum', priority: 'nice', notes: 'Nice to have and to share' },
-  { category: 'Personal Care & Hygiene', item: 'Moleskin (for blisters)', priority: 'nice' },
-  { category: 'Personal Care & Hygiene', item: 'Medical tape (plastic or cloth)', priority: 'nice', notes: 'Bandages don\'t stay on well — great for wrapping cracked fingers' },
-  { category: 'Personal Care & Hygiene', item: 'Bug protection / repellent', priority: 'nice' },
-  { category: 'Personal Care & Hygiene', item: 'Aloe / burn lotion', priority: 'nice' },
-  { category: 'Personal Care & Hygiene', item: 'Arnica / muscle rub', priority: 'nice', notes: 'Helps after setup and all the physical activity' },
-  { category: 'Personal Care & Hygiene', item: 'Gold Bond powder', priority: 'nice' },
-  { category: 'Personal Care & Hygiene', item: 'Condoms & lubricant', priority: 'nice' },
-  { category: 'Personal Care & Hygiene', item: 'Ladies: Tampons or menstrual cup', priority: 'nice', notes: 'Even off-cycle it may surprise you. NEVER put tampons in porto-potties!' },
+  { category: 'Personal Care & Bathing', item: 'Baby wipes / body wipes (lots)', priority: 'must', notes: '"Playa showers" — bring more than you think you need' },
+  { category: 'Personal Care & Bathing', item: 'Toiletries (toothbrush, toothpaste, deodorant)', priority: 'must', notes: 'Try to bring biodegradable products' },
+  { category: 'Personal Care & Bathing', item: 'Shampoo & conditioner', priority: 'must', notes: 'Biodegradable preferred' },
+  { category: 'Personal Care & Bathing', item: 'Towels (2, quick-dry)', priority: 'must' },
+  { category: 'Personal Care & Bathing', item: 'Heavy-duty moisturizer/lotion', priority: 'must', notes: 'Bring several — by bed, in bag, etc.' },
+  { category: 'Personal Care & Bathing', item: 'Hand sanitizer (60%+ alcohol)', priority: 'must', notes: 'Keep a small one on you at all times. Use before every meal.' },
+  { category: 'Personal Care & Bathing', item: 'Vinegar spray bottle (1:4 vinegar:water)', priority: 'must', notes: 'Neutralizes alkaline playa dust on skin/feet. Follow with heavy lotion.' },
+  { category: 'Personal Care & Bathing', item: 'Lubricating eye drops / saline', priority: 'must', notes: 'Dust is extremely drying — use 3-4 times a day even without contacts' },
+  { category: 'Personal Care & Bathing', item: 'Nasal saline spray', priority: 'must', notes: 'Use 3-4 times daily. Essential for dust recovery.' },
+  { category: 'Personal Care & Bathing', item: 'Kleenex / tissue packs', priority: 'must', notes: 'Port-o-potties run out of TP constantly. Only 1-ply in portos!' },
+  { category: 'Personal Care & Bathing', item: 'Ear plugs', priority: 'must', notes: 'For sound camps and sleeping — Burning Man is loud everywhere' },
+  { category: 'Personal Care & Bathing', item: 'Eye shades for sleeping', priority: 'must', notes: 'You will need these no matter how deeply you sleep' },
+  { category: 'Personal Care & Bathing', item: 'Biodegradable soap', priority: 'must' },
+  { category: 'Personal Care & Bathing', item: 'Bag Balm / O\'Keeffe\'s for hands & feet', priority: 'nice', notes: 'Apply before playa and once daily. Prevents dehydration and cracking.' },
+  { category: 'Personal Care & Bathing', item: 'Neti pot & saline', priority: 'nice', notes: 'Cleanses nasal passages — not table salt, use proper saline' },
+  { category: 'Personal Care & Bathing', item: 'Essential oils (peppermint, eucalyptus)', priority: 'nice', notes: 'Drop in dust mask for easier breathing. Great gifting item too.' },
+  { category: 'Personal Care & Bathing', item: 'Throat lozenges', priority: 'nice', notes: 'You breathe in a lot of dust — these help a lot' },
+  { category: 'Personal Care & Bathing', item: 'Vitamins / multivitamins', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'TP (single-ply, extra rolls)', priority: 'nice', notes: 'Septic-safe single-ply only. Porto\'s run out all the time.' },
+  { category: 'Personal Care & Bathing', item: 'Gum', priority: 'nice', notes: 'Nice to have and to share' },
+  { category: 'Personal Care & Bathing', item: 'Moleskin (for blisters)', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Medical tape (plastic or cloth)', priority: 'nice', notes: 'Bandages don\'t stay on well — great for wrapping cracked fingers' },
+  { category: 'Personal Care & Bathing', item: 'Bug protection / repellent', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Aloe / burn lotion', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Arnica / muscle rub', priority: 'nice', notes: 'Helps after setup and all the physical activity' },
+  { category: 'Personal Care & Bathing', item: 'Gold Bond powder', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Condoms & lubricant', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Ladies: Tampons or menstrual cup', priority: 'nice', notes: 'Even off-cycle it may surprise you. NEVER put tampons in porto-potties!' },
 
   // ═══════════════════════════════════════════
   // HEALTH & FIRST AID
@@ -155,10 +155,10 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   // ═══════════════════════════════════════════
   // BATHING
   // ═══════════════════════════════════════════
-  { category: 'Bathing', item: 'Solar shower (3 gallon)', priority: 'must', notes: 'Heats water to 120°F in a few hours' },
-  { category: 'Bathing', item: 'Water catch bin (for under shower)', priority: 'must', notes: 'Use a storage bin that carried your stuff out — double duty' },
-  { category: 'Bathing', item: 'Flip flops / water shoes for shower', priority: 'nice' },
-  { category: 'Bathing', item: 'Nail brush', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Solar shower (3 gallon)', priority: 'must', notes: 'Heats water to 120°F in a few hours' },
+  { category: 'Personal Care & Bathing', item: 'Water catch bin (for under shower)', priority: 'must', notes: 'Use a storage bin that carried your stuff out — double duty' },
+  { category: 'Personal Care & Bathing', item: 'Flip flops / water shoes for shower', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Nail brush', priority: 'nice' },
 
   // ═══════════════════════════════════════════
   // KITCHEN & COOKING
@@ -201,14 +201,14 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   // ═══════════════════════════════════════════
   // DRINKS & BEVERAGES
   // ═══════════════════════════════════════════
-  { category: 'Drinks & Beverages', item: 'Coffee / tea (instant)', priority: 'must' },
-  { category: 'Drinks & Beverages', item: 'Energy shots', priority: 'nice' },
-  { category: 'Drinks & Beverages', item: 'Shelf-stable milk (almond/soy/oat)', priority: 'nice', notes: 'Shelf-stable boxes save cooler space' },
-  { category: 'Drinks & Beverages', item: 'Frozen juice (acts as ice first days)', priority: 'nice' },
-  { category: 'Drinks & Beverages', item: 'Beer (cans only)', priority: 'optional', notes: 'Cans = less trash than bottles. Bring to recycling camp.' },
-  { category: 'Drinks & Beverages', item: 'Liquor (plastic bottles only)', priority: 'optional' },
-  { category: 'Drinks & Beverages', item: 'Mixers', priority: 'optional' },
-  { category: 'Drinks & Beverages', item: 'Box wine', priority: 'optional', notes: 'Box = less trash than bottles' },
+  { category: 'Water, Hydration & Drinks', item: 'Coffee / tea (instant)', priority: 'must' },
+  { category: 'Water, Hydration & Drinks', item: 'Energy shots', priority: 'nice' },
+  { category: 'Water, Hydration & Drinks', item: 'Shelf-stable milk (almond/soy/oat)', priority: 'nice', notes: 'Shelf-stable boxes save cooler space' },
+  { category: 'Water, Hydration & Drinks', item: 'Frozen juice (acts as ice first days)', priority: 'nice' },
+  { category: 'Water, Hydration & Drinks', item: 'Beer (cans only)', priority: 'optional', notes: 'Cans = less trash than bottles. Bring to recycling camp.' },
+  { category: 'Water, Hydration & Drinks', item: 'Liquor (plastic bottles only)', priority: 'optional' },
+  { category: 'Water, Hydration & Drinks', item: 'Mixers', priority: 'optional' },
+  { category: 'Water, Hydration & Drinks', item: 'Box wine', priority: 'optional', notes: 'Box = less trash than bottles' },
 
   // ═══════════════════════════════════════════
   // BIKE & TRANSPORTATION
@@ -324,24 +324,22 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
 // Get unique categories in display order
 export const PACKING_CATEGORIES = [
   'Tickets & Documentation',
-  'Water & Hydration',
+  'Vehicle & Travel',
   'Shelter, Sleep & Camp Setup',
+  'Water, Hydration & Drinks',
+  'Food & Meals',
+  'Health & First Aid',
+  'Sun & Dust Protection',
+  'Bike & Transportation',
+  'Personal Care & Bathing',
+  'Kitchen & Cooking',
+  'Lighting & Visibility',
+  'Electronics & Power',
   'Clothing - Daywear',
   'Clothing - Cold Weather',
   'Footwear & Accessories',
-  'Sun & Dust Protection',
-  'Personal Care & Hygiene',
-  'Health & First Aid',
-  'Bathing',
-  'Kitchen & Cooking',
-  'Food & Meals',
-  'Drinks & Beverages',
-  'Bike & Transportation',
-  'Lighting & Visibility',
-  'Electronics & Power',
   'Tools & Hardware',
   'Gifting & Community',
-  'Vehicle & Travel',
   'Emergency & Safety',
   'Build Week',
 ] as const

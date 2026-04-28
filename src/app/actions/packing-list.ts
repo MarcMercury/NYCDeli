@@ -37,6 +37,10 @@ export async function syncMissingBaseItemsAction(
   const CATEGORY_REMAP: Record<string, string> = {
     'Shelter & Sleep': 'Shelter, Sleep & Camp Setup',
     'Camp Setup & Home': 'Shelter, Sleep & Camp Setup',
+    'Water & Hydration': 'Water, Hydration & Drinks',
+    'Drinks & Beverages': 'Water, Hydration & Drinks',
+    'Personal Care & Hygiene': 'Personal Care & Bathing',
+    'Bathing': 'Personal Care & Bathing',
   }
   for (const [oldCat, newCat] of Object.entries(CATEGORY_REMAP)) {
     await supabase
