@@ -7,7 +7,7 @@ import {
   Badge, Tabs, TabPanel, Alert, Button, Input
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
+import { cn, formatDate, formatTime } from '@/lib/utils'
 import type {
   KitchenRole, KitchenShift, ScheduleAssignment, Camper,
   ShiftDraftRow, ShiftOfferingRow, ShiftDraftRankingRow, ShiftDraftAssignmentRow,
@@ -30,6 +30,7 @@ const DELI_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 const tabs: Tab[] = [
   { id: 'roles', label: 'Roles & Descriptions' },
   { id: 'signup', label: 'Sign-Up Sheet & Draft' },
+  { id: 'full-schedule', label: 'Full Schedule' },
 ]
 
 interface ShiftPosition {
@@ -288,7 +289,7 @@ function countSlots(categories: ShiftCategory[], role: string, time?: string): n
 export default function KitchenPage() {
   const [activeTab, setActiveTab] = useState('roles')
   const [_roles, setRoles] = useState<KitchenRole[]>([])
-  const [_shifts, setShifts] = useState<ShiftWithAssignments[]>([])
+  const [shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
 
   // Auto-draft state
@@ -1095,8 +1096,126 @@ export default function KitchenPage() {
           </div>
         </TabPanel>
 
+        {/* Full Schedule Tab — visible to every camper */}
+        <TabPanel tabId="full-schedule" activeTab={activeTab}>
+          <FullScheduleTable shifts={shifts} highlightCamperId={currentUser.camperId} />
+        </TabPanel>
+
 
       </div>
     </div>
+  )
+}
+
+/* ── Full schedule table — flattens kitchen_shifts × schedule_assignments ── */
+function FullScheduleTable({
+  shifts,
+  highlightCamperId,
+}: {
+  shifts: ShiftWithAssignments[]
+  highlightCamperId: string | null
+}) {
+  type Row = {
+    key: string
+    camperId: string
+    name: string
+    role: string
+    date: string
+    startTime: string
+    endTime: string
+    status: ScheduleAssignment['status']
+  }
+
+  const rows: Row[] = []
+  for (const shift of shifts) {
+    for (const a of shift.assignments ?? []) {
+      rows.push({
+        key: a.id,
+        camperId: a.camper_id,
+        name: a.camper?.playa_name || a.camper?.full_name || '—',
+        role: shift.role?.name ?? '—',
+        date: shift.date,
+        startTime: shift.start_time,
+        endTime: shift.end_time,
+        status: a.status,
+      })
+    }
+  }
+  rows.sort((a, b) =>
+    a.date.localeCompare(b.date) ||
+    a.startTime.localeCompare(b.startTime) ||
+    a.role.localeCompare(b.role) ||
+    a.name.localeCompare(b.name)
+  )
+
+  if (rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Full Schedule</CardTitle>
+          <CardDescription>Everyone&apos;s shifts. Yours are highlighted.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-gray-500 py-8">
+            No assignments yet. The schedule will populate once a draft has been published.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Full Schedule</CardTitle>
+        <CardDescription>
+          Everyone&apos;s shifts at a glance. Yours are highlighted.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="text-left p-3 font-bold uppercase tracking-wider">Name</th>
+                <th className="text-left p-3 font-bold uppercase tracking-wider">Shift / Role</th>
+                <th className="text-left p-3 font-bold uppercase tracking-wider">Date</th>
+                <th className="text-left p-3 font-bold uppercase tracking-wider">Time</th>
+                <th className="text-left p-3 font-bold uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr
+                  key={r.key}
+                  className={cn(
+                    "border-b border-gray-200 hover:bg-gray-50 transition-colors",
+                    highlightCamperId && r.camperId === highlightCamperId && "bg-yellow-50 hover:bg-yellow-100"
+                  )}
+                >
+                  <td className="p-3 font-medium">{r.name}</td>
+                  <td className="p-3">{r.role}</td>
+                  <td className="p-3 whitespace-nowrap">{formatDate(r.date)}</td>
+                  <td className="p-3 whitespace-nowrap">
+                    {formatTime(r.startTime)} – {formatTime(r.endTime)}
+                  </td>
+                  <td className="p-3">
+                    <Badge
+                      variant={
+                        r.status === 'confirmed' ? 'success' :
+                        r.status === 'completed' ? 'info' :
+                        r.status === 'no-show' ? 'error' : 'warning'
+                      }
+                    >
+                      {r.status}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

@@ -25,7 +25,6 @@ const profileTabs: Tab[] = [
   { id: 'details', label: 'Camper Details' },
   { id: 'packing-list', label: 'My Packing List' },
   { id: 'my-schedule', label: 'My Schedule' },
-  { id: 'all-schedule', label: 'All Schedule' },
 ]
 
 export default function ProfilePage() {
@@ -58,7 +57,6 @@ export default function ProfilePage() {
 
 
   // Schedule state
-  const [allAssignments, setAllAssignments] = useState<EnrichedAssignment[]>([])
   const [myAssignments, setMyAssignments] = useState<EnrichedAssignment[]>([])
 
   // All campers for Sharing Tent With dropdown
@@ -141,23 +139,6 @@ export default function ProfilePage() {
         camper: camperData as unknown as Camper,
       }))
       setMyAssignments(myEnriched)
-    }
-
-    // Only fetch all assignments for admin users (lazy load on tab switch)
-    if (profileResult.data?.role === 'admin') {
-      const [assignmentsRes, allCampersRes] = await Promise.all([
-        supabase.from('schedule_assignments').select('*'),
-        supabase.from('campers').select('id, full_name, playa_name, email'),
-      ])
-      const assignmentsData = (assignmentsRes.data as ScheduleAssignment[]) || []
-      const allCampers = (allCampersRes.data as Camper[]) || []
-
-      const enrichedAssignments = assignmentsData.map(assignment => ({
-        ...assignment,
-        shift: enrichedShifts.find(s => s.id === assignment.shift_id),
-        camper: allCampers.find(c => c.id === assignment.camper_id),
-      }))
-      setAllAssignments(enrichedAssignments)
     }
 
     setLoading(false)
@@ -1055,21 +1036,6 @@ export default function ProfilePage() {
             </Card>
           </div>
         )}
-      </TabPanel>
-
-      {/* ───── TAB 5: All Schedule ───── */}
-      <TabPanel tabId="all-schedule" activeTab={activeTab}>
-        <Card>
-          <CardHeader>
-            <CardTitle>All Assignments</CardTitle>
-            <CardDescription>
-              Everyone&apos;s schedule at a glance.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScheduleTable assignments={allAssignments} highlightCamperId={camper?.id} />
-          </CardContent>
-        </Card>
       </TabPanel>
     </div>
   )
