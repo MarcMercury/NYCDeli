@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent,
@@ -8,17 +8,18 @@ import {
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import type { KitchenRole, KitchenShift, ScheduleAssignment, Camper, ShiftDraftRow, ShiftDraftOrderWithCamper, ShiftDraftPickRow } from '@/types/database'
+import type {
+  KitchenRole, KitchenShift, ScheduleAssignment, Camper,
+  ShiftDraftRow, ShiftOfferingRow, ShiftDraftRankingRow, ShiftDraftAssignmentRow,
+} from '@/types/database'
 import {
   fetchActiveDraft,
-  fetchDraft,
-  fetchDraftOrder,
-  fetchDraftPicks,
-  makePick,
-  getAllDraftShiftCategories,
-  applyDraftOverrides,
+  fetchOfferings,
+  fetchMyRankings,
+  fetchAssignments,
+  upsertCamperRanking,
+  clearCamperRanking,
   applyShiftCategoryOverrides,
-  type DraftShiftPosition,
   type ShiftOverrides,
 } from '@/lib/shift-draft'
 
@@ -290,18 +291,15 @@ export default function KitchenPage() {
   const [_shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Draft state
+  // Auto-draft state
   const [draft, setDraft] = useState<ShiftDraftRow | null>(null)
-  const [draftOrder, setDraftOrder] = useState<ShiftDraftOrderWithCamper[]>([])
-  const [picks, setPicks] = useState<ShiftDraftPickRow[]>([])
+  const [offerings, setOfferings] = useState<ShiftOfferingRow[]>([])
+  const [myRankings, setMyRankings] = useState<ShiftDraftRankingRow[]>([])
+  const [myAssignments, setMyAssignments] = useState<ShiftDraftAssignmentRow[]>([])
   const [allCampers, setAllCampers] = useState<Camper[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; camperId: string | null }>({ id: '', camperId: null })
   const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [selectedPosition, setSelectedPosition] = useState<DraftShiftPosition | null>(null)
-  const [confirming, setConfirming] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const [savingOffering, setSavingOffering] = useState<string | null>(null)
   // Admin editing state
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminEditing, setAdminEditing] = useState(false)
@@ -416,10 +414,29 @@ export default function KitchenPage() {
       const activeDraft = await fetchActiveDraft()
       if (activeDraft) {
         setDraft(activeDraft)
-        const order = await fetchDraftOrder(activeDraft.id)
-        setDraftOrder(order)
-        const draftPicks = await fetchDraftPicks(activeDraft.id)
-        setPicks(draftPicks)
+        const [ofs, asgs] = await Promise.all([
+          fetchOfferings(activeDraft.id),
+          fetchAssignments(activeDraft.id),
+        ])
+        setOfferings(ofs)
+        // Resolve current user's camper id (scoped above is out of reach here)
+        let cid: string | null = null
+        const { data: { user: u2 } } = await supabase.auth.getUser()
+        if (u2?.email) {
+          const { data: c2 } = await supabase
+            .from('campers')
+            .select('id')
+            .eq('email', u2.email)
+            .maybeSingle() as unknown as { data: { id: string } | null }
+          cid = c2?.id ?? null
+        }
+        if (cid) {
+          const rks = await fetchMyRankings(activeDraft.id, cid)
+          setMyRankings(rks)
+          setMyAssignments(asgs.filter(a => a.camper_id === cid))
+        } else {
+          setMyAssignments([])
+        }
       }
     } catch {
       // Draft loading is non-critical
@@ -433,138 +450,35 @@ export default function KitchenPage() {
     fetchData()
   }, [fetchData])
 
-  // Real-time subscription for draft updates
-  useEffect(() => {
-    if (!draft || (draft.status !== 'active' && draft.status !== 'paused')) return
 
-    const supabase = createClient()
 
-    const channel = supabase
-      .channel('kitchen-draft-updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'shift_drafts',
-        filter: `id=eq.${draft.id}`,
-      }, async () => {
-        const updated = await fetchDraft(draft.id)
-        if (updated) setDraft(updated)
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'shift_draft_picks',
-        filter: `draft_id=eq.${draft.id}`,
-      }, async () => {
-        const updatedPicks = await fetchDraftPicks(draft.id)
-        setPicks(updatedPicks)
-      })
-      .subscribe()
+  // ======== Auto-Draft Derived State ========
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft?.id, draft?.status])
+  const rankingByOffering = new Map(myRankings.map(r => [r.offering_id, r.rank]))
+  const assignedOfferingIds = new Set(myAssignments.map(a => a.offering_id))
+  const draftIsOpen = draft?.status === 'open'
+  const draftIsFrozen = draft?.status === 'frozen'
+  const draftIsDrafted = draft?.status === 'drafted'
 
-  // Timer for current pick
-  useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
-
-    if (!draft || draft.status !== 'active') {
-      setTimeLeft(null)
-      return
-    }
-
-    const currentPick = picks.find(p =>
-      p.round_number === draft.current_round &&
-      p.pick_index === draft.current_pick_index &&
-      p.status === 'picking'
-    )
-
-    if (!currentPick?.turn_started_at) {
-      setTimeLeft(null)
-      return
-    }
-
-    const updateTimer = () => {
-      const started = new Date(currentPick.turn_started_at!).getTime()
-      const now = Date.now()
-      const elapsed = Math.floor((now - started) / 1000)
-      const remaining = draft.pick_time_limit_seconds - elapsed
-      setTimeLeft(Math.max(0, remaining))
-    }
-
-    updateTimer()
-    timerRef.current = setInterval(updateTimer, 1000)
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft?.status, draft?.current_round, draft?.current_pick_index, draft?.pick_time_limit_seconds, picks])
-
-  // ======== Draft Derived State ========
-
-  const myPosition = draftOrder.find(o => o.camper_id === currentUser.camperId)
-
-  const isMyTurn = draft?.status === 'active' && currentUser.camperId && (() => {
-    const currentPick = picks.find(p =>
-      p.round_number === draft.current_round &&
-      p.pick_index === draft.current_pick_index &&
-      p.status === 'picking'
-    )
-    return currentPick?.camper_id === currentUser.camperId
+  const offeringsByPool = (() => {
+    const groups: Record<'deli'|'special'|'strike', ShiftOfferingRow[]> = { deli: [], special: [], strike: [] }
+    for (const o of offerings) groups[o.pool].push(o)
+    return groups
   })()
 
-  const myPicks = picks.filter(
-    p => p.camper_id === currentUser.camperId && p.status === 'picked'
-  )
-
-  const currentPickerInfo = (() => {
-    if (!draft || draft.status !== 'active') return null
-    const pick = picks.find(p =>
-      p.round_number === draft.current_round &&
-      p.pick_index === draft.current_pick_index &&
-      p.status === 'picking'
-    )
-    if (!pick) return null
-    return allCampers.find(c => c.id === pick.camper_id) ?? null
+  const offeringByDay = (() => {
+    const map = new Map<string, ShiftOfferingRow[]>()
+    for (const o of offeringsByPool.deli) {
+      const k = o.day_label ?? '—'
+      if (!map.has(k)) map.set(k, [])
+      map.get(k)!.push(o)
+    }
+    return map
   })()
-
-  const pickedPositionIds = new Set(
-    picks
-      .filter(p => p.status === 'picked' && p.shift_category && p.shift_role)
-      .map(p => `${p.shift_category}|${p.shift_role}|${p.shift_time ?? ''}`)
-  )
-
-  const draftCategories = applyDraftOverrides(getAllDraftShiftCategories(), shiftOverrides, 'deli')
-
-  // Calculate % full for deli shifts (all categories except Strike and Deep Playa)
-  const deliDraftPositions = draftCategories
-    .filter(c => !c.name.startsWith('Strike') && !c.name.startsWith('Deep Playa'))
-    .flatMap(c => c.positions)
-  const deliTotalSlots = deliDraftPositions.length
-  const deliFilledSlots = deliDraftPositions.filter(pos => {
-    const posKey = `${pos.category}|${pos.role}|${pos.time ?? ''}`
-    return pickedPositionIds.has(posKey)
-  }).length
-  const deliPercentFull = deliTotalSlots > 0 ? Math.round((deliFilledSlots / deliTotalSlots) * 100) : 0
-
-  // Calculate % full for strike shifts
-  const strikeDraftPositions = draftCategories
-    .filter(c => c.name.startsWith('Strike'))
-    .flatMap(c => c.positions)
-  const strikeTotalSlots = strikeDraftPositions.length
-  const strikeFilledSlots = strikeDraftPositions.filter(pos => {
-    const posKey = `${pos.category}|${pos.role}|${pos.time ?? ''}`
-    return pickedPositionIds.has(posKey)
-  }).length
-  const strikePercentFull = strikeTotalSlots > 0 ? Math.round((strikeFilledSlots / strikeTotalSlots) * 100) : 0
 
   const getCamperById = (id: string) => allCampers.find(c => c.id === id)
 
-  // Optimistic update helper for admin position edits
+  // Optimistic update helper for admin position edits (roles tab)
   const updateDisplayPosition = (catIdx: number, posIdx: number, field: 'role' | 'time' | 'description', value: string) => {
     setDisplayDeliCategories(prev => prev.map((cat, ci) =>
       ci === catIdx ? {
@@ -576,50 +490,32 @@ export default function KitchenPage() {
     ))
   }
 
-  /** Get the camper name who picked a specific position key */
-  const _getPickedCamperForSlot = (category: string, role: string, time?: string) => {
-    const posKey = `${category}|${role}|${time ?? ''}`
-    const pick = picks.find(p => p.status === 'picked' && `${p.shift_category}|${p.shift_role}|${p.shift_time ?? ''}` === posKey)
-    if (!pick) return null
-    const camper = getCamperById(pick.camper_id)
-    return camper ? (camper.playa_name || camper.full_name) : 'Taken'
-  }
-
   // ======== Draft Actions ========
 
-  const handleSelectPosition = (pos: DraftShiftPosition) => {
-    if (!isMyTurn) return
-    const posKey = `${pos.category}|${pos.role}|${pos.time ?? ''}`
-    if (pickedPositionIds.has(posKey)) return
-    setSelectedPosition(pos)
-    setConfirming(true)
-  }
 
-  const handleConfirmPick = async () => {
-    if (!draft || !currentUser.camperId || !selectedPosition) return
-    setSubmitting(true)
+  const handleSetRanking = async (offeringId: string, rankStr: string) => {
+    if (!draft || !currentUser.camperId || !draftIsOpen) return
+    setSavingOffering(offeringId)
     try {
-      await makePick(
-        draft.id,
-        currentUser.camperId,
-        selectedPosition.category,
-        selectedPosition.role,
-        selectedPosition.time ?? null,
-      )
-      setDraftMessage({ type: 'success', text: `You picked: ${selectedPosition.role}${selectedPosition.time ? ` (${selectedPosition.time})` : ''}` })
-      setSelectedPosition(null)
-      setConfirming(false)
+      if (rankStr.trim() === '') {
+        await clearCamperRanking(draft.id, offeringId)
+      } else {
+        const rank = parseInt(rankStr, 10)
+        if (!Number.isFinite(rank) || rank < 1) {
+          setDraftMessage({ type: 'error', text: 'Rank must be a positive integer.' })
+          return
+        }
+        await upsertCamperRanking(draft.id, offeringId, rank)
+      }
+      const rks = await fetchMyRankings(draft.id, currentUser.camperId)
+      setMyRankings(rks)
     } catch (err) {
-      setDraftMessage({ type: 'error', text: `Failed to submit pick: ${err instanceof Error ? err.message : 'Unknown error'}` })
+      setDraftMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed' })
     } finally {
-      setSubmitting(false)
+      setSavingOffering(null)
     }
   }
 
-  const handleCancelPick = () => {
-    setSelectedPosition(null)
-    setConfirming(false)
-  }
 
   if (loading) {
     return (
@@ -1040,505 +936,162 @@ export default function KitchenPage() {
           </div>
         </TabPanel>
 
-        {/* Sign-Up Sheet & Draft Tab */}
+        {/* Sign-Up Sheet & Draft Tab — Rankings */}
         <TabPanel tabId="signup" activeTab={activeTab}>
-          <div className="space-y-10">
+          <div className="space-y-6">
+            {!draft && (
+              <Alert variant="info">
+                No active shift draft yet. An admin will create one and seed the offerings; check back soon.
+              </Alert>
+            )}
 
-            {/* Draft Status Banner */}
-            {draft && (draft.status === 'active' || draft.status === 'paused') && (
+            {draft && (
               <Card className={cn(
                 "border-4",
-                isMyTurn ? "border-green-500 bg-green-50" :
-                draft.status === 'paused' ? "border-yellow-500" :
-                "border-blue-500"
+                draftIsOpen ? "border-blue-500" :
+                draftIsFrozen ? "border-yellow-500 bg-yellow-50" :
+                draftIsDrafted ? "border-green-500 bg-green-50" :
+                "border-gray-300"
               )}>
-                <CardContent className="py-6">
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="text-center md:text-left">
-                      {isMyTurn ? (
-                        <>
-                          <p className="text-3xl font-black text-green-700 uppercase animate-pulse">
-                            🎯 It&apos;s Your Turn!
-                          </p>
-                          <p className="text-gray-600">Select a shift from the board below</p>
-                        </>
-                      ) : draft.status === 'paused' ? (
-                        <>
-                          <p className="text-2xl font-black text-yellow-700 uppercase">Draft Paused</p>
-                          <p className="text-gray-600">Waiting for admin to resume...</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xl font-black uppercase">
-                            🎯 {currentPickerInfo
-                              ? `${currentPickerInfo.playa_name || currentPickerInfo.full_name} is picking...`
-                              : 'Waiting...'}
-                          </p>
-                          <p className="text-gray-600">
-                            Round {draft.current_round} of {draft.total_rounds} · Pick {draft.current_pick_index + 1} of {draftOrder.length}
-                          </p>
-                        </>
-                      )}
-                    </div>
-
-                    {draft.status === 'active' && timeLeft !== null && (
-                      <div className={cn(
-                        "text-5xl font-mono font-black",
-                        isMyTurn && timeLeft <= 30 ? "text-red-600 animate-pulse" :
-                        timeLeft <= 30 ? "text-red-600" :
-                        timeLeft <= 60 ? "text-yellow-600" : "text-green-600"
-                      )}>
-                        {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                      </div>
-                    )}
-                  </div>
-
-                  {myPosition && (
-                    <div className="mt-4 text-center md:text-left">
-                      <p className="text-sm text-gray-500">
-                        Your draft position: <span className="font-bold">#{myPosition.draft_position}</span>
-                        {myPicks.length > 0 && (
-                          <> · Picks made: <span className="font-bold">{myPicks.length}</span></>
-                        )}
+                <CardContent className="py-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                      <p className="font-black uppercase tracking-wider">{draft.name}</p>
+                      <p className="text-sm text-gray-600">
+                        Status:{" "}
+                        {draftIsOpen && <Badge variant="default">Rankings open</Badge>}
+                        {draftIsFrozen && <Badge variant="warning">Frozen — awaiting auto-draft</Badge>}
+                        {draftIsDrafted && <Badge variant="success">Drafted</Badge>}
+                        {!draftIsOpen && !draftIsFrozen && !draftIsDrafted && <Badge>{draft.status}</Badge>}
                       </p>
                     </div>
-                  )}
+                    <div className="text-sm">
+                      {draftIsOpen && (
+                        <p>Rank as many shifts as you want — lower number = higher priority. Quotas: {draft.deli_quota} deli, {draft.special_quota} special, {draft.strike_quota} strike.</p>
+                      )}
+                      {draftIsFrozen && <p>Rankings are locked. Auto-draft will run shortly.</p>}
+                      {draftIsDrafted && <p>The auto-draft has been run. Your assignments are highlighted below.</p>}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Draft Complete Banner */}
-            {draft && draft.status === 'completed' && (
-              <Alert variant="success">
-                <strong>Draft Complete!</strong> All rounds have been completed. Shift assignments are shown below.
-              </Alert>
-            )}
-
-            {/* Draft Setup Banner */}
-            {draft && draft.status === 'setup' && (
-              <Alert variant="info">
-                <strong>Draft Coming Soon!</strong> The shift draft is being set up. Your position: {myPosition ? `#${myPosition.draft_position}` : 'Not yet assigned'}.
-              </Alert>
-            )}
-
-            {/* No Draft Banner */}
-            {!draft && (
-              <Alert variant="info">
-                The shift draft has not started yet. Sign-up slots will fill in as the draft progresses.
-              </Alert>
-            )}
-
-            {/* Draft Messages */}
             {draftMessage && (
               <Alert variant={draftMessage.type === 'success' ? 'success' : 'error'}>
                 {draftMessage.text}
-                <button className="ml-4 underline" onClick={() => setDraftMessage(null)}>Dismiss</button>
+                <button className="ml-3 underline" onClick={() => setDraftMessage(null)}>Dismiss</button>
               </Alert>
             )}
 
-            {/* Confirmation Modal */}
-            {confirming && selectedPosition && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                <Card className="max-w-md w-full border-4 border-yellow-500">
-                  <CardHeader>
-                    <CardTitle>Confirm Your Pick</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center p-4 bg-yellow-50 border-2 border-yellow-300">
-                      <p className="text-sm uppercase tracking-wider text-gray-500">{selectedPosition.category}</p>
-                      <p className="text-xl font-black">{selectedPosition.role}</p>
-                      {selectedPosition.time && (
-                        <p className="text-gray-600">{selectedPosition.time}</p>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 text-center">
-                      This choice is final. Are you sure?
-                    </p>
-                  </CardContent>
-                  <div className="flex gap-2 p-4 border-t-2 border-gray-200">
-                    <Button onClick={handleCancelPick} variant="secondary" className="flex-1" disabled={submitting}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleConfirmPick} className="flex-1" disabled={submitting}>
-                      {submitting ? 'Submitting...' : '✅ Confirm Pick'}
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {/* My Picks */}
-            {myPicks.length > 0 && (
+            {draft && currentUser.camperId && draftIsDrafted && myAssignments.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Your Picks</CardTitle>
+                  <CardTitle>Your Assigned Shifts</CardTitle>
+                  <CardDescription>{myAssignments.length} shift{myAssignments.length === 1 ? '' : 's'} assigned</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-3">
-                    {myPicks.map(pick => (
-                      <div key={pick.id} className="bg-green-50 border-2 border-green-300 px-4 py-2 rounded">
-                        <p className="font-bold text-sm">{pick.shift_role}</p>
-                        {pick.shift_time && <p className="text-xs text-gray-500">{pick.shift_time}</p>}
-                        <p className="text-xs text-gray-400">{pick.shift_category}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <ul className="space-y-1 text-sm">
+                    {myAssignments.map(a => {
+                      const o = offerings.find(x => x.id === a.offering_id)
+                      if (!o) return null
+                      return (
+                        <li key={a.id} className="flex items-center gap-2">
+                          <Badge variant="success">{o.pool}</Badge>
+                          <span className="font-bold">{o.role}</span>
+                          {o.time_label && <span className="text-gray-600">{o.time_label}</span>}
+                          {o.day_label && <span className="text-gray-600">· {o.day_label}</span>}
+                        </li>
+                      )
+                    })}
+                  </ul>
                 </CardContent>
               </Card>
             )}
 
-            {/* Main Content: Sign-Up Grid + Draft Order */}
-            <div className={cn("grid gap-6", draft && (draft.status === 'active' || draft.status === 'paused') ? "lg:grid-cols-4" : "")}>
-              {/* Sign-Up Sheet / Draft Board */}
-              <div className={cn(draft && (draft.status === 'active' || draft.status === 'paused') ? "lg:col-span-3" : "")}>
+            {draft && offerings.length > 0 && (
+              <>
+                {(['deli', 'special', 'strike'] as const).map(pool => {
+                  const list = offeringsByPool[pool]
+                  if (list.length === 0) return null
+                  const groups: { label: string; items: ShiftOfferingRow[] }[] =
+                    pool === 'deli'
+                      ? Array.from(offeringByDay.entries()).map(([k, v]) => ({ label: k, items: v }))
+                      : [{ label: pool === 'special' ? 'Special / Deep Playa' : 'Strike', items: list }]
 
-                {/* Deli Shifts Grid */}
-                <section className="mb-10">
-                  <div className={cn(
-                    "inline-flex items-center gap-2 mb-1 px-3 py-1 rounded-full text-sm font-black",
-                    deliPercentFull >= 80 ? "bg-green-100 text-green-800" :
-                    deliPercentFull >= 50 ? "bg-yellow-100 text-yellow-800" :
-                    "bg-red-100 text-red-800"
-                  )}>
-                    {deliPercentFull}% Full
-                  </div>
-                  <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                    🥪 Deli Shifts (Mon–Sat)
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    {draft && (draft.status === 'active' || draft.status === 'paused')
-                      ? 'Click a green slot to draft it when it\'s your turn'
-                      : 'Sign up for your shifts below. Each box = one slot per day.'}
-                  </p>
-
-                  {/* Draft-style interactive board for active drafts */}
-                  {draft && (draft.status === 'active' || draft.status === 'paused' || draft.status === 'completed') ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {draftCategories.map(cat => (
-                        <div key={cat.name} className="border-2 border-black p-3">
-                          <h4 className="font-bold uppercase text-sm mb-1">{cat.name}</h4>
-                          {cat.time && <p className="text-xs text-gray-500 mb-2">{cat.time}</p>}
-                          {cat.note && <p className="text-xs text-gray-400 mb-2">{cat.note}</p>}
-                          <div className="space-y-1">
-                            {cat.positions.map(pos => {
-                              const posKey = `${pos.category}|${pos.role}|${pos.time ?? ''}`
-                              const taken = pickedPositionIds.has(posKey)
-                              const pick = taken
-                                ? picks.find(p => p.status === 'picked' && `${p.shift_category}|${p.shift_role}|${p.shift_time ?? ''}` === posKey)
-                                : null
-                              const picker = pick ? getCamperById(pick.camper_id) : null
-                              const isMyPick = pick?.camper_id === currentUser.camperId
-
-                              return (
-                                <button
-                                  key={pos.id}
-                                  disabled={taken || !isMyTurn}
-                                  onClick={() => handleSelectPosition(pos)}
-                                  className={cn(
-                                    "w-full text-left text-xs flex items-center gap-1 p-1.5 rounded transition-colors",
-                                    taken
-                                      ? isMyPick
-                                        ? "bg-blue-100 border border-blue-300"
-                                        : "bg-red-50 text-gray-400 cursor-not-allowed"
-                                      : isMyTurn
-                                        ? "bg-green-50 hover:bg-green-200 cursor-pointer border border-green-300"
-                                        : "bg-green-50"
-                                  )}
-                                >
-                                  <span className={cn(
-                                    "w-2 h-2 rounded-full inline-block flex-shrink-0",
-                                    taken
-                                      ? isMyPick ? "bg-blue-500" : "bg-red-400"
-                                      : "bg-green-400"
-                                  )} />
-                                  <span className={cn("flex-1", taken && !isMyPick && "line-through")}>
-                                    {pos.role}
-                                  </span>
-                                  {pos.time && !cat.time && (
-                                    <span className="text-gray-400 text-[10px]">{pos.time}</span>
-                                  )}
-                                  {taken && picker && (
-                                    <span className="text-[10px] text-gray-500 truncate max-w-[80px]">
-                                      {isMyPick ? '(You)' : picker.playa_name || picker.full_name}
-                                    </span>
-                                  )}
-                                  {pos.requiresExp && <Badge variant="warning" className="text-[10px] py-0 px-1">EXP</Badge>}
-                                  {pos.countsDouble && <Badge variant="info" className="text-[10px] py-0 px-1">2×</Badge>}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    /* Static sign-up grid when no active draft */
-                    <div className="overflow-x-auto">
-                      {adminEditing && (
-                        <Alert variant="info" className="mb-2">
-                          <strong>Admin Edit Mode:</strong> Click on any role name or time cell in the grid to edit it inline.
-                        </Alert>
-                      )}
-                      <table className="w-full border-collapse border-2 border-black text-sm">
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th className="border-2 border-black px-3 py-2 text-left font-bold uppercase tracking-wider">Role / Position</th>
-                            <th className="border-2 border-black px-2 py-2 text-center font-bold uppercase tracking-wider w-20">Time</th>
-                            <th className="border-2 border-black px-2 py-2 text-center font-bold uppercase tracking-wider w-10">#</th>
-                            {DELI_DAYS.map(day => (
-                              <th key={day} className="border-2 border-black px-3 py-2 text-center font-bold uppercase tracking-wider">{day}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {displayDeliCategories.map((category, catIdx) => {
-                            const uniquePositions = getUniquePositions([category])
-                            return (
-                              <React.Fragment key={`cat-${catIdx}`}>
-                                <tr className="bg-yellow-50">
-                                  <td colSpan={3 + DELI_DAYS.length} className="border-2 border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wider">
-                                    {category.name}
-                                    {category.note && <span className="font-normal text-gray-500 ml-2">— {category.note}</span>}
-                                  </td>
-                                </tr>
-                                {uniquePositions.map((pos, posIdx) => {
-                                  const slots = countSlots([category], pos.role, pos.time)
-                                  const gridCellKey = `deli-${catIdx}-${posIdx}`
-                                  return (
-                                    <tr key={`${catIdx}-${posIdx}`} className={cn("hover:bg-gray-50", adminEditing && "hover:bg-yellow-50")}>
-                                      <td className="border-2 border-black px-3 py-2">
-                                        {adminEditing && editingCell?.catIdx === catIdx + 100 && editingCell?.posIdx === posIdx && editingCell?.field === 'role' ? (
-                                          <div className="flex gap-1 items-center">
-                                            <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
-                                            <button className="text-xs text-green-600 font-bold" onClick={async () => {
-                                              const { updateShiftPositionAction } = await import('@/app/actions/admin')
-                                              await updateShiftPositionAction(gridCellKey, { role: editValue, category: category.name })
-                                              updateDisplayPosition(catIdx, posIdx, 'role', editValue)
-                                              setAdminMessage({ type: 'success', text: `Updated role` })
-                                              setEditingCell(null)
-                                            }}>✓</button>
-                                            <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
-                                          </div>
-                                        ) : (
-                                          <div
-                                            className={cn("flex items-center gap-2", adminEditing && "cursor-pointer hover:underline")}
-                                            onClick={() => { if (adminEditing) { setEditingCell({ catIdx: catIdx + 100, posIdx, field: 'role' }); setEditValue(pos.role) } }}
-                                          >
-                                            <span className="font-medium">{pos.role}</span>
-                                            {pos.requiresExp && <Badge variant="warning" className="text-[10px] px-1 py-0">Exp.</Badge>}
-                                            {pos.countsDouble && <Badge variant="success" className="text-[10px] px-1 py-0">2×</Badge>}
-                                            {adminEditing && <span className="text-[10px] text-blue-400">✎</span>}
-                                          </div>
+                  return (
+                    <Card key={pool}>
+                      <CardHeader>
+                        <CardTitle className="capitalize">{pool} Pool</CardTitle>
+                        <CardDescription>
+                          {pool === 'deli' && 'Daily kitchen + camp shifts (Mon–Sat).'}
+                          {pool === 'special' && 'Deep Playa Friday food service.'}
+                          {pool === 'strike' && 'Sunday teardown — Sunday departures only.'}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {groups.map(group => (
+                          <div key={group.label}>
+                            <h4 className="font-bold uppercase text-xs tracking-wider text-gray-700 mb-2">{group.label}</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs border-collapse">
+                                <thead>
+                                  <tr className="border-b-2 border-black">
+                                    <th className="text-left py-1 pr-2 font-black uppercase w-16">Rank</th>
+                                    <th className="text-left py-1 pr-2 font-black uppercase">Role</th>
+                                    <th className="text-left py-1 pr-2 font-black uppercase">Time</th>
+                                    <th className="text-left py-1 pr-2 font-black uppercase">Cap</th>
+                                    <th className="text-left py-1 pr-2 font-black uppercase">Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {group.items.map(o => {
+                                    const rank = rankingByOffering.get(o.id) ?? ''
+                                    const assigned = assignedOfferingIds.has(o.id)
+                                    return (
+                                      <tr
+                                        key={o.id}
+                                        className={cn(
+                                          "border-b border-gray-200",
+                                          assigned && "bg-green-50",
                                         )}
-                                      </td>
-                                      <td className="border-2 border-black px-2 py-2 text-center text-xs text-gray-600 whitespace-nowrap">
-                                        {adminEditing && editingCell?.catIdx === catIdx + 100 && editingCell?.posIdx === posIdx && editingCell?.field === 'time' ? (
-                                          <div className="flex gap-1 items-center">
-                                            <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-xs py-0.5 w-24" autoFocus onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }} />
-                                            <button className="text-xs text-green-600 font-bold" onClick={async () => {
-                                              const { updateShiftPositionAction } = await import('@/app/actions/admin')
-                                              await updateShiftPositionAction(gridCellKey, { time: editValue, category: category.name })
-                                              updateDisplayPosition(catIdx, posIdx, 'time', editValue)
-                                              setAdminMessage({ type: 'success', text: `Updated time` })
-                                              setEditingCell(null)
-                                            }}>✓</button>
-                                            <button className="text-xs text-gray-400" onClick={() => setEditingCell(null)}>✕</button>
-                                          </div>
-                                        ) : (
-                                          <span
-                                            className={cn(adminEditing && "cursor-pointer hover:underline")}
-                                            onClick={() => { if (adminEditing) { setEditingCell({ catIdx: catIdx + 100, posIdx, field: 'time' }); setEditValue(pos.time ?? '') } }}
-                                          >
-                                            {pos.time ?? '—'}{adminEditing && <span className="text-[10px] text-blue-400 ml-0.5">✎</span>}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="border-2 border-black px-2 py-2 text-center text-xs font-bold">{slots}</td>
-                                      {DELI_DAYS.map(day => (
-                                        <td key={day} className="border-2 border-black px-2 py-2 text-center">
-                                          <div className="min-h-[28px] flex flex-col gap-0.5 items-center justify-center">
-                                            {Array.from({ length: slots }, (_, i) => (
-                                              <div key={i} className="w-full h-6 border border-dashed border-gray-300 rounded bg-gray-50" />
-                                            ))}
-                                          </div>
+                                      >
+                                        <td className="py-1 pr-2">
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            defaultValue={rank === '' ? '' : String(rank)}
+                                            disabled={!draftIsOpen || !currentUser.camperId || savingOffering === o.id}
+                                            onBlur={(e) => handleSetRanking(o.id, e.currentTarget.value)}
+                                            className="w-14 text-xs"
+                                            placeholder="—"
+                                          />
                                         </td>
-                                      ))}
-                                    </tr>
-                                  )
-                                })}
-                              </React.Fragment>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
-
-            {/* Special Events Grid */}
-            <section>
-              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                🍜 Special Event Shifts
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">One-off events — sign up for a specific role</p>
-              {displaySpecialCategories.map((category, catIdx) => {
-                const uniquePositions = getUniquePositions([category])
-                return (
-                  <div key={catIdx} className="overflow-x-auto mb-6">
-                    <table className="w-full border-collapse border-2 border-black text-sm">
-                      <thead>
-                        <tr className="bg-orange-50">
-                          <th className="border-2 border-black px-3 py-2 text-left font-bold uppercase tracking-wider">{category.name}</th>
-                          <th className="border-2 border-black px-2 py-2 text-center font-bold uppercase tracking-wider w-20">Time</th>
-                          <th className="border-2 border-black px-2 py-2 text-center font-bold uppercase tracking-wider w-10">#</th>
-                          <th className="border-2 border-black px-3 py-2 text-center font-bold uppercase tracking-wider">Sign-Up</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {uniquePositions.map((pos, posIdx) => {
-                          const slots = countSlots([category], pos.role, pos.time)
-                          return (
-                            <tr key={posIdx} className="hover:bg-gray-50">
-                              <td className="border-2 border-black px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{pos.role}</span>
-                                  {pos.requiresExp && <Badge variant="warning" className="text-[10px] px-1 py-0">Exp.</Badge>}
-                                </div>
-                              </td>
-                              <td className="border-2 border-black px-2 py-2 text-center text-xs text-gray-600 whitespace-nowrap">{pos.time ?? '—'}</td>
-                              <td className="border-2 border-black px-2 py-2 text-center text-xs font-bold">{slots}</td>
-                              <td className="border-2 border-black px-2 py-2">
-                                <div className="flex gap-1 flex-wrap justify-center">
-                                  {Array.from({ length: slots }, (_, i) => (
-                                    <div key={i} className="w-24 h-6 border border-dashed border-gray-300 rounded bg-gray-50" />
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              })}
-            </section>
-
-            {/* Strike Grid */}
-            <section>
-              <div className={cn(
-                "inline-flex items-center gap-2 mb-1 px-3 py-1 rounded-full text-sm font-black",
-                strikePercentFull >= 80 ? "bg-green-100 text-green-800" :
-                strikePercentFull >= 50 ? "bg-yellow-100 text-yellow-800" :
-                "bg-red-100 text-red-800"
-              )}>
-                {strikePercentFull}% Full
-              </div>
-              <h2 className="text-2xl font-black uppercase tracking-wider mb-1">
-                🔨 Strike Shifts (Sun 9/6)
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">Teardown and pack-out — everyone pitches in</p>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border-2 border-black text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border-2 border-black px-3 py-2 text-left font-bold uppercase tracking-wider">Strike Category</th>
-                      <th className="border-2 border-black px-2 py-2 text-center font-bold uppercase tracking-wider w-20">Time</th>
-                      <th className="border-2 border-black px-2 py-2 text-center font-bold uppercase tracking-wider w-10">#</th>
-                      <th className="border-2 border-black px-3 py-2 text-center font-bold uppercase tracking-wider">Sign-Up</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayStrikeCategories.map((category, catIdx) => {
-                      const uniquePositions = getUniquePositions([category])
-                      return (
-                        <React.Fragment key={`scat-${catIdx}`}>
-                          <tr className="bg-red-50">
-                            <td colSpan={4} className="border-2 border-black px-3 py-1.5 font-bold text-xs uppercase tracking-wider">
-                              {category.name}
-                              {category.note && <span className="font-normal text-gray-500 ml-2">— {category.note}</span>}
-                            </td>
-                          </tr>
-                          {uniquePositions.map((pos, posIdx) => {
-                            const slots = countSlots([category], pos.role, pos.time)
-                            return (
-                              <tr key={`${catIdx}-${posIdx}`} className="hover:bg-gray-50">
-                                <td className="border-2 border-black px-3 py-2 font-medium">{pos.role}</td>
-                                <td className="border-2 border-black px-2 py-2 text-center text-xs text-gray-600 whitespace-nowrap">{pos.time ?? '—'}</td>
-                                <td className="border-2 border-black px-2 py-2 text-center text-xs font-bold">{slots}</td>
-                                <td className="border-2 border-black px-2 py-2">
-                                  <div className="flex gap-1 flex-wrap justify-center">
-                                    {Array.from({ length: slots }, (_, i) => (
-                                      <div key={i} className="w-24 h-6 border border-dashed border-gray-300 rounded bg-gray-50" />
-                                    ))}
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </React.Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <Alert variant="warning" className="mt-4">
-                <strong>Strike Lighting/Shade/Bikes:</strong> ONLY for campers who must depart Sunday afternoon. This is their Exodus Monday strike commitment and does <strong>not</strong> count as a regular shift.
-              </Alert>
-            </section>
-
-              </div>
-
-              {/* Draft Order Sidebar (visible during active/paused drafts) */}
-              {draft && (draft.status === 'active' || draft.status === 'paused') && (
-                <div>
-                  <Card className="sticky top-20">
-                    <CardHeader>
-                      <CardTitle className="text-sm">Draft Order</CardTitle>
-                      <CardDescription className="text-xs">
-                        Round {draft.current_round}/{draft.total_rounds}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <div className="max-h-[60vh] overflow-y-auto">
-                        {draftOrder.map((entry, idx) => {
-                          const isCurrentPicker = draft.status === 'active' && draft.current_pick_index === idx
-                          const isMe = entry.camper_id === currentUser.camperId
-                          const camperPicks = picks.filter(
-                            p => p.camper_id === entry.camper_id && p.status === 'picked'
-                          )
-                          return (
-                            <div
-                              key={entry.id}
-                              className={cn(
-                                "flex items-center gap-1 px-3 py-1.5 border-b border-gray-100 text-xs",
-                                isCurrentPicker && "bg-yellow-200 font-bold",
-                                isMe && !isCurrentPicker && "bg-blue-50"
-                              )}
-                            >
-                              <span className="text-gray-400 font-mono w-5 text-right">{idx + 1}.</span>
-                              <span className="flex-1 truncate">
-                                {isMe ? (
-                                  <span className="text-blue-700 font-bold">You</span>
-                                ) : (
-                                  entry.camper?.playa_name || entry.camper?.full_name || 'Unknown'
-                                )}
-                              </span>
-                              {isCurrentPicker && <span>🎯</span>}
-                              {camperPicks.length > 0 && (
-                                <Badge variant="default" className="text-[9px] py-0 px-1">
-                                  {camperPicks.length}
-                                </Badge>
-                              )}
+                                        <td className="py-1 pr-2">
+                                          <span className="font-bold">{o.role}</span>
+                                          {o.counts_double && <Badge variant="warning" className="ml-2 text-[9px]">2×</Badge>}
+                                          {o.requires_exp && <Badge variant="default" className="ml-1 text-[9px]">EXP</Badge>}
+                                        </td>
+                                        <td className="py-1 pr-2 text-gray-600">{o.time_label ?? '—'}</td>
+                                        <td className="py-1 pr-2">{o.capacity}</td>
+                                        <td className="py-1 pr-2 text-gray-500">
+                                          {o.description}
+                                          {o.note && <div className="italic text-[10px]">{o.note}</div>}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </>
+            )}
           </div>
         </TabPanel>
 

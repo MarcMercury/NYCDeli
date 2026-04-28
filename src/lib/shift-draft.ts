@@ -2,10 +2,11 @@ import { createClient } from '@/lib/supabase/client'
 import type {
   ShiftDraftRow,
   ShiftDraftOrderRow,
-  ShiftDraftPickRow,
   ShiftDraftOrderWithCamper,
-  DraftStatus,
-
+  ShiftOfferingRow,
+  ShiftDraftRankingRow,
+  ShiftDraftAssignmentRow,
+  DraftPool,
 } from '@/types/database'
 
 // ==========================================
@@ -261,291 +262,311 @@ export function applyShiftCategoryOverrides<T extends { positions: P[] }, P exte
     .filter(cat => cat.positions.length > 0)
 }
 
-// ==========================================
-// Data fetching
-// ==========================================
 
-/** Fetch the active or most recent draft */
+// ==========================================
+// Auto-Draft data layer (RPC-backed)
+// ==========================================
+//
+// All write paths go through SECURITY DEFINER RPCs in migration 053.
+// Reads use Supabase's PostgREST with RLS enforcing the policies.
+
+// Helper: typed wrapper for RPC calls (Database type's Functions union doesn't
+// always satisfy supabase-js v2's overload picker, so we cast through unknown).
+async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
+  const supabase = createClient()
+  const { data, error } = await (supabase.rpc as unknown as (n: string, a: Record<string, unknown>) => Promise<{ data: unknown; error: Error | null }>)(name, args)
+  if (error) throw error
+  return data as T
+}
+
+const STATUSES_OPEN = ['open', 'frozen', 'drafted'] as const
+
+/** Fetch the most recent non-archived draft. */
 export async function fetchActiveDraft(): Promise<ShiftDraftRow | null> {
   const supabase = createClient()
   const { data } = await supabase
-    .from('shift_drafts' as never)
+    .from('shift_drafts')
     .select('*')
-    .in('status' as never, ['setup', 'active', 'paused'] as never)
-    .order('created_at' as never, { ascending: false })
+    .in('status', STATUSES_OPEN as unknown as string[])
+    .order('created_at', { ascending: false })
     .limit(1)
-    .single() as unknown as { data: ShiftDraftRow | null }
-  return data
+    .maybeSingle()
+  return (data as ShiftDraftRow | null) ?? null
 }
 
-/** Fetch a specific draft by ID */
+/** Fetch a specific draft by ID. */
 export async function fetchDraft(draftId: string): Promise<ShiftDraftRow | null> {
   const supabase = createClient()
   const { data } = await supabase
-    .from('shift_drafts' as never)
+    .from('shift_drafts')
     .select('*')
-    .eq('id' as never, draftId)
-    .single() as unknown as { data: ShiftDraftRow | null }
-  return data
+    .eq('id', draftId)
+    .maybeSingle()
+  return (data as ShiftDraftRow | null) ?? null
 }
 
-/** Fetch draft order with camper details */
+/** List all drafts (admin overview). */
+export async function fetchAllDrafts(): Promise<ShiftDraftRow[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('shift_drafts')
+    .select('*')
+    .order('created_at', { ascending: false })
+  return (data as ShiftDraftRow[] | null) ?? []
+}
+
+export interface CreateDraftInput {
+  name: string
+  deli_quota?: number
+  special_quota?: number
+  strike_quota?: number
+  snake_start_round?: number
+  created_by: string
+}
+
+/** Create a new draft (admin). */
+export async function createDraft(input: CreateDraftInput): Promise<ShiftDraftRow> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('shift_drafts')
+    .insert({
+      name: input.name,
+      status: 'open',
+      deli_quota: input.deli_quota ?? 4,
+      special_quota: input.special_quota ?? 0,
+      strike_quota: input.strike_quota ?? 1,
+      snake_start_round: input.snake_start_round ?? 3,
+      created_by: input.created_by,
+    } as never)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as ShiftDraftRow
+}
+
+/** Update top-level draft settings. */
+export async function updateDraftSettings(
+  draftId: string,
+  updates: Partial<Pick<ShiftDraftRow, 'name' | 'deli_quota' | 'special_quota' | 'strike_quota' | 'snake_start_round'>>
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('shift_drafts').update(updates as never).eq('id', draftId)
+  if (error) throw error
+}
+
+/** Delete a draft (cascades to offerings/order/rankings/assignments). */
+export async function deleteDraft(draftId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('shift_drafts').delete().eq('id', draftId)
+  if (error) throw error
+}
+
+// -------- Offerings --------
+
+export async function fetchOfferings(draftId: string): Promise<ShiftOfferingRow[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('shift_offerings')
+    .select('*')
+    .eq('draft_id', draftId)
+    .order('pool')
+    .order('sort_order')
+  return (data as ShiftOfferingRow[] | null) ?? []
+}
+
+export async function seedDefaultOfferings(draftId: string): Promise<number> {
+  const data = await rpc<number>('seed_default_shift_offerings', { p_draft_id: draftId })
+  return data ?? 0
+}
+
+export type OfferingDraft = Omit<ShiftOfferingRow, 'id' | 'created_at' | 'updated_at'>
+
+export async function upsertOffering(
+  offering: Partial<ShiftOfferingRow> & { id?: string; draft_id: string }
+): Promise<ShiftOfferingRow> {
+  const supabase = createClient()
+  if (offering.id) {
+    const { id, ...rest } = offering
+    const { data, error } = await supabase
+      .from('shift_offerings')
+      .update(rest as never)
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw error
+    return data as ShiftOfferingRow
+  }
+  const { data, error } = await supabase
+    .from('shift_offerings')
+    .insert(offering as never)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as ShiftOfferingRow
+}
+
+export async function deleteOffering(offeringId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from('shift_offerings').delete().eq('id', offeringId)
+  if (error) throw error
+}
+
+// -------- Draft order (camper priority) --------
+
 export async function fetchDraftOrder(draftId: string): Promise<ShiftDraftOrderWithCamper[]> {
   const supabase = createClient()
   const { data: orders } = await supabase
-    .from('shift_draft_order' as never)
+    .from('shift_draft_order')
     .select('*')
-    .eq('draft_id' as never, draftId)
-    .order('draft_position' as never) as unknown as { data: ShiftDraftOrderRow[] | null }
+    .eq('draft_id', draftId)
+    .order('draft_position')
+  const list = (orders as ShiftDraftOrderRow[] | null) ?? []
+  if (list.length === 0) return []
 
-  if (!orders || orders.length === 0) return []
-
-  const camperIds = orders.map(o => o.camper_id)
+  const camperIds = list.map((o) => o.camper_id)
   const { data: campers } = await supabase
     .from('campers')
     .select('id, full_name, playa_name, email')
-    .in('id', camperIds) as unknown as { data: { id: string; full_name: string; playa_name: string | null; email: string }[] | null }
+    .in('id', camperIds)
+  const camperList = (campers as { id: string; full_name: string; playa_name: string | null; email: string }[] | null) ?? []
+  const camperMap = new Map(camperList.map((c) => [c.id, c]))
 
-  const camperMap = new Map((campers ?? []).map(c => [c.id, c]))
-
-  return orders.map(o => ({
-    ...o,
-    camper: camperMap.get(o.camper_id) ?? null,
-  }))
+  return list.map((o) => ({ ...o, camper: camperMap.get(o.camper_id) ?? null }))
 }
 
-/** Fetch all picks for a draft */
-export async function fetchDraftPicks(draftId: string): Promise<ShiftDraftPickRow[]> {
-  const supabase = createClient()
-  const { data } = await supabase
-    .from('shift_draft_picks' as never)
-    .select('*')
-    .eq('draft_id' as never, draftId)
-    .order('round_number' as never)
-    .order('pick_index' as never) as unknown as { data: ShiftDraftPickRow[] | null }
-  return data ?? []
-}
-
-// ==========================================
-// Admin actions
-// ==========================================
-
-/** Create a new draft */
-export async function createDraft(name: string, totalRounds: number, pickTimeLimitSeconds: number, createdBy: string): Promise<ShiftDraftRow> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('shift_drafts' as never)
-    .insert({
-      name,
-      total_rounds: totalRounds,
-      pick_time_limit_seconds: pickTimeLimitSeconds,
-      created_by: createdBy,
-    } as never)
-    .select('*')
-    .single() as unknown as { data: ShiftDraftRow | null; error: Error | null }
-
-  if (error) throw error
-  return data!
-}
-
-/** Set the draft order (replaces existing) */
 export async function setDraftOrder(draftId: string, camperIds: string[]): Promise<void> {
   const supabase = createClient()
-
-  // Delete existing order
-  await supabase
-    .from('shift_draft_order' as never)
-    .delete()
-    .eq('draft_id' as never, draftId)
-
-  // Insert new order
-  const rows = camperIds.map((camperId, idx) => ({
+  await supabase.from('shift_draft_order').delete().eq('draft_id', draftId)
+  if (camperIds.length === 0) return
+  const rows = camperIds.map((camper_id, idx) => ({
     draft_id: draftId,
-    camper_id: camperId,
+    camper_id,
     draft_position: idx + 1,
   }))
-
-  const { error } = await supabase
-    .from('shift_draft_order' as never)
-    .insert(rows as never)
-
+  const { error } = await supabase.from('shift_draft_order').insert(rows as never)
   if (error) throw error
 }
 
-/** Start the draft - creates pick records for round 1 and sets first person to 'picking' */
-export async function startDraft(draftId: string): Promise<void> {
+// -------- Rankings --------
+
+export async function fetchMyRankings(draftId: string, camperId: string): Promise<ShiftDraftRankingRow[]> {
   const supabase = createClient()
-
-  const order = await fetchDraftOrder(draftId)
-  if (order.length === 0) throw new Error('No campers in draft order')
-
-  // Create pick records for round 1
-  const picks = order.map((o, idx) => ({
-    draft_id: draftId,
-    camper_id: o.camper_id,
-    round_number: 1,
-    pick_index: idx,
-    status: idx === 0 ? 'picking' : 'pending',
-    turn_started_at: idx === 0 ? new Date().toISOString() : null,
-  }))
-
-  const { error: picksError } = await supabase
-    .from('shift_draft_picks' as never)
-    .insert(picks as never)
-
-  if (picksError) throw picksError
-
-  // Update draft status
-  const { error } = await supabase
-    .from('shift_drafts' as never)
-    .update({
-      status: 'active',
-      current_round: 1,
-      current_pick_index: 0,
-      started_at: new Date().toISOString(),
-    } as never)
-    .eq('id' as never, draftId)
-
-  if (error) throw error
+  const { data } = await supabase
+    .from('shift_draft_rankings')
+    .select('*')
+    .eq('draft_id', draftId)
+    .eq('camper_id', camperId)
+    .order('rank')
+  return (data as ShiftDraftRankingRow[] | null) ?? []
 }
 
-/** Advance to the next pick (admin can force-advance) */
-export async function advanceDraft(draftId: string, skipReason?: 'skipped' | 'auto_skipped'): Promise<void> {
+export async function fetchAllRankings(draftId: string): Promise<ShiftDraftRankingRow[]> {
   const supabase = createClient()
-
-  const draft = await fetchDraft(draftId)
-  if (!draft || draft.status !== 'active') throw new Error('Draft is not active')
-
-  const order = await fetchDraftOrder(draftId)
-
-  // Mark current pick as skipped if needed
-  if (skipReason) {
-    await supabase
-      .from('shift_draft_picks' as never)
-      .update({
-        status: skipReason,
-        expired_at: new Date().toISOString(),
-      } as never)
-      .eq('draft_id' as never, draftId)
-      .eq('round_number' as never, draft.current_round)
-      .eq('pick_index' as never, draft.current_pick_index)
-  }
-
-  let nextIndex = draft.current_pick_index + 1
-  let nextRound = draft.current_round
-
-  // If we've gone through all campers in this round, start next round
-  if (nextIndex >= order.length) {
-    nextRound++
-    nextIndex = 0
-
-    if (nextRound > draft.total_rounds) {
-      // Draft is complete
-      await supabase
-        .from('shift_drafts' as never)
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        } as never)
-        .eq('id' as never, draftId)
-      return
-    }
-
-    // Create pick records for the new round
-    const newPicks = order.map((o, idx) => ({
-      draft_id: draftId,
-      camper_id: o.camper_id,
-      round_number: nextRound,
-      pick_index: idx,
-      status: idx === 0 ? 'picking' : 'pending',
-      turn_started_at: idx === 0 ? new Date().toISOString() : null,
-    }))
-
-    await supabase
-      .from('shift_draft_picks' as never)
-      .insert(newPicks as never)
-  } else {
-    // Set next person's pick to 'picking'
-    await supabase
-      .from('shift_draft_picks' as never)
-      .update({
-        status: 'picking',
-        turn_started_at: new Date().toISOString(),
-      } as never)
-      .eq('draft_id' as never, draftId)
-      .eq('round_number' as never, nextRound)
-      .eq('pick_index' as never, nextIndex)
-  }
-
-  // Update draft state
-  await supabase
-    .from('shift_drafts' as never)
-    .update({
-      current_round: nextRound,
-      current_pick_index: nextIndex,
-    } as never)
-    .eq('id' as never, draftId)
+  const { data } = await supabase
+    .from('shift_draft_rankings')
+    .select('*')
+    .eq('draft_id', draftId)
+    .order('camper_id')
+    .order('rank')
+  return (data as ShiftDraftRankingRow[] | null) ?? []
 }
 
-/** Camper makes their pick */
-export async function makePick(
+export async function upsertCamperRanking(
   draftId: string,
-  camperId: string,
-  shiftCategory: string,
-  shiftRole: string,
-  shiftTime: string | null
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('shift_draft_picks' as never)
-    .update({
-      shift_category: shiftCategory,
-      shift_role: shiftRole,
-      shift_time: shiftTime,
-      status: 'picked',
-      picked_at: new Date().toISOString(),
-    } as never)
-    .eq('draft_id' as never, draftId)
-    .eq('camper_id' as never, camperId)
-    .eq('status' as never, 'picking')
-
-  if (error) throw error
-
-  // Auto-advance to next pick
-  await advanceDraft(draftId)
+  offeringId: string,
+  rank: number,
+  camperId?: string
+): Promise<ShiftDraftRankingRow> {
+  return rpc<ShiftDraftRankingRow>('upsert_camper_ranking', {
+    p_draft_id: draftId,
+    p_offering_id: offeringId,
+    p_rank: rank,
+    p_camper_id: camperId ?? null,
+  })
 }
 
-/** Pause or resume the draft */
-export async function toggleDraftPause(draftId: string, currentStatus: DraftStatus): Promise<void> {
-  const supabase = createClient()
-  const newStatus = currentStatus === 'active' ? 'paused' : 'active'
-  const { error } = await supabase
-    .from('shift_drafts' as never)
-    .update({ status: newStatus } as never)
-    .eq('id' as never, draftId)
-  if (error) throw error
+export async function clearCamperRanking(draftId: string, offeringId: string, camperId?: string): Promise<void> {
+  await rpc<unknown>('clear_camper_ranking', {
+    p_draft_id: draftId,
+    p_offering_id: offeringId,
+    p_camper_id: camperId ?? null,
+  })
 }
 
-/** Delete a draft (setup only) */
-export async function deleteDraft(draftId: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('shift_drafts' as never)
-    .delete()
-    .eq('id' as never, draftId)
-  if (error) throw error
+export async function compactCamperRankings(draftId: string, camperId?: string): Promise<number> {
+  const data = await rpc<number>('compact_camper_rankings', {
+    p_draft_id: draftId,
+    p_camper_id: camperId ?? null,
+  })
+  return data ?? 0
 }
 
-/** Update draft settings */
-export async function updateDraftSettings(
+// -------- Freeze / publish --------
+
+export async function freezeDraftRankings(draftId: string): Promise<ShiftDraftRow> {
+  return rpc<ShiftDraftRow>('freeze_draft_rankings', { p_draft_id: draftId })
+}
+
+export async function unfreezeDraftRankings(draftId: string): Promise<ShiftDraftRow> {
+  return rpc<ShiftDraftRow>('unfreeze_draft_rankings', { p_draft_id: draftId })
+}
+
+export async function publishDraft(draftId: string): Promise<ShiftDraftRow> {
+  return rpc<ShiftDraftRow>('publish_draft', { p_draft_id: draftId })
+}
+
+// -------- Auto-draft execution --------
+
+export interface AutoDraftPlannedAssignment {
+  camper_id: string
+  offering_id: string
+  slot_index: number
+  source: 'ranked' | 'random_fill' | 'manual'
+  assigned_round: number | null
+  rank_used: number | null
+  category: string
+  role: string
+  time_label: string | null
+  day_label: string | null
+  day_date: string | null
+  pool: DraftPool
+  camper_name: string
+  camper_playa_name: string | null
+}
+
+export interface AutoDraftResult {
+  draft_id: string
+  seed: number
+  dry_run: boolean
+  count: number
+  assignments: AutoDraftPlannedAssignment[]
+}
+
+export async function runAutoDraft(
   draftId: string,
-  updates: { name?: string; total_rounds?: number; pick_time_limit_seconds?: number }
-): Promise<void> {
+  opts?: { seed?: number; dryRun?: boolean }
+): Promise<AutoDraftResult> {
+  return rpc<AutoDraftResult>('run_auto_draft', {
+    p_draft_id: draftId,
+    p_seed: opts?.seed ?? null,
+    p_dry_run: opts?.dryRun ?? false,
+  })
+}
+
+// -------- Assignments --------
+
+export async function fetchAssignments(draftId: string): Promise<ShiftDraftAssignmentRow[]> {
   const supabase = createClient()
-  const { error } = await supabase
-    .from('shift_drafts' as never)
-    .update(updates as never)
-    .eq('id' as never, draftId)
-  if (error) throw error
+  const { data } = await supabase
+    .from('shift_draft_assignments')
+    .select('*')
+    .eq('draft_id', draftId)
+  return (data as ShiftDraftAssignmentRow[] | null) ?? []
+}
+
+export async function swapAssignments(assignmentA: string, assignmentB: string): Promise<void> {
+  await rpc<unknown>('swap_assignments', {
+    p_assignment_a: assignmentA,
+    p_assignment_b: assignmentB,
+  })
 }

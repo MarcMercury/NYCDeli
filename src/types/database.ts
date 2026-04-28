@@ -37,6 +37,7 @@ export interface CamperRow {
   arrival_date: string
   arrival_method: ArrivalMethod
   departure_date: string
+  departure_method: ArrivalMethod
   early_arrival: boolean
   shelter_type: ShelterType
   shelter_length_ft: number
@@ -94,6 +95,7 @@ export interface CamperInsert {
   arrival_date: string
   arrival_method: ArrivalMethod
   departure_date: string
+  departure_method?: ArrivalMethod
   early_arrival?: boolean
   shelter_type: ShelterType
   shelter_length_ft: number
@@ -574,10 +576,22 @@ export interface Database {
         Update: Partial<ShiftDraftOrderInsert>
         Relationships: []
       }
-      shift_draft_picks: {
-        Row: ShiftDraftPickRow
-        Insert: ShiftDraftPickInsert
-        Update: ShiftDraftPickUpdate
+      shift_offerings: {
+        Row: ShiftOfferingRow
+        Insert: ShiftOfferingInsert
+        Update: ShiftOfferingUpdate
+        Relationships: []
+      }
+      shift_draft_rankings: {
+        Row: ShiftDraftRankingRow
+        Insert: ShiftDraftRankingInsert
+        Update: Partial<ShiftDraftRankingInsert>
+        Relationships: []
+      }
+      shift_draft_assignments: {
+        Row: ShiftDraftAssignmentRow
+        Insert: ShiftDraftAssignmentInsert
+        Update: Partial<ShiftDraftAssignmentInsert>
         Relationships: []
       }
       deli_ideas: {
@@ -618,7 +632,44 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      seed_default_shift_offerings: {
+        Args: { p_draft_id: string }
+        Returns: number
+      }
+      upsert_camper_ranking: {
+        Args: { p_draft_id: string; p_offering_id: string; p_rank: number; p_camper_id?: string | null }
+        Returns: ShiftDraftRankingRow
+      }
+      clear_camper_ranking: {
+        Args: { p_draft_id: string; p_offering_id: string; p_camper_id?: string | null }
+        Returns: boolean
+      }
+      compact_camper_rankings: {
+        Args: { p_draft_id: string; p_camper_id?: string | null }
+        Returns: number
+      }
+      freeze_draft_rankings: {
+        Args: { p_draft_id: string }
+        Returns: ShiftDraftRow
+      }
+      unfreeze_draft_rankings: {
+        Args: { p_draft_id: string }
+        Returns: ShiftDraftRow
+      }
+      publish_draft: {
+        Args: { p_draft_id: string }
+        Returns: ShiftDraftRow
+      }
+      run_auto_draft: {
+        Args: { p_draft_id: string; p_seed?: number | null; p_dry_run?: boolean }
+        Returns: unknown
+      }
+      swap_assignments: {
+        Args: { p_assignment_a: string; p_assignment_b: string }
+        Returns: boolean
+      }
+    }
     Enums: {
       shelter_type: ShelterType
       arrival_method: ArrivalMethod
@@ -633,7 +684,8 @@ export interface Database {
       utility_line_type: UtilityLineType
       user_role: UserRole
       draft_status: DraftStatus
-      draft_pick_status: DraftPickStatus
+      draft_pool: DraftPool
+      draft_assignment_source: DraftAssignmentSource
     }
   }
 }
@@ -1298,11 +1350,14 @@ export interface UserProfileWithCamper extends UserProfileRow {
 }
 
 // ==========================================
-// Shift Draft Types
+// Shift Draft (Auto-Draft) Types
 // ==========================================
 
-export type DraftStatus = 'setup' | 'active' | 'paused' | 'completed'
-export type DraftPickStatus = 'pending' | 'picking' | 'picked' | 'skipped' | 'auto_skipped'
+export type DraftStatus = 'open' | 'frozen' | 'drafted' | 'archived'
+  // Note: legacy values 'setup'|'active'|'paused'|'completed' may exist in DB
+  // for old drafts but are not used by the new auto-draft flow.
+export type DraftPool = 'deli' | 'special' | 'strike'
+export type DraftAssignmentSource = 'ranked' | 'random_fill' | 'manual'
 
 export interface ShiftDraftRow {
   id: string
@@ -1310,34 +1365,37 @@ export interface ShiftDraftRow {
   updated_at: string
   name: string
   status: DraftStatus
-  current_round: number
-  current_pick_index: number
-  pick_time_limit_seconds: number
-  total_rounds: number
-  started_at: string | null
-  completed_at: string | null
+  ranking_frozen_at: string | null
+  drafted_at: string | null
+  random_seed: number | null
+  deli_quota: number
+  special_quota: number
+  strike_quota: number
+  snake_start_round: number
   created_by: string | null
 }
 
 export interface ShiftDraftInsert {
   name?: string
   status?: DraftStatus
-  current_round?: number
-  current_pick_index?: number
-  pick_time_limit_seconds?: number
-  total_rounds?: number
+  deli_quota?: number
+  special_quota?: number
+  strike_quota?: number
+  snake_start_round?: number
+  random_seed?: number | null
   created_by?: string | null
 }
 
 export interface ShiftDraftUpdate {
   name?: string
   status?: DraftStatus
-  current_round?: number
-  current_pick_index?: number
-  pick_time_limit_seconds?: number
-  total_rounds?: number
-  started_at?: string | null
-  completed_at?: string | null
+  deli_quota?: number
+  special_quota?: number
+  strike_quota?: number
+  snake_start_round?: number
+  random_seed?: number | null
+  ranking_frozen_at?: string | null
+  drafted_at?: string | null
 }
 
 export interface ShiftDraftOrderRow {
@@ -1354,47 +1412,62 @@ export interface ShiftDraftOrderInsert {
   draft_position: number
 }
 
-export interface ShiftDraftPickRow {
+// --- Offerings ---
+export interface ShiftOfferingRow {
+  id: string
+  created_at: string
+  updated_at: string
+  draft_id: string
+  pool: DraftPool
+  category: string
+  role: string
+  time_label: string | null
+  day_label: string | null
+  day_date: string | null
+  capacity: number
+  requires_exp: boolean
+  counts_double: boolean
+  description: string | null
+  note: string | null
+  sort_order: number
+}
+
+export type ShiftOfferingInsert = Omit<ShiftOfferingRow, 'id' | 'created_at' | 'updated_at'>
+export type ShiftOfferingUpdate = Partial<ShiftOfferingInsert>
+
+// --- Rankings ---
+export interface ShiftDraftRankingRow {
+  id: string
+  created_at: string
+  updated_at: string
+  draft_id: string
+  camper_id: string
+  offering_id: string
+  rank: number
+}
+
+export type ShiftDraftRankingInsert = Omit<ShiftDraftRankingRow, 'id' | 'created_at' | 'updated_at'>
+
+// --- Assignments ---
+export interface ShiftDraftAssignmentRow {
   id: string
   created_at: string
   draft_id: string
   camper_id: string
-  round_number: number
-  pick_index: number
-  shift_category: string | null
-  shift_role: string | null
-  shift_time: string | null
-  status: DraftPickStatus
-  picked_at: string | null
-  expired_at: string | null
-  turn_started_at: string | null
+  offering_id: string
+  slot_index: number
+  source: DraftAssignmentSource
+  assigned_round: number | null
+  rank_used: number | null
 }
 
-export interface ShiftDraftPickInsert {
-  draft_id: string
-  camper_id: string
-  round_number: number
-  pick_index: number
-  shift_category?: string | null
-  shift_role?: string | null
-  shift_time?: string | null
-  status?: DraftPickStatus
-  turn_started_at?: string | null
-}
-
-export interface ShiftDraftPickUpdate {
-  shift_category?: string | null
-  shift_role?: string | null
-  shift_time?: string | null
-  status?: DraftPickStatus
-  picked_at?: string | null
-  expired_at?: string | null
-  turn_started_at?: string | null
-}
+export type ShiftDraftAssignmentInsert = Omit<ShiftDraftAssignmentRow, 'id' | 'created_at'>
 
 export type ShiftDraft = ShiftDraftRow
 export type ShiftDraftOrder = ShiftDraftOrderRow
-export type ShiftDraftPick = ShiftDraftPickRow
+export type ShiftOffering = ShiftOfferingRow
+export type ShiftDraftRanking = ShiftDraftRankingRow
+export type ShiftDraftAssignment = ShiftDraftAssignmentRow
 
 // ==========================================
 // Resource Edits
