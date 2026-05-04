@@ -456,7 +456,7 @@ export default function HomePage() {
             Build Week (Optional)
           </h2>
           <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
-            22 of NYC Deli&apos;s 70 campers will build camp. Half-price camp fee, free housing,
+            22 of NYC Deli&apos;s ~70-80 campers will build camp. Half-price camp fee, free housing,
             and camp handles your transport logistics.
           </p>
           

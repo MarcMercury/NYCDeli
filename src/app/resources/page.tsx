@@ -64,8 +64,8 @@ const RESOURCES: Resource[] = [
   {
     title: 'What Is Burning Man?',
     category: 'burning-man-101',
-    tags: ['overview', 'intro', 'first-time', 'new burner'],
-    content: `Burning Man is an annual gathering in the Black Rock Desert of Nevada, creating a temporary city (Black Rock City) dedicated to community, art, self-expression, and self-reliance. In 2025, over 1,400 theme camps, 5,000 art pieces, and hundreds of art cars (Mutant Vehicles) participated. The event typically runs for a week at the end of August through early September.`,
+    tags: ['overview', 'intro', 'first-time', 'new burner', '2026'],
+    content: `Burning Man is an annual gathering in the Black Rock Desert of Nevada, creating a temporary city (Black Rock City) dedicated to community, art, self-expression, and self-reliance. **Burning Man 2026 by the numbers:** 1,400 theme camps, 5,000 art pieces, and 1,000 art cars (Mutant Vehicles). Attendance is expected to be ~80,000 cumulative across Build Week and the event. Burning Man typically runs for a week at the end of August through early September.`,
   },
   {
     title: 'Black Rock City Survival Guide',
@@ -200,55 +200,62 @@ Remember: Burning Man has a **gifting economy**, not a barter economy. Give free
     title: 'NYC Deli Camp History',
     category: 'camp-info',
     tags: ['history', 'camp', 'loveburn', 'brian', 'founding'],
-    content: `NYC Deli was founded by Brian at LoveBurn 2022 and has attended LoveBurn and Burning Man every year since. The playa loves our food gift and we have a lot of fun giving it!
+    content: `Brian started NYC Deli at LoveBurn 2022 and the camp has attended LoveBurn and Burning Man every year since. The playa loves our food gift and we have a lot of fun giving it!
 
-**Recognition:**
-• LoveBurn Miami offered NYC Deli campers half-price tickets in 2026 to induce us to return.
-• BMORG told NYC Deli to "just do it, we trust you" when it comes to administering 60% of our superblock — an unprecedented vote of confidence. Getting this "blank check" from Placement is virtually unheard of for BM camps.`,
+**Two concrete examples of how much Burning Man & LoveBurn appreciate us and our playa gift:**
+• **LoveBurn Miami** gives NYC Deli ½-price tickets — we're the only camp that gets that.
+• **BMORG (Burning Man Org)** told NYC Deli to "just do it, we trust you" when it comes to running our city block. Usually a Camp Lead has to ask BMORG Placement permission for nearly anything — getting a "blank check" from Placement is unheard of for BM camps, and an implicit vote of confidence in how NYC Deli ran its superblock in 2024-2025.`,
   },
   {
     title: 'Camp Size & Recruiting',
     category: 'camp-info',
-    tags: ['camp size', 'campers', 'recruiting', 'population'],
-    content: `NYC Deli targets ~70-80 campers each year — the number needed to fulfill our service promise and playa gifts: no more, no less.
+    tags: ['camp size', 'campers', 'recruiting', 'population', 'waitlist'],
+    content: `**Recruiting Update:** NYC Deli has **80 campers signed up**. Historically ~70 will actually go by the time late August comes. The Google Form for camp registration is still open as a **waitlist**.
 
-**Why 70-80?** That's the number of dedicated people required to cover camp's **3× 2.5-hour volunteer shifts** during the event. Compared to many camps, this is a light volunteer commitment — many camps demand far more hours and campers don't find that out until they're in the desert.
+We strive to bring exactly the number of campers needed to fulfill our service-promise and gifts to playa: no more, no less.
 
-**Note:** The 3× 2.5-hour shift commitment is separate from Build and Strike. Early arrival for Build is optional; everyone participates in Strike.`,
+**Why ~70-80 people?** That's the number of kind, dedicated volunteers required to make camp work with **3× 2.5-hour volunteer shifts per person** during the event. As Burning Man camps go, that's not a lot of work — many camps want far more volunteer hours from you, and often campers don't find that out until they're already in the desert. NYC Deli tries to be straightforward about work because Brian has been in camps that worked him to proverbial death.
+
+**Gentle disclaimer:** The 3× 2.5-hour shift commitment is exclusive of Build and Strike. Choosing to come in early for Build is optional, and everyone participates in Strike.`,
   },
   {
     title: 'HUBS — Humans Uniting for Better Sustainability',
     category: 'camp-info',
     tags: ['hubs', 'sister camps', 'infrastructure', 'cost sharing', 'village', 'sustainability'],
-    content: `HUBS (Humans Uniting for Better Sustainability) is NYC Deli's infrastructure cost-sharing model. One BM camp with significant infrastructure shares backend gear with other camps — saving everyone money and reducing heavy vehicles on playa (safer and greener).
+    content: `HUBS (Humans Uniting for Better Sustainability) is a fancy backronym for NYC Deli's infrastructure cost-sharing model: one BM camp with a lot of infrastructure (us) cost-shares that backend gear with other camps — saving everyone money and reducing the number of heavy vehicles that come to playa, which is safer and greener.
 
 **Key facts:**
-• 4 HUBS sister camps share infrastructure costs, keeping our camp fee at $800 ($500 for Builders)
-• Without HUBS, our amenity level would typically cost $2,000+
-• BMORG approves of and encourages this model
-• HUBS sister camp members have their own separate camps and won't walk through ours
-• HUBS replaced the old "Village" model`,
+• **7 HUBS sister camps** share infrastructure costs, keeping our camp fee at $900 ($450 for Builders arriving before Build Tuesday)
+• Our set of amenities in other camps usually costs ~$2,500
+• BMORG knows about this and has approved what we're doing
+• HUBS sister camp members are their own camps — they won't be walking through NYC Deli willy-nilly. HUBS Camp Leads may walk around our camp to find Brian or Beck.
+• For veteran Burners: HUBS replaced Villages. Villages have been history since 2024.
+
+**Heads-up about discretion:** When talking to outside-of-camp burners on-playa, be careful about going too far talking about NYC Deli's amenities. Many BM camps and especially open campers have very spartan home-bases. Be kind, use your judgement, and please avoid rubbing it in their face that we have amenities like a private bathroom and showers.`,
   },
   {
     title: 'Camp Fees & Refund Policy',
     category: 'camp-info',
     tags: ['fees', 'camp fees', 'refund', 'payment', 'deadline', 'money'],
-    content: `**Camp Fee:** $800 ($500 for Builders arriving before Build Wednesday)
+    content: `**Camp Fee:** $900 ($450 for Builders arriving before Build Tuesday)
+
+Thank you everyone for paying camp fees promptly. This lets Brian pay vendors early — they appreciate it, and vendor appreciation leads to enhanced service on-playa (e.g. United pumps the rented portos of their earliest payers first; they made that explicit this year).
 
 **Payment Deadlines:**
-• If paying in two installments: second half due 7/1
-• Campers joining after 6/15: full fee due 7/1
-• Two-payment plans: final payment due 7/15
+• Camp fees can be split into two payments: 5/1 and 6/1
+• For campers who paid half their camp fee already, the **second half is due 6/1**
 
 **Refund Policy:**
-• No refunds after 7/15 — camp fee money is already with vendors by then
+• **No refunds after 7/1** — camp fee money is already with vendors by 7/1
 • To request a refund, DM Brian
 
-**Where do fees go?** Example purchases:
-• 8,200 gallons of potable water + 3,000-gallon tank rental (Temen Logistics)
-• Porto rental + daily cleaning/pumping (United Site Services)
+**Where do your camp fees go?** Representative sample of major purchases for camp:
+• **10,000 gallons** of potable water + **3,000-gallon water tank rental** (Temen Logistics)
+• Rented Porto + daily cleaning/pumping service (United Site Services)
 • 100 high-quality NYC Deli aprons (Broken Arrow Printing)
-• To/from playa transport of 4× storage containers + annual storage (Peik Construction)`,
+• To/from playa transport of 4× 20' storage containers + annual storage and access at Peik Construction in West Reno
+• Annual service visits for the camp dualie pickup truck, refrigerated truck, and towed 125 kW generator
+• Insurance for the vehicles`,
   },
   {
     title: 'What Camp Brings to Playa — Big Logistics',
@@ -256,12 +263,12 @@ Remember: Burning Man has a **gifting economy**, not a barter economy. Give free
     tags: ['logistics', 'truck', 'generator', 'water tank', 'containers', 'shade'],
     content: `NYC Deli brings serious infrastructure:
 • 4× 20'×8'×8' full storage containers
-• "Treats" — a 30-foot refrigerated truck
-• 1× dualie pickup truck
-• 1× 120KW generator + heavy distribution gear
-• 1× 3,000-gallon water tank + 1× 5,000-gallon backup tank
+• **Treats** — the 30-foot refrigerated truck
+• **DUA-LIPA** — the dualie pickup truck
+• 1× **125 kW** generator + heavy distribution gear
+• 1× 3,000-gallon water tank + 1× 1,500-gallon backup tank
 • 1,000 gallons of grey-water capacity
-• Camp shade over all populated, eating, and activity areas`,
+• Camp shade over all tents, kitchen, eating, and activity areas`,
   },
   {
     title: 'SparklePony Express — Camp Art Car',
@@ -277,13 +284,29 @@ Over 500 Mutant Vehicles (art/sound cars) attend Burning Man each year.`,
   {
     title: 'Bike Rentals — Dust Rentals',
     category: 'camp-info',
-    tags: ['bike', 'bicycle', 'rental', 'dust rentals', 'transportation'],
-    content: `Rent a bike through **Dust Rentals** for on-playa transportation.
+    tags: ['bike', 'bicycle', 'rental', 'dust rentals', 'transportation', 'e-bike', 'mechanic'],
+    content: `NYC Deli will offer optional bikes picked up and dropped off in camp again — this will be our **3rd year** offering this. We'll be renting from **Dust Rentals** again.
 
-• Rental deadline: 7/7 (check WhatsApp Announcements for details)
-• If you can't rent by the deadline, DM Brian — he has a side-deal with Dust Rentals to ensure nobody is left behind
-• Bikes include on-playa pickup and dropoff
-• Always lock your bike and add lights (front + back) for night visibility`,
+**Important:** The Burning Man 2026 order page on Dust Rentals' site is not live yet. Brian will let everyone know when the rental option is available to buy.
+
+**Sizing:**
+• Riders **5'3" or taller** → default **medium** bike size works
+• Riders **shorter than 5'3"** → order a **small** bike
+
+**Cost & deposit:**
+• Each rental charges a **$100 refundable-within-30-days security deposit**
+• You provide your own lock — any lock will do, it does not need to be NYC-level
+
+**Buy vs. rent:** Renting is the convenience play — you avoid the big hassle of getting a bike into and out of Black Rock City.
+
+**Bike mechanics — free rental:** This year **one free bike rental** will go to any bike mechanic among us who is willing to help campers fix their bikes if they break. Camp also has a bike repair kit in **Tooltown**, the 20' storage container devoted to tools.
+
+**E-Bikes & E-Trikes:** Available for rental too, but pricing is high. You must be **5'3" or taller** to use them (otherwise your feet won't reach the ground).
+
+**On-playa tips:**
+• Always lock your bike — bike theft is real on playa
+• Add lights (front + back) for night visibility — it's required in BRC
+• If you miss the rental deadline, DM Brian — he has a side-deal with Dust Rentals to ensure nobody is left behind`,
   },
 
   /* ---- Amenities ---- */
@@ -698,26 +721,26 @@ Designated areas for bike storage:
   {
     title: 'Volunteer Shift Overview',
     category: 'volunteering',
-    tags: ['shifts', 'volunteering', 'work', 'food service', 'dj'],
+    tags: ['shifts', 'volunteering', 'work', 'food service', 'dj', 'manager'],
     content: `Each camper commits to **3× 2.5-hour shifts** during the event.
 
-**Shift signup:** A spreadsheet will be posted (check WhatsApp) for you to choose when and what you'll do.
+**Shift signup:** A spreadsheet will be posted later May for you to choose **when** you want to do your 3 shifts and **what** you'll do.
 
-**Common roles:**
+**Most common roles:**
 • 🍕 Preparing food
 • 🍽️ Serving food
-• 🎪 Entertaining/managing the food line + guiding bike parking
+• 🎪 Entertaining/managing the food line + guiding bike parking to NYC Deli's public bike racks
 • 🎵 DJ'ing during food service
 
 **Special role — Camp Day/Night Manager:**
 • Must have burned before
-• Worth 2 shifts
-• DM Brian for details
+• **Day:** 10am–4pm — **Night:** 4pm–10pm
+• Counts as **2 shifts**
 
 **Shift etiquette:**
-• Show up 10 minutes before your shift starts
-• Be sober for your shift
-• They're only 2.5 hours — you've got this!`,
+• Show up **10 minutes before** your shift starts
+• Be **sober** for your shift
+• Shifts are just 2.5 hours long and there's only 3 of them — you've got this!`,
   },
   {
     title: 'How to Shine in Camp',
@@ -738,19 +761,22 @@ Designated areas for bike storage:
     title: 'NYC Deli Community Guidelines',
     category: 'community',
     tags: ['guidelines', 'community', 'politics', 'religion', 'tolerance', 'inclusion'],
-    content: `NYC Deli is an **a-political and tolerant home** for all campers regardless of race, sex, gender, religion, romantic orientation, or national origin.
+    content: `NYC Deli is an **apolitical and tolerant home** for all campers regardless of race, sex, gender, religion, sexual orientation, or national origin.
 
-**Simple rules (like an old-school bar):** "No politics, no religion" leads to a happy camp.
+**Simple rules (like an old-school bar):** "No politics, no religion" — this leads to happy bars and happy camps.
 
-**Guidelines:**
-• Don't espouse a particular religion in camp
-• Political activism is best expressed through art — Burning Man is an art festival first
-• Camp will even help you bring art!
-• Avoid pins, flags, or verbal political activism likely to anger others, especially if unsolicited
-• Radical Self-Expression is a BM principle, but there's no principle protecting you from social consequences of that expression
-• If anyone feels disrespected, confidentially talk to a Camp Lead or Brian
+**Common-sense guidelines:**
+• Obviously, please do not espouse a particular religion in camp.
+• Several wars have happened in the last 3 years and they are ongoing. Our joke deli had nothing to do with it. Nothing our joke deli does at Burning Man will change anything about it. Nothing we do or say will change anything about it.
+• **Political activism:** Radical Self-Expression applies — but here's one suggestion: bring political activism in art form. Burning Man is an art festival first! Yes to art — camp will even help you bring it however we reasonably can.
 
-**TLDR:** NYC Deli is a chosen village and family. Please make an effort to get along.`,
+**What not to do:** Wear pins that may anger people, fly flags that may anger people, or say political things meant to provoke others to anger — especially if unsolicited or delivered in an intolerant or mean-spirited way. That rubs burners the wrong way and they will radically self-express back to you in a disproportionate manner. "There's no burner like a righteously angered burner" (unofficial 12th Burning Man Principle).
+
+**Tip:** Radical Self-Expression is a core Burning Man Principle, but there is no Burning Man Principle that will protect you from the social consequences of your radical self-expression!
+
+If anyone feels disrespected before, during, or after the burn, please confidentially talk to a Camp Lead or Brian so we can assess the situation and possibly take corrective action.
+
+**TLDR:** NYC Deli is a chosen village and family during prep, Build, and event week. Please make an effort to get along — especially with people who have different views than you do.`,
   },
   {
     title: 'Consent Guidelines',
@@ -780,18 +806,33 @@ Designated areas for bike storage:
 • Know your limits and have a buddy system`,
   },
   {
+    title: 'Romantic Pursuits in Camp',
+    category: 'community',
+    tags: ['romance', 'dating', 'consent', 'relationships', 'community', 'guidelines'],
+    content: `Brian prefers Deli campers find new special friends **outside of camp** because "we're just a deli, man." That said, attractions to fellow Deli campers can happen — here's how to handle it:
+
+• If you are romantically interested in someone in camp, you may **politely and romantically ask them once** about it.
+• If they do **not enthusiastically reciprocate** your romantic interest, **drop it**.
+• Do **not** chase them.
+• Do **not** leave them gifts.
+• There are 70,000 horn-dogs on-playa. Go find one!
+
+**Hard rule:** Anyone under 18 is off-limits for romance. In this camp and anywhere else. Anyone breaking this rule: Brian will figuratively bring the rope and see you hang.`,
+  },
+  {
     title: 'Camp Events & Social Gatherings',
     category: 'community',
-    tags: ['events', 'social', 'picnic', 'movie night', 'dinner', 'central park'],
-    content: `**On-Playa Events:**
-• 3 sunset trips (optional)
-• Short 15-minute daily meetings in Siberia following food service and cleanup (12:30pm, required)
-
-**Pre-Burn Events (examples from past years):**
-• Camp picnics in Sheep's Meadow, Central Park
+    tags: ['events', 'social', 'picnic', 'movie night', 'dinner', 'central park', 'sheeps meadow'],
+    content: `**Optional NYC Deli Pre-Burn Events** (to get better acquainted with each other):
+• **Camp Picnic — Sunday May 17 @ 1pm in Sheep's Meadow, Central Park** (weather permitting)
+• A **3rd Camp Picnic** will be held in July, date TBD
 • Camp build days to make bike racks and 8-person couch platforms for the public picnic area
 • Movie nights at Brian's loft in Bushwick
-• Friday night dinners at Brian's loft (they're Shabbat dinners but non-sectarian — you don't need to be Jewish and no religion is evident)`,
+• Friday night dinners at Brian's loft (they're Shabbat dinners but non-sectarian — you don't need to be Jewish and no religion is evident)
+
+**On-Playa Events:**
+• 3 sunset trips (optional)
+• Short 15-minute daily meetings in Siberia following food service and cleanup (12:30pm, required)`,
   },
   {
     title: 'Camp Amenity Etiquette',
