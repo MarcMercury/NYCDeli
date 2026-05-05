@@ -4,6 +4,15 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Load .env.local
+try {
+  const envFile = readFileSync(join(__dirname, '..', '.env.local'), 'utf-8');
+  for (const line of envFile.split('\n')) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m) process.env[m[1].trim()] = m[2].trim();
+  }
+} catch {}
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -13,7 +22,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 // Read CSV
-const csvPath = join(__dirname, '..', 'public', 'Campers', 'NYC Deli Camp Registration + Burning Man 26  (Responses) - Form Responses 1.csv');
+const csvPath = join(__dirname, '..', 'public', 'Files', 'NYC Deli Camp Registration + Burning Man 26  (Responses) - Form Responses 1 (1).csv');
 const csvContent = readFileSync(csvPath, 'utf-8');
 
 // Manual CSV parse (no extra deps needed)

@@ -96,23 +96,32 @@ function parseTentDimensions(tentStr) {
 }
 
 function extractDimensions(str) {
-  // Try various dimension formats
-  // Match patterns like "10x10x6", "10'x10'x6'", "14x10", "10x10", "10 x 10 x 6.5"
-  // Also handle feet/inches markers like 6'6", 6.5, etc.
+  // Convert "6'6\"" → 6.5ft, "84in"/"84\"" → 7ft, etc.
+  // First convert feet'inches" notation: 6'6" -> 6.5
+  let s = str.replace(/(\d+)\s*'\s*(\d+)\s*"/g, (_m, ft, inch) => `${parseInt(ft) + parseInt(inch) / 12}`);
+  // Convert standalone inches markers: "84in" or 84" -> feet (only when value >= 24, treat as inches)
+  s = s.replace(/(\d+\.?\d*)\s*(?:in|inch|inches|")\b/gi, (_m, n) => {
+    const v = parseFloat(n);
+    return v >= 24 ? `${(v / 12).toFixed(2)}` : `${v}`;
+  });
+  // Strip remaining feet markers
+  s = s.replace(/'/g, '').replace(/ft\b/gi, '').replace(/feet\b/gi, '');
 
-  // Normalize the string
-  const s = str.replace(/'/g, '').replace(/"/g, '').replace(/ft/gi, '').replace(/feet/gi, '');
+  // Extract all numbers with their positions to detect a trailing "population" digit
+  const numTokens = [...s.matchAll(/\d+\.?\d*/g)].map(m => parseFloat(m[0]));
 
-  // Try LxWxH pattern
+  // Try LxWxH pattern first
   let match = s.match(/(\d+\.?\d*)\s*[xX×*]\s*(\d+\.?\d*)\s*[xX×*]\s*(\d+\.?\d*)/);
   if (match) {
-    const nums = [parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])];
-    // Sort to determine length/width (larger two) and height (smallest, unless > 10 which means it's not height)
-    nums.sort((a, b) => b - a);
-    const length = nums[0];
-    const width = nums[1];
-    const height = nums[2];
-    return { length: Math.min(length, 20), width: Math.min(width, 15), height: Math.min(height, 15) };
+    let nums = [parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])];
+    // If any value > 20 it's likely inches → convert
+    nums = nums.map(n => n > 20 ? +(n / 12).toFixed(2) : n);
+    // Sort: largest two = length/width, smallest = height (unless smallest is wider than tallest)
+    const sorted = [...nums].sort((a, b) => b - a);
+    const length = Math.min(sorted[0], 20);
+    const width = Math.min(sorted[1], 15);
+    const height = Math.min(sorted[2], 12);
+    return { length, width, height };
   }
 
   // Try LxW pattern (no height)
@@ -120,15 +129,26 @@ function extractDimensions(str) {
   if (match) {
     let l = parseFloat(match[1]);
     let w = parseFloat(match[2]);
+    if (l > 20) l = +(l / 12).toFixed(2);
+    if (w > 20) w = +(w / 12).toFixed(2);
     if (w > l) [l, w] = [w, l];
     return { length: Math.min(l, 20), width: Math.min(w, 15), height: null };
   }
 
-  // Try just extracting numbers
-  const numbers = s.match(/\d+\.?\d*/g);
-  if (numbers && numbers.length >= 2) {
-    const nums = numbers.map(Number).sort((a, b) => b - a);
-    return { length: Math.min(nums[0], 20), width: Math.min(nums[1], 15), height: nums[2] ? Math.min(nums[2], 15) : null };
+  // Fallback: extract numbers, drop trailing single-digit "population" (1-6)
+  if (numTokens.length >= 2) {
+    let nums = [...numTokens];
+    // If last number is small (1-6) and integer-ish and more than 2 nums, assume population
+    const last = nums[nums.length - 1];
+    if (nums.length > 2 && Number.isInteger(last) && last >= 1 && last <= 6) {
+      nums.pop();
+    }
+    nums = nums.map(n => n > 20 ? +(n / 12).toFixed(2) : n).sort((a, b) => b - a);
+    return {
+      length: Math.min(nums[0], 20),
+      width: Math.min(nums[1], 15),
+      height: nums[2] != null ? Math.min(nums[2], 12) : null,
+    };
   }
 
   // Default fallback
@@ -376,7 +396,7 @@ async function main() {
   console.log('');
 
   // Read CSV
-  const csvPath = join(__dirname, '..', 'public', 'Campers', 'NYC Deli Camp Registration + Burning Man 26  (Responses) - Form Responses 1.csv');
+  const csvPath = join(__dirname, '..', 'public', 'Files', 'NYC Deli Camp Registration + Burning Man 26  (Responses) - Form Responses 1 (1).csv');
   const csvText = readFileSync(csvPath, 'utf-8');
   const rows = parseCSV(csvText);
 
