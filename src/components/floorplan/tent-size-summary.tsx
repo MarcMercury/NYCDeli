@@ -9,15 +9,27 @@ import type { FloorplanObjectRow } from '@/types/database'
 const CSV_PATH =
   '/Campers/NYC%20Deli%20Camp%20Registration%20%2B%20Burning%20Man%2026%20%20(Responses)%20-%20Form%20Responses%201.csv'
 
-/* ── Bucket definitions (10×10 merged into 11×11) ──────────────── */
+/* ── Bucket definitions ─────────────────────────────────────────
+ * Buckets are tried in order; the first one whose maxW/maxL covers the
+ * tent's short/long sides wins. Sizes below match the layout spot
+ * inventory used in the Admin Layout Builder so every spot lands in a
+ * named bucket (no real spot should fall through to "Oversized").
+ *   - 11×11     → standard small tent (Coleman 10×10, Kodiak 9×8, etc.)
+ *   - 11×15     → medium tent (10×14, 10×12.5, Shiftpod III 11×12, ...)
+ *   - 13×13     → large square (Shiftpod 12×12, REI 12.6×8.4, ...)
+ *   - 14×14     → extra-large square (covers 12×14, 13×14, 14×14 spots)
+ *   - 12×18     → long No Bake / 18-ft tents (10×18, 10×17.5, 18×10)
+ */
 const TENT_BUCKETS = [
   { label: '11×11', maxW: 11, maxL: 11 },
   { label: '11×15', maxW: 11, maxL: 15 },
   { label: '13×13', maxW: 13, maxL: 13 },
+  { label: '14×14', maxW: 14, maxL: 14 },
+  { label: '12×18', maxW: 12, maxL: 18 },
 ] as const
 
 type BucketLabel = (typeof TENT_BUCKETS)[number]['label'] | 'Oversized' | 'RV' | 'Unknown'
-const ALL_BUCKETS: BucketLabel[] = ['11×11', '11×15', '13×13', 'Oversized', 'RV', 'Unknown']
+const ALL_BUCKETS: BucketLabel[] = ['11×11', '11×15', '13×13', '14×14', '12×18', 'Oversized', 'RV', 'Unknown']
 
 /* ── CSV parser (handles quoted fields / newlines) ─────────────── */
 function parseCSV(text: string): string[][] {
