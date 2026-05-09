@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils'
 import ElectricalLoadTab from './electrical-load-tab'
 import LayoutSyncTab from './layout-sync-tab'
+import MeetingAgendasTab from './meeting-agendas-tab'
 import {
   fetchBuildStagesWithGoals,
   fetchBuildResources,
@@ -57,6 +58,7 @@ type Tab = { id: string; label: string }
 
 const tabs: Tab[] = [
   { id: 'roster', label: 'Roster' },
+  { id: 'agendas', label: 'Meeting Agendas' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'electrical', label: 'Electrical Load' },
@@ -594,6 +596,11 @@ export default function BuildWeekPage() {
               </div>
             )}
           </div>
+        </TabPanel>
+
+        {/* ═══════════  MEETING AGENDAS  ═══════════ */}
+        <TabPanel tabId="agendas" activeTab={activeTab}>
+          <MeetingAgendasTab />
         </TabPanel>
 
         {/* ═══════════  INVENTORY  ═══════════ */}

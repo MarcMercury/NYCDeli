@@ -1319,6 +1319,52 @@ export interface ElectricalLoadItemRow {
   updated_at: string
 }
 
+// ==========================================
+// Meeting Agenda Types
+// ==========================================
+
+export interface BuildMeetingResourceLink {
+  label: string
+  href: string
+}
+
+export interface BuildMeetingRow {
+  id: string
+  slug: string
+  number: number
+  month_label: string
+  title: string
+  subtitle: string
+  primary_goal: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type BuildMeetingSectionKind = 'section' | 'decisions'
+
+export interface BuildMeetingSectionRow {
+  id: string
+  meeting_id: string
+  sort_order: number
+  number: number | null
+  kind: BuildMeetingSectionKind
+  title: string
+  body_md: string | null
+  resource_links: BuildMeetingResourceLink[]
+  created_at: string
+  updated_at: string
+}
+
+export interface BuildMeetingNoteRow {
+  id: string
+  meeting_id: string
+  section_id: string | null
+  content: string
+  updated_by: string | null
+  updated_at: string
+}
+
 // Convenience types
 export type BuildStage = BuildStageRow
 export type BuildGoal = BuildGoalRow
@@ -1330,6 +1376,9 @@ export type BuildScheduleItem = BuildScheduleItemRow
 export type ElectricalLoadConfig = ElectricalLoadConfigRow
 export type ElectricalDistroBox = ElectricalDistroBoxRow
 export type ElectricalLoadItem = ElectricalLoadItemRow
+export type BuildMeeting = BuildMeetingRow
+export type BuildMeetingSection = BuildMeetingSectionRow
+export type BuildMeetingNote = BuildMeetingNoteRow
 
 // Extended type for stage with its goals
 export interface BuildStageWithGoals extends BuildStageRow {

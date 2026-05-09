@@ -11,6 +11,9 @@ import type {
   ElectricalLoadConfig,
   ElectricalDistroBox,
   ElectricalLoadItem,
+  BuildMeeting,
+  BuildMeetingSection,
+  BuildMeetingNote,
   Camper,
 } from '@/types/database'
 
@@ -683,4 +686,88 @@ export async function deleteElectricalLoadItem(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   if (error) throw error
+}
+
+// ==========================================
+// Meeting Agendas
+// ==========================================
+
+export async function fetchBuildMeetings(): Promise<BuildMeeting[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_meetings')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data as BuildMeeting[]) || []
+}
+
+export async function fetchBuildMeetingSections(meetingId: string): Promise<BuildMeetingSection[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_meeting_sections')
+    .select('*')
+    .eq('meeting_id', meetingId)
+    .order('sort_order')
+  if (error) throw error
+  return (data as BuildMeetingSection[]) || []
+}
+
+export async function fetchBuildMeetingNotes(meetingId: string): Promise<BuildMeetingNote[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_meeting_notes')
+    .select('*')
+    .eq('meeting_id', meetingId)
+  if (error) throw error
+  return (data as BuildMeetingNote[]) || []
+}
+
+/** Upsert a note. Pass section_id = null for the meeting-level (general) note. */
+export async function upsertBuildMeetingNote(params: {
+  meeting_id: string
+  section_id: string | null
+  content: string
+}): Promise<BuildMeetingNote> {
+  const supabase = createClient()
+  const userResp = await supabase.auth.getUser()
+  const userId = userResp.data.user?.id ?? null
+
+  // Find existing note (NULL-aware match)
+  let query = supabase
+    .from('build_meeting_notes')
+    .select('id')
+    .eq('meeting_id', params.meeting_id)
+  query = params.section_id === null
+    ? query.is('section_id', null)
+    : query.eq('section_id', params.section_id)
+  const { data: existing, error: selErr } = await query.maybeSingle()
+  if (selErr && selErr.code !== 'PGRST116') throw selErr
+
+  const payload = {
+    meeting_id: params.meeting_id,
+    section_id: params.section_id,
+    content: params.content,
+    updated_by: userId,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('build_meeting_notes')
+      .update(payload as never)
+      .eq('id', (existing as { id: string }).id)
+      .select()
+      .single()
+    if (error) throw error
+    return data as BuildMeetingNote
+  }
+
+  const { data, error } = await supabase
+    .from('build_meeting_notes')
+    .insert(payload as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildMeetingNote
 }
