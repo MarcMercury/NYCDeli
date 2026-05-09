@@ -30,7 +30,7 @@ export default function CampersPage() {
     const { data: profiles } = await supabase
       .from('user_profiles')
       .select('*')
-      .in('role', ['user', 'admin'])
+      .in('role', ['user', 'builder', 'admin'])
       .order('email') as unknown as { data: UserProfileRow[] | null }
 
     // Get all campers
