@@ -644,6 +644,41 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="grid md:grid-cols-4 gap-4 mt-4">
+                        <div>
+                          <label className="text-xs font-bold uppercase">Tent Entrances</label>
+                          <Select
+                            options={[
+                              { value: '', label: 'Not set' },
+                              { value: '1', label: '1 Side' },
+                              { value: '2', label: '2 Side' },
+                              { value: '3', label: '3 Side' },
+                              { value: '4', label: '4 Side' },
+                            ]}
+                            value={selectedCamper.tent_entrance_count ?? ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, tent_entrance_count: e.target.value ? parseInt(e.target.value) : null})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Entrance Orientation</label>
+                          <Select
+                            options={[
+                              { value: '', label: 'Not set' },
+                              { value: 'width', label: 'Short Side' },
+                              { value: 'length', label: 'Long Side' },
+                              { value: 'both', label: 'Short and Long Sides' },
+                            ]}
+                            value={selectedCamper.tent_opening_side || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, tent_opening_side: (e.target.value || null) as Camper['tent_opening_side']})}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-xs font-bold uppercase">Tent Make/Model</label>
+                          <Input
+                            value={selectedCamper.tent_make_model || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, tent_make_model: e.target.value || null})}
+                            placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
+                          />
+                        </div>
                         <div className="md:col-span-2">
                           <label className="text-xs font-bold uppercase">Sharing Tent With</label>
                           <Select
