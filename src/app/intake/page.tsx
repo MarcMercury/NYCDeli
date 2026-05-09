@@ -9,7 +9,7 @@ import {
   Card, CardHeader, CardTitle, CardContent, CardFooter,
   Alert, Stepper
 } from '@/components/ui'
-import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, orientationPreferences, tentOpeningSides, skillTags } from '@/lib/validations'
+import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, skillTags } from '@/lib/validations'
 import { getRandomLoadingMessage, pageCopy } from '@/lib/tone'
 import { createClient } from '@/lib/supabase/client'
 import type { Step } from '@/components/ui/stepper'
@@ -109,7 +109,7 @@ export default function IntakePage() {
     const fieldsToValidate: (keyof IntakeFormData)[][] = [
       ['full_name', 'playa_name', 'email', 'phone', 'password', 'confirmPassword'],
       ['arrival_date', 'arrival_method', 'departure_date', 'early_arrival'],
-      ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'orientation_preference', 'bringing_vehicle', 'tent_make_model', 'tent_entrance_count', 'tent_opening_side', 'sharing_tent_with', 'sharing_tent_with_2'],
+      ['shelter_type', 'shelter_length_ft', 'shelter_width_ft', 'shelter_height_ft', 'bringing_vehicle', 'tent_make_model', 'tent_entrance_count', 'tent_opening_side', 'sharing_tent_with', 'sharing_tent_with_2'],
       ['power_required', 'power_type', 'special_requests'],
       ['kitchen_participation', 'strike_participation'],
       ['skills', 'custom_skills'],
@@ -521,15 +521,20 @@ export default function IntakePage() {
                         name="tent_entrance_count"
                         control={control}
                         render={({ field }) => (
-                          <Input
-                            label="How many entrances does your tent have?"
-                            type="number"
-                            min={1}
-                            max={4}
-                            step={1}
+                          <Select
+                            label="Tent Entrances"
+                            options={[
+                              { value: '', label: 'Select one...' },
+                              { value: '1', label: '1 Side' },
+                              { value: '2', label: '2 Side' },
+                              { value: '3', label: '3 Side' },
+                              { value: '4', label: '4 Side' },
+                            ]}
                             error={errors.tent_entrance_count?.message}
-                            {...field}
-                            value={field.value ?? 1}
+                            name={field.name}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
+                            value={field.value ?? ''}
                             onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                           />
                         )}
@@ -539,33 +544,16 @@ export default function IntakePage() {
                         control={control}
                         render={({ field }) => (
                           <Select
-                            label="What side of your tent is the main opening on?"
+                            label="Entrance Orientation"
                             options={[
                               { value: '', label: 'Select one...' },
-                              ...tentOpeningSides.map(s => ({
-                                value: s,
-                                label: s === 'length' ? 'Length side' : s === 'width' ? 'Width side' : 'Both sides'
-                              }))
+                              { value: 'width', label: 'Short Side' },
+                              { value: 'length', label: 'Long Side' },
+                              { value: 'both', label: 'Short and Long Sides' },
                             ]}
                             error={errors.tent_opening_side?.message}
                             {...field}
                             value={field.value || ''}
-                          />
-                        )}
-                      />
-                      <Controller
-                        name="orientation_preference"
-                        control={control}
-                        render={({ field }) => (
-                          <Select
-                            label="Which direction should your tent opening face in camp?"
-                            options={orientationPreferences.map(o => ({ 
-                              value: o, 
-                              label: o.charAt(0).toUpperCase() + o.slice(1)
-                            }))}
-                            error={errors.orientation_preference?.message}
-                            {...field}
-                            value={field.value || 'any'}
                           />
                         )}
                       />

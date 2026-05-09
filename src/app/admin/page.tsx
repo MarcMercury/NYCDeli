@@ -605,20 +605,6 @@ export default function AdminPage() {
                       </div>
                       <div className="grid md:grid-cols-4 gap-4">
                         <div>
-                          <label className="text-xs font-bold uppercase">Orientation</label>
-                          <Select
-                            options={[
-                              { value: 'any', label: 'Any' },
-                              { value: 'north', label: 'North' },
-                              { value: 'south', label: 'South' },
-                              { value: 'east', label: 'East' },
-                              { value: 'west', label: 'West' },
-                            ]}
-                            value={selectedCamper.orientation_preference || 'any'}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, orientation_preference: e.target.value as Camper['orientation_preference']})}
-                          />
-                        </div>
-                        <div>
                           <label className="text-xs font-bold uppercase">Power Type</label>
                           <Select
                             options={[

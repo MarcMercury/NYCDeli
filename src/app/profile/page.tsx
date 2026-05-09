@@ -10,7 +10,7 @@ import {
   Tabs, TabPanel
 } from '@/components/ui'
 import { cn, formatDate, formatTime } from '@/lib/utils'
-import { shelterTypes, arrivalMethods, powerTypes, orientationPreferences, tentOpeningSides, shiftTypes, skillTags } from '@/lib/validations'
+import { shelterTypes, arrivalMethods, powerTypes, shiftTypes, skillTags } from '@/lib/validations'
 import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole, KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 import type { Tab } from '@/components/ui/tabs'
 import PackingListTab from '@/components/packing-list-tab'
@@ -688,13 +688,6 @@ export default function ProfilePage() {
                       min={3} max={15} step={0.5}
                     />
                   </div>
-                  <Select
-                    label="Door Orientation Preference"
-                    value={editCamper.orientation_preference || 'any'}
-                    onChange={(e) => updateField('orientation_preference', e.target.value as CamperRow['orientation_preference'])}
-                    options={orientationPreferences.map(o => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
-                  />
-
                   <div className="border-t-2 border-black pt-4 mt-2">
                     <h3 className="font-black uppercase text-sm mb-4">Vehicle &amp; Tent Details</h3>
                     <div className="space-y-4">
@@ -709,23 +702,27 @@ export default function ProfilePage() {
                         onChange={(e) => updateField('tent_make_model', e.target.value || null)}
                         placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
                       />
-                      <Input
-                        label="Number of Entrances"
-                        type="number"
+                      <Select
+                        label="Tent Entrances"
                         value={editCamper.tent_entrance_count ?? ''}
                         onChange={(e) => updateField('tent_entrance_count', e.target.value ? parseInt(e.target.value) : null)}
-                        min={1} max={4} step={1}
+                        options={[
+                          { value: '', label: 'Not set' },
+                          { value: '1', label: '1 Side' },
+                          { value: '2', label: '2 Side' },
+                          { value: '3', label: '3 Side' },
+                          { value: '4', label: '4 Side' },
+                        ]}
                       />
                       <Select
-                        label="Which side of your tent is the main opening on?"
+                        label="Entrance Orientation"
                         value={editCamper.tent_opening_side || ''}
                         onChange={(e) => updateField('tent_opening_side', e.target.value as CamperRow['tent_opening_side'] || null)}
                         options={[
                           { value: '', label: 'Not set' },
-                          ...tentOpeningSides.map(s => ({
-                            value: s,
-                            label: s === 'length' ? 'Length side' : s === 'width' ? 'Width side' : 'Both sides'
-                          }))
+                          { value: 'width', label: 'Short Side' },
+                          { value: 'length', label: 'Long Side' },
+                          { value: 'both', label: 'Short and Long Sides' },
                         ]}
                       />
                     </div>
