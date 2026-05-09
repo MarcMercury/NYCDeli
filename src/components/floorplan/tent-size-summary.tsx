@@ -210,7 +210,7 @@ interface CamperInfo {
   l: number | null
   isRV: boolean
   bucket: BucketLabel
-  sharingWith: string | null  // matched partner name, or null
+  sharingWith: string | null  // comma-joined partner names, or null
 }
 
 /* ── A "tent need" = one tent required (solo camper or sharing pair) */
@@ -254,13 +254,14 @@ interface TentSizeSummaryProps {
 
 export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
   const [csvCampers, setCsvCampers] = useState<CamperInfo[]>([])
-  const [sharingPairs, setSharingPairs] = useState<[string, string][]>([])
+  // Each group is a list of camper names sharing one tent (size 2 or 3).
+  const [sharingGroups, setSharingGroups] = useState<string[][]>([])
   const [loading, setLoading] = useState(true)
   const [dataSource, setDataSource] = useState<'supabase' | 'csv' | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null)
 
-  const loadFromCSV = useCallback(async (): Promise<{ campers: CamperInfo[]; pairs: [string, string][] } | null> => {
+  const loadFromCSV = useCallback(async (): Promise<{ campers: CamperInfo[]; groups: string[][] } | null> => {
     try {
       const res = await fetch(CSV_PATH)
       if (!res.ok) return null
@@ -297,35 +298,39 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
       }
 
-      // Detect sharing pairs
+      // Detect sharing pairs (CSV has only one free-text "sharing with" column,
+      // so groups from CSV are always size 2).
       const pairs = findSharingPairs(names, sharingMap)
+      const groups: string[][] = pairs.map(([a, b]) => [a, b])
 
       // Mark sharing partners
-      const partnerOf = new Map<string, string>()
-      for (const [a, b] of pairs) {
-        partnerOf.set(a, b)
-        partnerOf.set(b, a)
+      const partnerOf = new Map<string, string[]>()
+      for (const g of groups) {
+        for (const name of g) {
+          partnerOf.set(name, g.filter(n => n !== name))
+        }
       }
       for (const c of camperList) {
-        c.sharingWith = partnerOf.get(c.name) ?? null
+        const partners = partnerOf.get(c.name)
+        c.sharingWith = partners && partners.length ? partners.join(', ') : null
       }
 
-      return { campers: camperList, pairs }
+      return { campers: camperList, groups }
     } catch {
       return null
     }
   }, [])
 
-  const loadFromSupabase = useCallback(async (): Promise<{ campers: CamperInfo[]; pairs: [string, string][] } | null> => {
+  const loadFromSupabase = useCallback(async (): Promise<{ campers: CamperInfo[]; groups: string[][] } | null> => {
     try {
       const supabase = createClient()
       const { data } = await supabase
         .from('campers')
-        .select('id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with')
+        .select('id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2')
         .order('full_name')
       if (!data || data.length === 0) return null
 
-      type Row = { id: string; full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null }
+      type Row = { id: string; full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null; sharing_tent_with_2: string | null }
       const rows = data as unknown as Row[]
 
       const camperList: CamperInfo[] = []
@@ -342,31 +347,62 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         camperList.push({ name, w, l, isRV, bucket, sharingWith: null })
       }
 
-      // Build sharing pairs from the sharing_tent_with FK column
-      const pairs: [string, string][] = []
-      const pairedIds = new Set<string>()
+      // Build sharing groups via union-find over BOTH sharing_tent_with FK
+      // columns so that 3-person tents (A↔B, A↔C) collapse into one group.
+      const parent = new Map<string, string>()
+      for (const row of rows) parent.set(row.id, row.id)
+      const find = (id: string): string => {
+        let cur = id
+        while (parent.get(cur) !== cur) cur = parent.get(cur)!
+        // Path compression
+        let walker = id
+        while (parent.get(walker) !== cur) {
+          const next = parent.get(walker)!
+          parent.set(walker, cur)
+          walker = next
+        }
+        return cur
+      }
+      const union = (a: string, b: string) => {
+        const ra = find(a), rb = find(b)
+        if (ra !== rb) parent.set(ra, rb)
+      }
       for (const row of rows) {
-        if (!row.sharing_tent_with || pairedIds.has(row.id)) continue
-        const partnerName = idToName.get(row.sharing_tent_with)
-        if (!partnerName) continue
-        // Only record each pair once (avoid A→B and B→A duplication)
-        pairedIds.add(row.id)
-        pairedIds.add(row.sharing_tent_with)
-        const myName = row.full_name ?? ''
-        if (myName) pairs.push([myName, partnerName])
+        for (const partnerId of [row.sharing_tent_with, row.sharing_tent_with_2]) {
+          if (!partnerId) continue
+          if (!parent.has(partnerId)) continue // partner missing/deleted
+          union(row.id, partnerId)
+        }
+      }
+
+      // Bucket camper IDs by their group root, but only keep groups of size ≥ 2.
+      const groupMap = new Map<string, string[]>()
+      for (const row of rows) {
+        const root = find(row.id)
+        const arr = groupMap.get(root) ?? []
+        arr.push(row.id)
+        groupMap.set(root, arr)
+      }
+      const groups: string[][] = []
+      for (const ids of groupMap.values()) {
+        if (ids.length < 2) continue
+        const names = ids.map(id => idToName.get(id) ?? '').filter(n => n.length > 0)
+        if (names.length >= 2) groups.push(names)
       }
 
       // Mark sharing partners on camper info
-      const partnerOf = new Map<string, string>()
-      for (const [a, b] of pairs) {
-        partnerOf.set(a, b)
-        partnerOf.set(b, a)
+      const partnerOf = new Map<string, string[]>()
+      for (const g of groups) {
+        for (const name of g) {
+          partnerOf.set(name, g.filter(n => n !== name))
+        }
       }
       for (const c of camperList) {
-        c.sharingWith = partnerOf.get(c.name) ?? null
+        const partners = partnerOf.get(c.name)
+        c.sharingWith = partners && partners.length ? partners.join(', ') : null
       }
 
-      return { campers: camperList, pairs }
+      return { campers: camperList, groups }
     } catch {
       return null
     }
@@ -379,14 +415,14 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         const sbResult = await loadFromSupabase()
         if (sbResult) {
           setCsvCampers(sbResult.campers)
-          setSharingPairs(sbResult.pairs)
+          setSharingGroups(sbResult.groups)
           setDataSource('supabase')
           return
         }
         const csvResult = await loadFromCSV()
         if (csvResult) {
           setCsvCampers(csvResult.campers)
-          setSharingPairs(csvResult.pairs)
+          setSharingGroups(csvResult.groups)
           setDataSource('csv')
         }
       } finally {
@@ -403,7 +439,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         const result = await loadFromSupabase()
         if (result) {
           setCsvCampers(result.campers)
-          setSharingPairs(result.pairs)
+          setSharingGroups(result.groups)
           setDataSource('supabase')
         }
       }
@@ -421,7 +457,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
         const result = await loadFromSupabase()
         if (result) {
           setCsvCampers(result.campers)
-          setSharingPairs(result.pairs)
+          setSharingGroups(result.groups)
           setDataSource('supabase')
         }
       })
@@ -430,49 +466,51 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
     return () => { supabase.removeChannel(channel) }
   }, [loadFromSupabase])
 
-  // ── Build tent needs (one per solo camper or sharing pair) ───────
+  // ── Build tent needs (one per solo camper or sharing group) ──────
   const { tentNeeds, spots, allocations, unplaced, shortageByBucket, totalNeeded, totalPlaced } = useMemo(() => {
     // --- 1. Build tent needs from campers ---
-    const pairNames = new Set<string>()
-    for (const [a, b] of sharingPairs) { pairNames.add(a); pairNames.add(b) }
+    const groupedNames = new Set<string>()
+    for (const g of sharingGroups) for (const n of g) groupedNames.add(n)
 
     const needs: TentNeed[] = []
-    const usedInPair = new Set<string>()
+    const usedInGroup = new Set<string>()
 
-    // Sharing pairs → 1 tent per pair (use the larger tent dimensions)
-    for (const [a, b] of sharingPairs) {
-      const ca = csvCampers.find(c => c.name === a)
-      const cb = csvCampers.find(c => c.name === b)
-      if (!ca || !cb) continue
-      usedInPair.add(a)
-      usedInPair.add(b)
+    // Sharing groups → 1 tent per group (use the largest tent dimensions)
+    for (const g of sharingGroups) {
+      const members = g
+        .map(name => csvCampers.find(c => c.name === name))
+        .filter((c): c is CamperInfo => !!c)
+      if (members.length < 2) continue
+      for (const m of members) usedInGroup.add(m.name)
 
-      // Pick the larger tent dims (by area), prefer known over unknown
+      // Pick the largest tent dims (by area) among members; prefer known
       let w: number | null = null, l: number | null = null, isRV = false
-      const areaA = (ca.w ?? 0) * (ca.l ?? 0)
-      const areaB = (cb.w ?? 0) * (cb.l ?? 0)
-      if (areaA >= areaB && ca.w != null && ca.l != null) {
-        w = ca.w; l = ca.l; isRV = ca.isRV
-      } else if (cb.w != null && cb.l != null) {
-        w = cb.w; l = cb.l; isRV = cb.isRV
-      } else if (ca.w != null && ca.l != null) {
-        w = ca.w; l = ca.l; isRV = ca.isRV
+      let bestArea = -1
+      for (const m of members) {
+        if (m.w == null || m.l == null) continue
+        const area = m.w * m.l
+        if (area > bestArea) {
+          bestArea = area
+          w = m.w; l = m.l; isRV = m.isRV
+        }
       }
+      // If nobody had known dims, fall back to first member's RV flag
+      if (w == null && l == null) isRV = members[0].isRV
 
       const shortSide = w != null && l != null ? Math.min(w, l) : null
       const longSide = w != null && l != null ? Math.max(w, l) : null
       const bucket = toBucket(shortSide, longSide, isRV)
 
       needs.push({
-        label: `${ca.name} & ${cb.name}`,
+        label: members.map(m => m.name).join(' & '),
         shortSide, longSide, isRV, bucket,
-        campers: [ca, cb],
+        campers: members,
       })
     }
 
     // Solo campers → 1 tent each
     for (const c of csvCampers) {
-      if (usedInPair.has(c.name)) continue
+      if (usedInGroup.has(c.name)) continue
       const shortSide = c.w != null && c.l != null ? Math.min(c.w, c.l) : null
       const longSide = c.w != null && c.l != null ? Math.max(c.w, c.l) : null
       needs.push({
@@ -561,7 +599,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
       totalNeeded: tentNeedsCount,
       totalPlaced: tentPlacedCount,
     }
-  }, [csvCampers, sharingPairs, objects])
+  }, [csvCampers, sharingGroups, objects])
 
   // Count remaining unused spots
   const unusedSpots = spots.length - totalPlaced
@@ -588,20 +626,24 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
             <p className="text-xs text-gray-400 animate-pulse">Loading camper data...</p>
           ) : (
             <>
-              {/* Sharing pairs count */}
-              {sharingPairs.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 px-2 py-1.5 space-y-0.5">
-                  <p className="text-[10px] text-blue-700 font-bold">
-                    🤝 {sharingPairs.length} sharing pair{sharingPairs.length !== 1 ? 's' : ''} ({sharingPairs.length * 2} campers → {sharingPairs.length} tent{sharingPairs.length !== 1 ? 's' : ''}, saving {sharingPairs.length} tent{sharingPairs.length !== 1 ? 's' : ''})
-                  </p>
-                  <div className="text-[9px] text-blue-600 space-y-0 max-h-[80px] overflow-y-auto">
-                    {tentNeeds.filter(n => n.campers.length > 1).map((n, i) => {
-                      const dims = n.shortSide != null && n.longSide != null ? ` (${n.shortSide}×${n.longSide})` : ''
-                      return <div key={i}>{n.label}{dims}</div>
-                    })}
+              {/* Sharing groups count */}
+              {sharingGroups.length > 0 && (() => {
+                const campersInGroups = sharingGroups.reduce((sum, g) => sum + g.length, 0)
+                const tentsSaved = campersInGroups - sharingGroups.length
+                return (
+                  <div className="bg-blue-50 border border-blue-200 px-2 py-1.5 space-y-0.5">
+                    <p className="text-[10px] text-blue-700 font-bold">
+                      🤝 {sharingGroups.length} sharing group{sharingGroups.length !== 1 ? 's' : ''} ({campersInGroups} campers → {sharingGroups.length} tent{sharingGroups.length !== 1 ? 's' : ''}, saving {tentsSaved} tent{tentsSaved !== 1 ? 's' : ''})
+                    </p>
+                    <div className="text-[9px] text-blue-600 space-y-0 max-h-[80px] overflow-y-auto">
+                      {tentNeeds.filter(n => n.campers.length > 1).map((n, i) => {
+                        const dims = n.shortSide != null && n.longSide != null ? ` (${n.shortSide}×${n.longSide})` : ''
+                        return <div key={i}>{n.label}{dims}</div>
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Tent count math breakdown */}
               <div className="bg-gray-50 border border-gray-200 px-2 py-1.5 text-[10px] text-gray-600 space-y-0.5">
@@ -609,7 +651,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
                 <div className="flex justify-between"><span>{csvCampers.length} total campers</span></div>
                 <div className="flex justify-between"><span>− {tentNeeds.filter(n => n.isRV).length} RV / no tent needed</span></div>
                 <div className="flex justify-between"><span>− {tentNeeds.filter(n => !n.isRV && n.shortSide == null).length} unknown tent size</span></div>
-                <div className="flex justify-between"><span>− {sharingPairs.length} saved by sharing (2 campers → 1 tent)</span></div>
+                <div className="flex justify-between"><span>− {sharingGroups.reduce((sum, g) => sum + g.length, 0) - sharingGroups.length} saved by sharing ({sharingGroups.length} group{sharingGroups.length !== 1 ? 's' : ''} of 2–3 campers)</span></div>
                 <div className="flex justify-between border-t border-gray-300 pt-0.5 font-bold text-gray-800">
                   <span>= {totalNeeded} tents needed</span>
                 </div>

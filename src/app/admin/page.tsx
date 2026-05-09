@@ -679,14 +679,14 @@ export default function AdminPage() {
                             placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
                           />
                         </div>
-                        <div className="md:col-span-2">
+                        <div>
                           <label className="text-xs font-bold uppercase">Sharing Tent With</label>
                           <Select
                             placeholder="None"
                             options={[
                               { value: '', label: 'None' },
                               ...campers
-                                .filter(c => c.id !== selectedCamper.id)
+                                .filter(c => c.id !== selectedCamper.id && c.id !== selectedCamper.sharing_tent_with_2)
                                 .map(c => ({
                                   value: c.id,
                                   label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
@@ -694,6 +694,23 @@ export default function AdminPage() {
                             ]}
                             value={selectedCamper.sharing_tent_with || ''}
                             onChange={(e) => setSelectedCamper({...selectedCamper, sharing_tent_with: e.target.value || null})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase">Sharing Tent With (2nd)</label>
+                          <Select
+                            placeholder="None"
+                            options={[
+                              { value: '', label: 'None' },
+                              ...campers
+                                .filter(c => c.id !== selectedCamper.id && c.id !== selectedCamper.sharing_tent_with)
+                                .map(c => ({
+                                  value: c.id,
+                                  label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                                }))
+                            ]}
+                            value={selectedCamper.sharing_tent_with_2 || ''}
+                            onChange={(e) => setSelectedCamper({...selectedCamper, sharing_tent_with_2: e.target.value || null})}
                           />
                         </div>
                       </div>
