@@ -4,17 +4,24 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import {
   fetchBuildMeetings,
   fetchBuildMeetingSections,
   fetchBuildMeetingNotes,
   upsertBuildMeetingNote,
+  updateBuildMeeting,
+  createBuildMeetingSection,
+  updateBuildMeetingSection,
+  deleteBuildMeetingSection,
+  reorderBuildMeetingSections,
 } from '@/lib/build-week'
 import type {
   BuildMeeting,
   BuildMeetingSection,
   BuildMeetingNote,
   BuildMeetingResourceLink,
+  BuildMeetingSectionKind,
 } from '@/types/database'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -43,11 +50,9 @@ function ResourceLinks({ links }: { links: BuildMeetingResourceLink[] }) {
   )
 }
 
-/** Render simple markdown-ish bullets/bold. Keeps deps minimal. */
 function AgendaBody({ md }: { md: string | null }) {
   if (!md) return null
   const lines = md.split('\n')
-  // Group into either paragraphs or bullet groups
   const blocks: { type: 'p' | 'ul'; lines: string[] }[] = []
   let cur: { type: 'p' | 'ul'; lines: string[] } | null = null
   for (const raw of lines) {
@@ -68,9 +73,7 @@ function AgendaBody({ md }: { md: string | null }) {
       cur.lines.push(line)
     }
   }
-
   const renderInline = (text: string) => {
-    // **bold** → <strong>
     const parts = text.split(/(\*\*[^*]+\*\*)/g)
     return parts.map((p, i) =>
       p.startsWith('**') && p.endsWith('**') ? (
@@ -80,7 +83,6 @@ function AgendaBody({ md }: { md: string | null }) {
       )
     )
   }
-
   return (
     <div className="space-y-2 text-sm text-gray-800">
       {blocks.map((b, i) =>
@@ -118,7 +120,6 @@ function NotesEditor({ meetingId, sectionId, initial, placeholder }: NotesEditor
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSaved = useRef(initial)
 
-  // If the upstream prop changes (e.g. on meeting switch) reset
   useEffect(() => {
     setValue(initial)
     lastSaved.current = initial
@@ -184,6 +185,241 @@ function NotesEditor({ meetingId, sectionId, initial, placeholder }: NotesEditor
   )
 }
 
+// ─── Admin: Meeting header editor ───
+
+interface MeetingEditFormProps {
+  meeting: BuildMeeting
+  onSave: (updates: { month_label: string; title: string; subtitle: string; primary_goal: string | null }) => Promise<void>
+  onCancel: () => void
+}
+
+function MeetingEditForm({ meeting, onSave, onCancel }: MeetingEditFormProps) {
+  const [monthLabel, setMonthLabel] = useState(meeting.month_label)
+  const [title, setTitle] = useState(meeting.title)
+  const [subtitle, setSubtitle] = useState(meeting.subtitle)
+  const [primaryGoal, setPrimaryGoal] = useState(meeting.primary_goal ?? '')
+  const [saving, setSaving] = useState(false)
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Month / Label</label>
+        <input
+          value={monthLabel}
+          onChange={e => setMonthLabel(e.target.value)}
+          className="w-full border-2 border-black px-3 py-1.5 text-sm"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Title</label>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          className="w-full border-2 border-black px-3 py-1.5 text-sm font-bold"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Subtitle</label>
+        <input
+          value={subtitle}
+          onChange={e => setSubtitle(e.target.value)}
+          className="w-full border-2 border-black px-3 py-1.5 text-sm italic"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Primary Goal</label>
+        <textarea
+          value={primaryGoal}
+          onChange={e => setPrimaryGoal(e.target.value)}
+          rows={3}
+          className="w-full border-2 border-black px-3 py-1.5 text-sm resize-y"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={async () => {
+            setSaving(true)
+            try {
+              await onSave({
+                month_label: monthLabel,
+                title,
+                subtitle,
+                primary_goal: primaryGoal.trim() === '' ? null : primaryGoal,
+              })
+            } finally {
+              setSaving(false)
+            }
+          }}
+          disabled={saving}
+          className="px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 disabled:bg-gray-400"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button onClick={onCancel} className="px-3 py-1 text-xs font-bold bg-gray-200 hover:bg-gray-300">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Admin: Resource link list editor ───
+
+interface ResourceLinksEditorProps {
+  links: BuildMeetingResourceLink[]
+  onChange: (links: BuildMeetingResourceLink[]) => void
+}
+
+function ResourceLinksEditor({ links, onChange }: ResourceLinksEditorProps) {
+  const update = (i: number, patch: Partial<BuildMeetingResourceLink>) => {
+    onChange(links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  const remove = (i: number) => onChange(links.filter((_, idx) => idx !== i))
+  const add = () => onChange([...links, { label: '', href: '' }])
+
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Resource Links</div>
+      {links.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No links. Click &ldquo;Add link&rdquo; below.</p>
+      )}
+      {links.map((l, i) => (
+        <div key={i} className="flex gap-1.5 items-center">
+          <input
+            value={l.label}
+            onChange={e => update(i, { label: e.target.value })}
+            placeholder="Label"
+            className="flex-1 border border-gray-400 px-2 py-1 text-xs"
+          />
+          <input
+            value={l.href}
+            onChange={e => update(i, { href: e.target.value })}
+            placeholder="/path or https://…"
+            className="flex-[2] border border-gray-400 px-2 py-1 text-xs font-mono"
+          />
+          <button
+            onClick={() => remove(i)}
+            className="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 border border-red-400"
+            title="Remove"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={add}
+        className="px-2 py-1 text-xs font-bold bg-gray-100 hover:bg-gray-200 border border-gray-400"
+      >
+        + Add link
+      </button>
+    </div>
+  )
+}
+
+// ─── Admin: Section editor ───
+
+interface SectionEditFormProps {
+  initial: {
+    number: number | null
+    kind: BuildMeetingSectionKind
+    title: string
+    body_md: string | null
+    resource_links: BuildMeetingResourceLink[]
+  }
+  onSave: (data: {
+    number: number | null
+    kind: BuildMeetingSectionKind
+    title: string
+    body_md: string | null
+    resource_links: BuildMeetingResourceLink[]
+  }) => Promise<void>
+  onCancel: () => void
+  submitLabel?: string
+}
+
+function SectionEditForm({ initial, onSave, onCancel, submitLabel = 'Save' }: SectionEditFormProps) {
+  const [number, setNumber] = useState<string>(initial.number == null ? '' : String(initial.number))
+  const [kind, setKind] = useState<BuildMeetingSectionKind>(initial.kind)
+  const [title, setTitle] = useState(initial.title)
+  const [body, setBody] = useState(initial.body_md ?? '')
+  const [links, setLinks] = useState<BuildMeetingResourceLink[]>(initial.resource_links)
+  const [saving, setSaving] = useState(false)
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <div className="w-24">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">#</label>
+          <input
+            value={number}
+            onChange={e => setNumber(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="—"
+            className="w-full border-2 border-black px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Kind</label>
+          <select
+            value={kind}
+            onChange={e => setKind(e.target.value as BuildMeetingSectionKind)}
+            className="w-full border-2 border-black px-2 py-1.5 text-sm bg-white"
+          >
+            <option value="section">Section</option>
+            <option value="decisions">Decisions block</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Title</label>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          className="w-full border-2 border-black px-3 py-1.5 text-sm font-bold"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          Body (markdown — supports - bullets and **bold**)
+        </label>
+        <textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          rows={8}
+          className="w-full border-2 border-black px-3 py-1.5 text-sm font-mono resize-y"
+        />
+      </div>
+      <ResourceLinksEditor links={links} onChange={setLinks} />
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={async () => {
+            setSaving(true)
+            try {
+              await onSave({
+                number: number === '' ? null : parseInt(number, 10),
+                kind,
+                title,
+                body_md: body.trim() === '' ? null : body,
+                resource_links: links.filter(l => l.label.trim() !== '' || l.href.trim() !== ''),
+              })
+            } finally {
+              setSaving(false)
+            }
+          }}
+          disabled={saving || title.trim() === ''}
+          className="px-3 py-1 text-xs font-bold bg-black text-white hover:bg-gray-800 disabled:bg-gray-400"
+        >
+          {saving ? 'Saving…' : submitLabel}
+        </button>
+        <button onClick={onCancel} className="px-3 py-1 text-xs font-bold bg-gray-200 hover:bg-gray-300">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main ───
+
 export default function MeetingAgendasTab() {
   const [meetings, setMeetings] = useState<BuildMeeting[]>([])
   const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null)
@@ -191,6 +427,31 @@ export default function MeetingAgendasTab() {
   const [notes, setNotes] = useState<BuildMeetingNote[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMeeting, setLoadingMeeting] = useState(false)
+
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editingMeetingHeader, setEditingMeetingHeader] = useState(false)
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
+  const [addingSection, setAddingSection] = useState(false)
+
+  // Detect admin
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = (await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()) as unknown as { data: { role: string } | null }
+      if (mounted) setIsAdmin(profile?.role === 'admin')
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -209,32 +470,106 @@ export default function MeetingAgendasTab() {
     }
   }, [])
 
+  const loadMeetingData = useCallback(async (meetingId: string) => {
+    setLoadingMeeting(true)
+    try {
+      const [secs, ns] = await Promise.all([
+        fetchBuildMeetingSections(meetingId),
+        fetchBuildMeetingNotes(meetingId),
+      ])
+      setSections(secs)
+      setNotes(ns)
+    } finally {
+      setLoadingMeeting(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!activeMeetingId) return
-    let mounted = true
-    setLoadingMeeting(true)
-    ;(async () => {
-      try {
-        const [secs, ns] = await Promise.all([
-          fetchBuildMeetingSections(activeMeetingId),
-          fetchBuildMeetingNotes(activeMeetingId),
-        ])
-        if (!mounted) return
-        setSections(secs)
-        setNotes(ns)
-      } finally {
-        if (mounted) setLoadingMeeting(false)
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [activeMeetingId])
+    loadMeetingData(activeMeetingId)
+    setEditingMeetingHeader(false)
+    setEditingSectionId(null)
+    setAddingSection(false)
+  }, [activeMeetingId, loadMeetingData])
 
   const activeMeeting = meetings.find(m => m.id === activeMeetingId) || null
 
   const noteFor = (sectionId: string | null) =>
     notes.find(n => (n.section_id ?? null) === sectionId)?.content ?? ''
+
+  // ─── Admin handlers ───
+
+  const handleSaveMeetingHeader = async (updates: {
+    month_label: string
+    title: string
+    subtitle: string
+    primary_goal: string | null
+  }) => {
+    if (!activeMeeting) return
+    await updateBuildMeeting(activeMeeting.id, updates)
+    setMeetings(prev => prev.map(m => (m.id === activeMeeting.id ? { ...m, ...updates } : m)))
+    setEditingMeetingHeader(false)
+  }
+
+  const handleAddSection = async (data: {
+    number: number | null
+    kind: BuildMeetingSectionKind
+    title: string
+    body_md: string | null
+    resource_links: BuildMeetingResourceLink[]
+  }) => {
+    if (!activeMeeting) return
+    const created = await createBuildMeetingSection({
+      meeting_id: activeMeeting.id,
+      ...data,
+    })
+    setSections(prev => [...prev, created])
+    setAddingSection(false)
+  }
+
+  const handleSaveSection = async (
+    sectionId: string,
+    data: {
+      number: number | null
+      kind: BuildMeetingSectionKind
+      title: string
+      body_md: string | null
+      resource_links: BuildMeetingResourceLink[]
+    }
+  ) => {
+    await updateBuildMeetingSection(sectionId, data)
+    setSections(prev => prev.map(s => (s.id === sectionId ? { ...s, ...data } : s)))
+    setEditingSectionId(null)
+  }
+
+  const handleDeleteSection = async (sectionId: string) => {
+    if (!confirm('Delete this section? Notes attached to it will also be deleted.')) return
+    await deleteBuildMeetingSection(sectionId)
+    setSections(prev => prev.filter(s => s.id !== sectionId))
+    setNotes(prev => prev.filter(n => n.section_id !== sectionId))
+  }
+
+  const moveSection = async (sectionId: string, direction: -1 | 1) => {
+    const idx = sections.findIndex(s => s.id === sectionId)
+    if (idx < 0) return
+    const swapIdx = idx + direction
+    if (swapIdx < 0 || swapIdx >= sections.length) return
+    const a = sections[idx]
+    const b = sections[swapIdx]
+    const newSections = [...sections]
+    newSections[idx] = { ...b, sort_order: a.sort_order }
+    newSections[swapIdx] = { ...a, sort_order: b.sort_order }
+    setSections(newSections)
+    try {
+      await reorderBuildMeetingSections([
+        { id: a.id, sort_order: b.sort_order },
+        { id: b.id, sort_order: a.sort_order },
+      ])
+    } catch {
+      // Reload on failure
+      if (activeMeetingId) loadMeetingData(activeMeetingId)
+    }
+  }
 
   if (loading) {
     return <div className="text-center py-12 text-gray-400">Loading agendas…</div>
@@ -250,6 +585,27 @@ export default function MeetingAgendasTab() {
 
   return (
     <div className="space-y-4">
+      {/* ─── Admin edit-mode toggle ─── */}
+      {isAdmin && (
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Admin</span>
+          <button
+            onClick={() => {
+              setEditMode(v => !v)
+              setEditingMeetingHeader(false)
+              setEditingSectionId(null)
+              setAddingSection(false)
+            }}
+            className={cn(
+              'px-3 py-1 text-xs font-bold uppercase tracking-wide border-2 border-black transition-colors',
+              editMode ? 'bg-red-400 hover:bg-red-500 text-black' : 'bg-white hover:bg-gray-100'
+            )}
+          >
+            {editMode ? '✓ Editing — Click to Finish' : '✏️ Edit Agenda'}
+          </button>
+        </div>
+      )}
+
       {/* ─── Meeting selector ─── */}
       <div className="flex flex-wrap gap-2">
         {meetings.map(m => {
@@ -275,20 +631,42 @@ export default function MeetingAgendasTab() {
           {/* ─── Header ─── */}
           <Card>
             <CardContent className="p-4">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                Meeting {activeMeeting.number} — {activeMeeting.month_label}
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black mt-1 leading-tight">
-                {activeMeeting.title}
-              </h2>
-              <p className="text-sm text-gray-600 mt-1 italic">{activeMeeting.subtitle}</p>
-              {activeMeeting.primary_goal && (
-                <div className="mt-3 border-l-4 border-yellow-400 pl-3 py-1 bg-yellow-50">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    Primary Goal
+              {editMode && editingMeetingHeader ? (
+                <MeetingEditForm
+                  meeting={activeMeeting}
+                  onSave={handleSaveMeetingHeader}
+                  onCancel={() => setEditingMeetingHeader(false)}
+                />
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                        Meeting {activeMeeting.number} — {activeMeeting.month_label}
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-black mt-1 leading-tight">
+                        {activeMeeting.title}
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1 italic">{activeMeeting.subtitle}</p>
+                    </div>
+                    {editMode && (
+                      <button
+                        onClick={() => setEditingMeetingHeader(true)}
+                        className="px-2 py-1 text-xs font-bold bg-yellow-300 hover:bg-yellow-400 border-2 border-black"
+                      >
+                        ✏️ Edit
+                      </button>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-800">{activeMeeting.primary_goal}</p>
-                </div>
+                  {activeMeeting.primary_goal && (
+                    <div className="mt-3 border-l-4 border-yellow-400 pl-3 py-1 bg-yellow-50">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                        Primary Goal
+                      </div>
+                      <p className="text-sm text-gray-800">{activeMeeting.primary_goal}</p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -299,38 +677,119 @@ export default function MeetingAgendasTab() {
             <>
               {/* ─── Sections ─── */}
               <div className="space-y-3">
-                {sections.map(sec => (
-                  <Card
-                    key={sec.id}
-                    className={cn(
-                      sec.kind === 'decisions' && 'border-2 border-red-400 bg-red-50'
-                    )}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-baseline gap-2">
-                        {sec.number != null && (
-                          <span className="text-2xl font-black text-gray-300 leading-none">
-                            {sec.number}
-                          </span>
+                {sections.map((sec, idx) => {
+                  const isEditingThis = editMode && editingSectionId === sec.id
+                  return (
+                    <Card
+                      key={sec.id}
+                      className={cn(
+                        sec.kind === 'decisions' && 'border-2 border-red-400 bg-red-50'
+                      )}
+                    >
+                      <CardContent className="p-4">
+                        {isEditingThis ? (
+                          <SectionEditForm
+                            initial={{
+                              number: sec.number,
+                              kind: sec.kind,
+                              title: sec.title,
+                              body_md: sec.body_md,
+                              resource_links: sec.resource_links,
+                            }}
+                            onSave={data => handleSaveSection(sec.id, data)}
+                            onCancel={() => setEditingSectionId(null)}
+                          />
+                        ) : (
+                          <>
+                            <div className="flex items-baseline gap-2">
+                              {sec.number != null && (
+                                <span className="text-2xl font-black text-gray-300 leading-none">
+                                  {sec.number}
+                                </span>
+                              )}
+                              <h3 className="text-base sm:text-lg font-bold flex-1">
+                                {sec.kind === 'decisions' && '🎯 '}
+                                {sec.title}
+                              </h3>
+                              {editMode && (
+                                <div className="flex gap-1 shrink-0">
+                                  <button
+                                    onClick={() => moveSection(sec.id, -1)}
+                                    disabled={idx === 0}
+                                    className="px-1.5 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-400 disabled:opacity-30"
+                                    title="Move up"
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    onClick={() => moveSection(sec.id, 1)}
+                                    disabled={idx === sections.length - 1}
+                                    className="px-1.5 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-400 disabled:opacity-30"
+                                    title="Move down"
+                                  >
+                                    ↓
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingSectionId(sec.id)}
+                                    className="px-2 py-0.5 text-xs font-bold bg-yellow-300 hover:bg-yellow-400 border border-black"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSection(sec.id)}
+                                    className="px-2 py-0.5 text-xs font-bold bg-red-200 hover:bg-red-300 border border-red-600"
+                                    title="Delete"
+                                  >
+                                    🗑
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-2">
+                              <AgendaBody md={sec.body_md} />
+                              <ResourceLinks links={sec.resource_links} />
+                            </div>
+                            <NotesEditor
+                              meetingId={activeMeeting.id}
+                              sectionId={sec.id}
+                              initial={noteFor(sec.id)}
+                            />
+                          </>
                         )}
-                        <h3 className="text-base sm:text-lg font-bold flex-1">
-                          {sec.kind === 'decisions' && '🎯 '}
-                          {sec.title}
-                        </h3>
-                      </div>
-                      <div className="mt-2">
-                        <AgendaBody md={sec.body_md} />
-                        <ResourceLinks links={sec.resource_links} />
-                      </div>
-                      <NotesEditor
-                        meetingId={activeMeeting.id}
-                        sectionId={sec.id}
-                        initial={noteFor(sec.id)}
-                      />
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
+
+              {/* ─── Add Section (admin) ─── */}
+              {editMode && (
+                <Card className="border-2 border-dashed border-gray-400 bg-gray-50">
+                  <CardContent className="p-4">
+                    {addingSection ? (
+                      <SectionEditForm
+                        initial={{
+                          number: sections.filter(s => s.kind === 'section').length + 1,
+                          kind: 'section',
+                          title: '',
+                          body_md: '',
+                          resource_links: [],
+                        }}
+                        onSave={handleAddSection}
+                        onCancel={() => setAddingSection(false)}
+                        submitLabel="Add Section"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setAddingSection(true)}
+                        className="w-full py-2 text-sm font-bold uppercase tracking-wide bg-white hover:bg-gray-100 border-2 border-black"
+                      >
+                        + Add Section
+                      </button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* ─── General Meeting Notes ─── */}
               <Card className="border-2 border-black bg-gray-50">

@@ -771,3 +771,90 @@ export async function upsertBuildMeetingNote(params: {
   if (error) throw error
   return data as BuildMeetingNote
 }
+
+// ── Admin: meeting + section edits ──
+
+export async function updateBuildMeeting(id: string, updates: {
+  month_label?: string
+  title?: string
+  subtitle?: string
+  primary_goal?: string | null
+}): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_meetings')
+    .update({ ...updates, updated_at: new Date().toISOString() } as never)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function createBuildMeetingSection(section: {
+  meeting_id: string
+  number: number | null
+  kind: 'section' | 'decisions'
+  title: string
+  body_md?: string | null
+  resource_links?: { label: string; href: string }[]
+}): Promise<BuildMeetingSection> {
+  const supabase = createClient()
+  const { data: existing } = await supabase
+    .from('build_meeting_sections')
+    .select('sort_order')
+    .eq('meeting_id', section.meeting_id)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0
+    ? (existing[0] as { sort_order: number }).sort_order + 10
+    : 10
+
+  const { data, error } = await supabase
+    .from('build_meeting_sections')
+    .insert({
+      ...section,
+      body_md: section.body_md ?? null,
+      resource_links: section.resource_links ?? [],
+      sort_order: nextOrder,
+    } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildMeetingSection
+}
+
+export async function updateBuildMeetingSection(id: string, updates: {
+  number?: number | null
+  kind?: 'section' | 'decisions'
+  title?: string
+  body_md?: string | null
+  resource_links?: { label: string; href: string }[]
+  sort_order?: number
+}): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_meeting_sections')
+    .update({ ...updates, updated_at: new Date().toISOString() } as never)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteBuildMeetingSection(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_meeting_sections')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function reorderBuildMeetingSections(
+  items: { id: string; sort_order: number }[]
+): Promise<void> {
+  const supabase = createClient()
+  for (const it of items) {
+    const { error } = await supabase
+      .from('build_meeting_sections')
+      .update({ sort_order: it.sort_order } as never)
+      .eq('id', it.id)
+    if (error) throw error
+  }
+}
