@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   Tabs, TabPanel, ProgressBar
 } from '@/components/ui'
@@ -110,7 +111,34 @@ function exportToCSV(filename: string, headers: string[], rows: string[][]) {
 }
 
 export default function BuildWeekPage() {
-  const [activeTab, setActiveTab] = useState('roster')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const validTabs = ['roster', 'agendas', 'schedule', 'inventory', 'electrical', 'shade']
+  const initialTab = (() => {
+    const t = searchParams?.get('tab')
+    return t && validTabs.includes(t) ? t : 'roster'
+  })()
+  const [activeTab, setActiveTabState] = useState(initialTab)
+
+  // Update URL when tab changes (without scroll-jumping)
+  const setActiveTab = useCallback((tabId: string) => {
+    setActiveTabState(tabId)
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    if (tabId === 'roster') params.delete('tab')
+    else params.set('tab', tabId)
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [router, pathname, searchParams])
+
+  // React to back/forward or external links to ?tab=
+  useEffect(() => {
+    const t = searchParams?.get('tab')
+    const next = t && validTabs.includes(t) ? t : 'roster'
+    setActiveTabState(prev => (prev === next ? prev : next))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   const [stages, setStages] = useState<BuildStageWithGoals[]>([])
   const [resources, setResources] = useState<BuildResource[]>([])
   const [_procedures, setProcedures] = useState<BuildProcedure[]>([])
