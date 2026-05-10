@@ -8,6 +8,7 @@ import {
   Badge, Button, Input
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { resolveTentMateIds } from '@/lib/tent-mates'
 import type { UserProfileRow, CamperRow, CamperPhotoRow } from '@/types/database'
 
 interface CamperDirectory {
@@ -209,16 +210,20 @@ export default function CampersPage() {
                     <span className="text-gray-500 block">Kitchen</span>
                     <span className="font-bold">{selectedCamper.camper.kitchen_participation ? 'Yes' : 'No'}</span>
                   </div>
-                  {selectedCamper.camper.sharing_tent_with && campersById.get(selectedCamper.camper.sharing_tent_with) && (
-                    <div>
-                      <span className="text-gray-500 block">Sharing Tent With</span>
-                      <span className="font-bold">
-                        {campersById.get(selectedCamper.camper.sharing_tent_with)?.playa_name
-                          ? `${campersById.get(selectedCamper.camper.sharing_tent_with)!.full_name} ("${campersById.get(selectedCamper.camper.sharing_tent_with)!.playa_name}")`
-                          : campersById.get(selectedCamper.camper.sharing_tent_with)!.full_name}
-                      </span>
-                    </div>
-                  )}
+                  {selectedCamper.camper && (() => {
+                    const mates = resolveTentMateIds(selectedCamper.camper.id, [...campersById.values()])
+                      .map(id => campersById.get(id))
+                      .filter((c): c is CamperRow => !!c)
+                    if (mates.length === 0) return null
+                    return (
+                      <div>
+                        <span className="text-gray-500 block">Sharing Tent With</span>
+                        <span className="font-bold">
+                          {mates.map(m => m.playa_name ? `${m.full_name} ("${m.playa_name}")` : m.full_name).join(', ')}
+                        </span>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
 
@@ -278,11 +283,18 @@ export default function CampersPage() {
             <div className="flex gap-1 mt-2 flex-wrap">
               {entry.profile.role === 'admin' && <Badge variant="info">Admin</Badge>}
               {entry.camper?.build_week_attending && <Badge variant="default">Builder</Badge>}
-              {entry.camper?.sharing_tent_with && campersById.get(entry.camper.sharing_tent_with) && (
-                <Badge variant="info">
-                  🏕️ w/ {campersById.get(entry.camper.sharing_tent_with)?.playa_name || campersById.get(entry.camper.sharing_tent_with)?.full_name}
-                </Badge>
-              )}
+              {entry.camper && (() => {
+                const mates = resolveTentMateIds(entry.camper.id, [...campersById.values()])
+                  .map(id => campersById.get(id))
+                  .filter((c): c is CamperRow => !!c)
+                if (mates.length === 0) return null
+                const label = mates.map(m => m.playa_name || m.full_name).join(', ')
+                return (
+                  <Badge variant="info">
+                    🏕️ w/ {label}
+                  </Badge>
+                )
+              })()}
             </div>
           </button>
         ))}

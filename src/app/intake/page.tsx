@@ -429,7 +429,7 @@ export default function IntakePage() {
                         required
                         options={shelterTypes.map(t => ({ 
                           value: t, 
-                          label: t === 'shiftpod' ? 'Shiftpod' : t === 'rv' ? 'RV (If Approved)' : t.charAt(0).toUpperCase() + t.slice(1)
+                          label: t === 'shiftpod' ? 'Shiftpod' : t === 'rv' ? 'RV (If Approved)' : t === 'vehicle' ? 'Vehicle / Sprinter' : t.charAt(0).toUpperCase() + t.slice(1)
                         }))}
                         error={errors.shelter_type?.message}
                         {...field}

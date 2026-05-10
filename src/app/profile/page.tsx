@@ -659,7 +659,7 @@ export default function ProfilePage() {
                     onChange={(e) => updateField('shelter_type', e.target.value as CamperRow['shelter_type'])}
                     options={shelterTypes.map(t => ({
                       value: t,
-                      label: t === 'shiftpod' ? 'Shiftpod' : t === 'rv' ? 'RV' : t.charAt(0).toUpperCase() + t.slice(1)
+                      label: t === 'shiftpod' ? 'Shiftpod' : t === 'rv' ? 'RV' : t === 'vehicle' ? 'Vehicle / Sprinter' : t.charAt(0).toUpperCase() + t.slice(1)
                     }))}
                     required
                   />

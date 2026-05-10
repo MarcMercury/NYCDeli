@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
 import { updateCamperAction, deleteCamperAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
+import { resolveTentMateIds } from '@/lib/tent-mates'
 import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
 
 type Tab = { id: string; label: string }
@@ -1121,11 +1122,14 @@ export default function AdminPage() {
                             {user.camper?.shelter_type || '—'}
                           </td>
                           <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
-                            {user.camper?.sharing_tent_with
-                              ? (campers.find(c => c.id === user.camper?.sharing_tent_with)?.playa_name
-                                || campers.find(c => c.id === user.camper?.sharing_tent_with)?.full_name
-                                || '—')
-                              : '—'}
+                            {(() => {
+                              if (!user.camper) return '—'
+                              const mates = resolveTentMateIds(user.camper.id, campers)
+                                .map(id => campers.find(c => c.id === id))
+                                .filter((c): c is Camper => !!c)
+                              if (mates.length === 0) return '—'
+                              return mates.map(m => m.playa_name || m.full_name).join(', ')
+                            })()}
                           </td>
                           <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
                             {user.camper?.arrival_date || '—'}

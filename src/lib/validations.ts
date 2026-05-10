@@ -6,7 +6,11 @@ const invalidEmail = "That's not a real email address."
 const tooSmall = "That's suspiciously small. Measure again."
 const tooLarge = "That won't fit. Downsize or stay home."
 
-export const shelterTypes = ['tent', 'shiftpod', 'rv', 'other'] as const
+// Keep in sync with the `shelter_type` Postgres enum (migration 001) and
+// `ShelterType` in src/types/database.ts. Adding/removing entries here without
+// matching the DB enum will silently break admin updates that route through
+// adminCamperUpdateSchema.
+export const shelterTypes = ['tent', 'shiftpod', 'rv', 'vehicle', 'other'] as const
 export const arrivalMethods = ['car', 'bus', 'other'] as const
 export const powerTypes = ['none', 'low', 'medium', 'high'] as const
 export const orientationPreferences = ['north', 'south', 'east', 'west', 'any'] as const
