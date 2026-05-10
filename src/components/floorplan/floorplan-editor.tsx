@@ -213,11 +213,22 @@ export function FloorplanEditor() {
     heightFt: number,
     x: number,
     y: number,
+    meta?: {
+      entranceCount?: number | null
+      openingSide?: 'length' | 'width' | 'both' | null
+      tentMakeModel?: string | null
+    },
   ) {
     if (!config) return
     const template = getTemplateForType('tent')
     const color = template?.defaultColor ?? '#60a5fa'
-    const props = { ...(template?.defaultProperties ?? {}), reservable: true }
+    const props: FloorplanObjectRow['properties'] = {
+      ...(template?.defaultProperties ?? {}),
+      reservable: true,
+      ...(meta?.entranceCount != null ? { entrance_count: meta.entranceCount } : {}),
+      ...(meta?.openingSide ? { entrance_side: meta.openingSide } : {}),
+      ...(meta?.tentMakeModel ? { tent_make_model: meta.tentMakeModel } : {}),
+    }
 
     const newObj: FloorplanObjectRow = {
       id: generateId(),
@@ -265,7 +276,17 @@ export function FloorplanEditor() {
       setObjects(prev => prev.filter(o => o.id !== newObj.id))
       setSelectedObjectId(null)
       // Restore the pending tent if save failed
-      setPendingTents(prev => [...prev, { id: tentId, label, width: widthFt, height: heightFt, isRV: false, camperNames: [] }])
+      setPendingTents(prev => [...prev, {
+        id: tentId,
+        label,
+        width: widthFt,
+        height: heightFt,
+        isRV: false,
+        camperNames: [],
+        entranceCount: meta?.entranceCount ?? null,
+        openingSide: meta?.openingSide ?? null,
+        tentMakeModel: meta?.tentMakeModel ?? null,
+      }])
       setError(`Failed to save tent "${label}"`)
     }
   }

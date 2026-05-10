@@ -936,6 +936,12 @@ export interface FloorplanObjectProperties {
   pc_number?: string
   door_direction?: 'north' | 'south' | 'east' | 'west'
   opening_side?: 'north' | 'south' | 'east' | 'west'
+  /** Tent-only: number of entrance sides on the physical tent (1–4) */
+  entrance_count?: number
+  /** Tent-only: which physical side(s) of the tent have the main opening — copied from the camper's `tent_opening_side` */
+  entrance_side?: 'length' | 'width' | 'both'
+  /** Tent-only: free-text make/model copied from camper profile */
+  tent_make_model?: string
   road_name?: string
   needs_pumpout?: boolean
   has_generator?: boolean

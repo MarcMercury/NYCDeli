@@ -12,9 +12,13 @@ interface ObjectDetailProps {
   /** pixel height of the rendered object */
   height: number
   color: string
+  /** Tent-only: physical entrance count (1–4) */
+  entranceCount?: number | null
+  /** Tent-only: which physical side(s) of the tent has the door */
+  entranceSide?: 'length' | 'width' | 'both' | null
 }
 
-export function ObjectDetailSVG({ objectType, width, height, color: _color }: ObjectDetailProps) {
+export function ObjectDetailSVG({ objectType, width, height, color: _color, entranceCount, entranceSide }: ObjectDetailProps) {
   // Don't render detail below minimum size
   if (width < 16 || height < 16) return null
 
@@ -26,7 +30,7 @@ export function ObjectDetailSVG({ objectType, width, height, color: _color }: Ob
     case 'pc_container':
       return <ContainerDetail width={width} height={height} />
     case 'tent':
-      return <TentDetail width={width} height={height} />
+      return <TentDetail width={width} height={height} entranceCount={entranceCount ?? null} entranceSide={entranceSide ?? null} />
     case 'generator':
       return <GeneratorDetail width={width} height={height} />
     case 'porta_potty':
@@ -215,7 +219,48 @@ function ContainerDetail({ width, height }: { width: number; height: number }) {
 }
 
 /* ── Tent ──────────────────────────────────────────────────── */
-function TentDetail({ width, height }: { width: number; height: number }) {
+function TentDetail({
+  width,
+  height,
+  entranceCount,
+  entranceSide,
+}: {
+  width: number
+  height: number
+  entranceCount: number | null
+  entranceSide: 'length' | 'width' | 'both' | null
+}) {
+  // Determine which sides should have an entrance marker.
+  // The SVG horizontal axis is the floorplan "width" (short side when width<height)
+  // and the vertical axis is the "length" (long side). We treat the longer of
+  // (width,height) as the "length" side and the shorter as the "width" side.
+  const longIsVertical = height >= width
+  // longSides = the two sides perpendicular to the long axis (i.e. the two
+  // long edges). For a portrait tent (longIsVertical) those are left+right.
+  const longEdges = longIsVertical ? ['left', 'right'] : ['top', 'bottom']
+  const shortEdges = longIsVertical ? ['top', 'bottom'] : ['left', 'right']
+
+  const sides = new Set<'top' | 'bottom' | 'left' | 'right'>()
+  if (entranceSide === 'length') longEdges.forEach(s => sides.add(s as 'top' | 'bottom' | 'left' | 'right'))
+  else if (entranceSide === 'width') shortEdges.forEach(s => sides.add(s as 'top' | 'bottom' | 'left' | 'right'))
+  else if (entranceSide === 'both') {
+    longEdges.forEach(s => sides.add(s as 'top' | 'bottom' | 'left' | 'right'))
+    shortEdges.forEach(s => sides.add(s as 'top' | 'bottom' | 'left' | 'right'))
+  }
+
+  // Cap to entrance count if known: prefer long sides first, then short sides.
+  const ordered: ('top' | 'bottom' | 'left' | 'right')[] = []
+  for (const s of [...longEdges, ...shortEdges]) {
+    const k = s as 'top' | 'bottom' | 'left' | 'right'
+    if (sides.has(k)) ordered.push(k)
+  }
+  const cap = typeof entranceCount === 'number' && entranceCount > 0 ? entranceCount : ordered.length
+  const visible = new Set(ordered.slice(0, cap))
+
+  // Marker geometry — a short bar centered on each edge.
+  const barLong = Math.max(6, Math.min(width, height) * 0.3)
+  const barThick = Math.max(2, Math.min(width, height) * 0.08)
+
   return (
     <svg className="absolute inset-0 pointer-events-none" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       {/* Cross-brace / ridge lines showing tent shape */}
@@ -228,6 +273,19 @@ function TentDetail({ width, height }: { width: number; height: number }) {
       <circle cx={width - 3} cy={3} r={1.5} fill="rgba(0,0,0,0.2)" />
       <circle cx={3} cy={height - 3} r={1.5} fill="rgba(0,0,0,0.2)" />
       <circle cx={width - 3} cy={height - 3} r={1.5} fill="rgba(0,0,0,0.2)" />
+      {/* Entrance markers — bright bars centered on entrance edges */}
+      {visible.has('top') && (
+        <rect x={(width - barLong) / 2} y={0} width={barLong} height={barThick} fill="#facc15" stroke="rgba(0,0,0,0.6)" strokeWidth={0.6} />
+      )}
+      {visible.has('bottom') && (
+        <rect x={(width - barLong) / 2} y={height - barThick} width={barLong} height={barThick} fill="#facc15" stroke="rgba(0,0,0,0.6)" strokeWidth={0.6} />
+      )}
+      {visible.has('left') && (
+        <rect x={0} y={(height - barLong) / 2} width={barThick} height={barLong} fill="#facc15" stroke="rgba(0,0,0,0.6)" strokeWidth={0.6} />
+      )}
+      {visible.has('right') && (
+        <rect x={width - barThick} y={(height - barLong) / 2} width={barThick} height={barLong} fill="#facc15" stroke="rgba(0,0,0,0.6)" strokeWidth={0.6} />
+      )}
     </svg>
   )
 }

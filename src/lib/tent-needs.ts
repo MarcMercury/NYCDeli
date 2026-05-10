@@ -16,6 +16,12 @@ export interface TentNeed {
   isRV: boolean
   /** Names of campers this tent serves */
   camperNames: string[]
+  /** Number of physical entrance sides (1–4) — taken from the primary camper used for sizing */
+  entranceCount: number | null
+  /** Which physical side of the tent has the main opening — taken from the primary camper */
+  openingSide: 'length' | 'width' | 'both' | null
+  /** Tent make/model from the primary camper */
+  tentMakeModel: string | null
 }
 
 interface CamperRow {
@@ -26,6 +32,9 @@ interface CamperRow {
   shelter_length_ft: number | null
   sharing_tent_with: string | null
   sharing_tent_with_2: string | null
+  tent_entrance_count: number | null
+  tent_opening_side: 'length' | 'width' | 'both' | null
+  tent_make_model: string | null
 }
 
 const DEFAULT_TENT_W = 10
@@ -45,7 +54,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   const { data, error } = await supabase
     .from('campers')
     .select(
-      'id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2',
+      'id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, tent_entrance_count, tent_opening_side, tent_make_model',
     )
     .order('full_name')
 
@@ -105,14 +114,17 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
       // Pick the largest RV dims if any are recorded; otherwise default
       let w = 0
       let l = 0
+      let primary: CamperRow | null = null
       for (const m of members) {
         const mw = m.shelter_width_ft ?? 0
         const ml = m.shelter_length_ft ?? 0
         if (mw > 0 && ml > 0 && mw * ml > w * l) {
           w = mw
           l = ml
+          primary = m
         }
       }
+      if (!primary) primary = members[0] ?? null
       tents.push({
         id: newId(),
         label: `${names.join(' & ')} (RV)`,
@@ -120,6 +132,9 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
         height: l > 0 ? l : DEFAULT_RV_L,
         isRV: true,
         camperNames: names,
+        entranceCount: primary?.tent_entrance_count ?? null,
+        openingSide: primary?.tent_opening_side ?? null,
+        tentMakeModel: primary?.tent_make_model ?? null,
       })
       continue
     }
@@ -127,6 +142,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
     // Tent: largest dims among non-RV members
     let bestW = 0
     let bestL = 0
+    let primary: CamperRow | null = null
     for (const m of members) {
       if (m.shelter_type === 'rv' || m.shelter_type === 'vehicle') continue
       const w = m.shelter_width_ft ?? 0
@@ -134,11 +150,15 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
       if (w > 0 && l > 0 && w * l > bestW * bestL) {
         bestW = w
         bestL = l
+        primary = m
       }
     }
     if (bestW <= 0 || bestL <= 0) {
       bestW = DEFAULT_TENT_W
       bestL = DEFAULT_TENT_L
+    }
+    if (!primary) {
+      primary = members.find(m => m.shelter_type !== 'rv' && m.shelter_type !== 'vehicle') ?? members[0] ?? null
     }
 
     tents.push({
@@ -148,6 +168,9 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
       height: bestL,
       isRV: false,
       camperNames: names,
+      entranceCount: primary?.tent_entrance_count ?? null,
+      openingSide: primary?.tent_opening_side ?? null,
+      tentMakeModel: primary?.tent_make_model ?? null,
     })
   }
 

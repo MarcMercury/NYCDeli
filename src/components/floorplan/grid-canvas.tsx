@@ -30,7 +30,19 @@ interface GridCanvasProps {
   onMoveObject: (id: string, x: number, y: number) => void
   onResizeObject: (id: string, width: number, height: number) => void
   onDropNew: (objectType: string, x: number, y: number) => void
-  onDropPendingTent?: (tentId: string, label: string, widthFt: number, heightFt: number, x: number, y: number) => void
+  onDropPendingTent?: (
+    tentId: string,
+    label: string,
+    widthFt: number,
+    heightFt: number,
+    x: number,
+    y: number,
+    meta?: {
+      entranceCount?: number | null
+      openingSide?: 'length' | 'width' | 'both' | null
+      tentMakeModel?: string | null
+    },
+  ) => void
   showGrid: boolean
   showLabels: boolean
   utilityLines: UtilityLineRow[]
@@ -194,7 +206,11 @@ export function GridCanvas({
       } else if (data.type === 'pending-tent' && onDropPendingTent) {
         const x = snapToGrid(toFeetX(e.clientX))
         const y = snapToGrid(toFeetY(e.clientY))
-        onDropPendingTent(data.tentId, data.label, data.width, data.height, x, y)
+        onDropPendingTent(data.tentId, data.label, data.width, data.height, x, y, {
+          entranceCount: data.entranceCount ?? null,
+          openingSide: data.openingSide ?? null,
+          tentMakeModel: data.tentMakeModel ?? null,
+        })
       }
     } catch (err) {
       console.error('[GridCanvas] Drop failed:', err)
@@ -447,6 +463,8 @@ export function GridCanvas({
               width={obj.width_ft * scale}
               height={obj.height_ft * scale}
               color={obj.color}
+              entranceCount={obj.properties?.entrance_count ?? null}
+              entranceSide={obj.properties?.entrance_side ?? null}
             />
 
             {/* Distance marker rendering */}

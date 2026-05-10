@@ -281,18 +281,43 @@ export function PropertiesPanel({
             <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 text-gray-500">
               Tent Opening
             </p>
-            <Select
-              label="Opening Side"
-              value={selectedObject.properties?.opening_side || ''}
-              onChange={e => updateProp('opening_side', e.target.value || undefined)}
-              options={[
-                { value: '', label: 'Not set' },
-                { value: 'north', label: '▲ North' },
-                { value: 'south', label: '▼ South' },
-                { value: 'east', label: '▶ East' },
-                { value: 'west', label: '◀ West' },
-              ]}
-            />
+            <div className="space-y-2">
+              <Select
+                label="Tent Entrances"
+                value={selectedObject.properties?.entrance_count != null ? String(selectedObject.properties.entrance_count) : ''}
+                onChange={e => updateProp('entrance_count', e.target.value ? parseInt(e.target.value) : undefined)}
+                options={[
+                  { value: '', label: 'Not set' },
+                  { value: '1', label: '1 Side' },
+                  { value: '2', label: '2 Side' },
+                  { value: '3', label: '3 Side' },
+                  { value: '4', label: '4 Side' },
+                ]}
+              />
+              <Select
+                label="Entrance Orientation"
+                value={selectedObject.properties?.entrance_side || ''}
+                onChange={e => updateProp('entrance_side', e.target.value || undefined)}
+                options={[
+                  { value: '', label: 'Not set' },
+                  { value: 'width', label: 'Short Side' },
+                  { value: 'length', label: 'Long Side' },
+                  { value: 'both', label: 'Short and Long Sides' },
+                ]}
+              />
+              <Select
+                label="Compass Facing (in camp)"
+                value={selectedObject.properties?.opening_side || ''}
+                onChange={e => updateProp('opening_side', e.target.value || undefined)}
+                options={[
+                  { value: '', label: 'Not set' },
+                  { value: 'north', label: '▲ North' },
+                  { value: 'south', label: '▼ South' },
+                  { value: 'east', label: '▶ East' },
+                  { value: 'west', label: '◀ West' },
+                ]}
+              />
+            </div>
           </div>
         )}
 

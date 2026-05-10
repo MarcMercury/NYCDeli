@@ -22,6 +22,9 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
         label: tent.label,
         width: tent.width,
         height: tent.height,
+        entranceCount: tent.entranceCount,
+        openingSide: tent.openingSide,
+        tentMakeModel: tent.tentMakeModel,
       }),
     )
     e.dataTransfer.effectAllowed = 'copy'
@@ -64,7 +67,7 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
                     draggable
                     onDragStart={e => handleDragStart(e, tent)}
                     className="flex items-center gap-2 p-2 border-2 border-gray-300 bg-white cursor-grab hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:cursor-grabbing transition-all select-none"
-                    title={`${tent.label} — ${tent.width}×${tent.height}${tent.isRV ? ' (RV)' : ''}`}
+                    title={`${tent.label} — ${tent.width}×${tent.height}${tent.isRV ? ' (RV)' : ''}${tent.entranceCount ? ` · ${tent.entranceCount}-side entrance` : ''}${tent.openingSide ? ` · ${tent.openingSide === 'length' ? 'long' : tent.openingSide === 'width' ? 'short' : 'short+long'} side` : ''}${tent.tentMakeModel ? ` · ${tent.tentMakeModel}` : ''}`}
                   >
                     <span className="text-base">{tent.isRV ? '🚐' : '⛺'}</span>
                     <div className="flex-1 min-w-0">
@@ -73,6 +76,8 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
                       </div>
                       <div className="text-[9px] text-gray-500 font-bold">
                         W {tent.width} × L {tent.height} ft
+                        {tent.entranceCount ? ` · ${tent.entranceCount}-side` : ''}
+                        {tent.openingSide ? ` · ${tent.openingSide === 'length' ? 'long' : tent.openingSide === 'width' ? 'short' : 'short+long'}` : ''}
                       </div>
                     </div>
                     <button
