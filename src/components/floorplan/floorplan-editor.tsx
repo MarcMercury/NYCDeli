@@ -23,6 +23,8 @@ import { ObjectPalette } from './object-palette'
 import { PropertiesPanel } from './properties-panel'
 import { ValidationPanel } from './validation-panel'
 import { TentSizeSummary } from './tent-size-summary'
+import { PendingTentsPalette } from './pending-tents-palette'
+import { computeTentNeeds, type TentNeed } from '@/lib/tent-needs'
 import { getTemplateForType, type ObjectTemplate } from './object-templates'
 
 export function FloorplanEditor() {
@@ -33,6 +35,8 @@ export function FloorplanEditor() {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [generatingTents, setGeneratingTents] = useState(false)
+  const [pendingTents, setPendingTents] = useState<TentNeed[]>([])
   const [error, setError] = useState<string | null>(null)
 
   // Editor state
@@ -183,6 +187,86 @@ export function FloorplanEditor() {
       setError('Failed to sync spots — check console for details')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  // Generate one pending tent object per camper / sharing group
+  async function handleGenerateTents() {
+    setGeneratingTents(true)
+    setError(null)
+    try {
+      const needs = await computeTentNeeds()
+      setPendingTents(needs)
+    } catch (err) {
+      console.error('Generate tents failed:', err)
+      setError('Failed to generate tents — check console for details')
+    } finally {
+      setGeneratingTents(false)
+    }
+  }
+
+  // Drop a pending tent onto the canvas → create a real tent floorplan object
+  async function handleDropPendingTent(
+    tentId: string,
+    label: string,
+    widthFt: number,
+    heightFt: number,
+    x: number,
+    y: number,
+  ) {
+    if (!config) return
+    const template = getTemplateForType('tent')
+    const color = template?.defaultColor ?? '#60a5fa'
+    const props = { ...(template?.defaultProperties ?? {}), reservable: true }
+
+    const newObj: FloorplanObjectRow = {
+      id: generateId(),
+      floorplan_id: config.id,
+      object_type: 'tent',
+      label,
+      x,
+      y,
+      width_ft: widthFt,
+      height_ft: heightFt,
+      rotation: 0,
+      color,
+      z_index: objects.length,
+      is_locked: false,
+      parent_id: null,
+      properties: props as FloorplanObjectRow['properties'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // Optimistic add + remove from pending list
+    setObjects(prev => [...prev, newObj])
+    setSelectedObjectId(newObj.id)
+    setPendingTents(prev => prev.filter(t => t.id !== tentId))
+    setHasUnsavedChanges(true)
+
+    const saved = await createFloorplanObject({
+      floorplan_id: config.id,
+      object_type: 'tent',
+      label,
+      x,
+      y,
+      width_ft: widthFt,
+      height_ft: heightFt,
+      color,
+      z_index: objects.length,
+      properties: props as FloorplanObjectRow['properties'],
+    })
+
+    if (saved) {
+      setObjects(prev => prev.map(o => (o.id === newObj.id ? saved : o)))
+      setSelectedObjectId(saved.id)
+      setHasUnsavedChanges(false)
+    } else {
+      setObjects(prev => prev.filter(o => o.id !== newObj.id))
+      setSelectedObjectId(null)
+      // Restore the pending tent if save failed
+      setPendingTents(prev => [...prev, { id: tentId, label, width: widthFt, height: heightFt, isRV: false, camperNames: [] }])
+      setError(`Failed to save tent "${label}"`)
     }
   }
 
@@ -553,6 +637,15 @@ export function FloorplanEditor() {
             )}
             <Button
               variant="secondary"
+              onClick={handleGenerateTents}
+              loading={generatingTents}
+              disabled={generatingTents}
+              title="Create one draggable tent per camper / sharing group"
+            >
+              ⛺ Generate Tents
+            </Button>
+            <Button
+              variant="secondary"
               onClick={handleSyncSpots}
               loading={syncing}
               disabled={syncing}
@@ -579,6 +672,12 @@ export function FloorplanEditor() {
           {/* LEFT: Object Palette */}
           <div className="xl:max-h-[calc(100vh-200px)] xl:overflow-y-auto space-y-4">
             <ObjectPalette onDragStart={handlePaletteDragStart} />
+
+            <PendingTentsPalette
+              tents={pendingTents}
+              onRemove={(id) => setPendingTents(prev => prev.filter(t => t.id !== id))}
+              onClear={() => setPendingTents([])}
+            />
 
             {/* Utility Lines */}
             <Card>
@@ -950,6 +1049,7 @@ export function FloorplanEditor() {
                     onMoveObject={handleMoveObject}
                     onResizeObject={handleResizeObject}
                     onDropNew={handleDropNew}
+                    onDropPendingTent={handleDropPendingTent}
                     showGrid={showGrid}
                     showLabels={showLabels}
                     utilityLines={utilityLines}
