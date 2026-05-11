@@ -506,7 +506,13 @@ export default function MeetingAgendasTab() {
     primary_goal: string | null
   }) => {
     if (!activeMeeting) return
-    await updateBuildMeeting(activeMeeting.id, updates)
+    try {
+      await updateBuildMeeting(activeMeeting.id, updates)
+    } catch (err) {
+      console.error('[meeting-agendas] updateBuildMeeting failed', err)
+      alert(`Failed to save meeting header: ${err instanceof Error ? err.message : String(err)}`)
+      throw err
+    }
     setMeetings(prev => prev.map(m => (m.id === activeMeeting.id ? { ...m, ...updates } : m)))
     setEditingMeetingHeader(false)
   }
@@ -519,10 +525,17 @@ export default function MeetingAgendasTab() {
     resource_links: BuildMeetingResourceLink[]
   }) => {
     if (!activeMeeting) return
-    const created = await createBuildMeetingSection({
-      meeting_id: activeMeeting.id,
-      ...data,
-    })
+    let created: BuildMeetingSection
+    try {
+      created = await createBuildMeetingSection({
+        meeting_id: activeMeeting.id,
+        ...data,
+      })
+    } catch (err) {
+      console.error('[meeting-agendas] createBuildMeetingSection failed', err)
+      alert(`Failed to add section: ${err instanceof Error ? err.message : String(err)}`)
+      throw err
+    }
     setSections(prev => [...prev, created])
     setAddingSection(false)
   }
@@ -537,8 +550,38 @@ export default function MeetingAgendasTab() {
       resource_links: BuildMeetingResourceLink[]
     }
   ) => {
-    await updateBuildMeetingSection(sectionId, data)
-    setSections(prev => prev.map(s => (s.id === sectionId ? { ...s, ...data } : s)))
+    try {
+      await updateBuildMeetingSection(sectionId, data)
+    } catch (err) {
+      console.error('[meeting-agendas] updateBuildMeetingSection failed', err)
+      alert(`Failed to save section: ${err instanceof Error ? err.message : String(err)}`)
+      throw err
+    }
+
+    // Verify the row was actually mutated server-side (RLS can silently update 0 rows)
+    try {
+      const fresh = await fetchBuildMeetingSections(activeMeeting!.id)
+      const updated = fresh.find(s => s.id === sectionId)
+      if (updated) {
+        const persisted =
+          updated.title === data.title &&
+          updated.body_md === data.body_md &&
+          updated.number === data.number &&
+          updated.kind === data.kind
+        if (!persisted) {
+          alert(
+            'Save did not persist. This usually means you do not have write permission ' +
+              '(admin or builder role required). Check your role and try again.'
+          )
+          setSections(fresh)
+          return
+        }
+      }
+      setSections(fresh)
+    } catch {
+      // If verification fetch fails, fall back to optimistic local update
+      setSections(prev => prev.map(s => (s.id === sectionId ? { ...s, ...data } : s)))
+    }
     setEditingSectionId(null)
   }
 
@@ -591,6 +634,16 @@ export default function MeetingAgendasTab() {
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Admin</span>
           <button
             onClick={() => {
+              // If a form is open with possibly-unsaved edits, warn before discarding.
+              const hasOpenForm =
+                editMode &&
+                (editingMeetingHeader || editingSectionId !== null || addingSection)
+              if (hasOpenForm) {
+                const ok = confirm(
+                  'You have an open edit form. Click "Save" inside that form first or your changes will be lost.\n\nDiscard changes and exit edit mode?'
+                )
+                if (!ok) return
+              }
               setEditMode(v => !v)
               setEditingMeetingHeader(false)
               setEditingSectionId(null)
