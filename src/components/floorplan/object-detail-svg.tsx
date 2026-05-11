@@ -261,6 +261,13 @@ function TentDetail({
   const barLong = Math.max(6, Math.min(width, height) * 0.3)
   const barThick = Math.max(2, Math.min(width, height) * 0.08)
 
+  // When there are 1 or 2 visible openings, also draw directional arrows
+  // pointing outward from the tent to make orientation obvious.
+  const showArrows = visible.size > 0 && visible.size <= 2
+  const arrowLen = Math.max(6, Math.min(width, height) * 0.28)
+  const arrowHalf = Math.max(3, Math.min(width, height) * 0.16)
+  const arrowInset = barThick + 1 // sit just inside the entrance bar
+
   return (
     <svg className="absolute inset-0 pointer-events-none" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       {/* Cross-brace / ridge lines showing tent shape */}
@@ -285,6 +292,44 @@ function TentDetail({
       )}
       {visible.has('right') && (
         <rect x={width - barThick} y={(height - barLong) / 2} width={barThick} height={barLong} fill="#facc15" stroke="rgba(0,0,0,0.6)" strokeWidth={0.6} />
+      )}
+      {/* Orientation arrows — pointing outward from the tent on the entrance edge(s).
+          Only rendered for 1- or 2-sided openings so the door direction is unambiguous. */}
+      {showArrows && visible.has('top') && (
+        <polygon
+          points={`${width / 2 - arrowHalf},${arrowInset + arrowLen} ${width / 2 + arrowHalf},${arrowInset + arrowLen} ${width / 2},${arrowInset}`}
+          fill="#dc2626"
+          stroke="rgba(0,0,0,0.7)"
+          strokeWidth={0.6}
+          strokeLinejoin="round"
+        />
+      )}
+      {showArrows && visible.has('bottom') && (
+        <polygon
+          points={`${width / 2 - arrowHalf},${height - arrowInset - arrowLen} ${width / 2 + arrowHalf},${height - arrowInset - arrowLen} ${width / 2},${height - arrowInset}`}
+          fill="#dc2626"
+          stroke="rgba(0,0,0,0.7)"
+          strokeWidth={0.6}
+          strokeLinejoin="round"
+        />
+      )}
+      {showArrows && visible.has('left') && (
+        <polygon
+          points={`${arrowInset + arrowLen},${height / 2 - arrowHalf} ${arrowInset + arrowLen},${height / 2 + arrowHalf} ${arrowInset},${height / 2}`}
+          fill="#dc2626"
+          stroke="rgba(0,0,0,0.7)"
+          strokeWidth={0.6}
+          strokeLinejoin="round"
+        />
+      )}
+      {showArrows && visible.has('right') && (
+        <polygon
+          points={`${width - arrowInset - arrowLen},${height / 2 - arrowHalf} ${width - arrowInset - arrowLen},${height / 2 + arrowHalf} ${width - arrowInset},${height / 2}`}
+          fill="#dc2626"
+          stroke="rgba(0,0,0,0.7)"
+          strokeWidth={0.6}
+          strokeLinejoin="round"
+        />
       )}
     </svg>
   )

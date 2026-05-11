@@ -225,6 +225,9 @@ export function FloorplanEditor() {
     const props: FloorplanObjectRow['properties'] = {
       ...(template?.defaultProperties ?? {}),
       reservable: true,
+      // Generated tents default to A-frame roof and 6ft elevation
+      roof_shape: 'a_frame',
+      elevation_ft: 6,
       ...(meta?.entranceCount != null ? { entrance_count: meta.entranceCount } : {}),
       ...(meta?.openingSide ? { entrance_side: meta.openingSide } : {}),
       ...(meta?.tentMakeModel ? { tent_make_model: meta.tentMakeModel } : {}),
