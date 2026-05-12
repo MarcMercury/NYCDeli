@@ -324,7 +324,12 @@ export default function ProfilePage() {
     setUploading(true)
     try {
       const supabase = createClient()
-      const nextOrder = photos.length + 1
+      const usedOrders = new Set(photos.map(p => p.display_order))
+      const nextOrder = [1, 2, 3].find(n => !usedOrders.has(n))
+      if (!nextOrder) {
+        setMessage({ type: 'error', text: 'You already have 3 photos. Delete one first.' })
+        return
+      }
 
       const fileExt = file.name.split('.').pop()
       const fileName = `${profile.id}/${nextOrder}.${fileExt}`
