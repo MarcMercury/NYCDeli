@@ -46,7 +46,9 @@ export default function CampersPage() {
       .order('display_order') as unknown as { data: CamperPhotoRow[] | null }
 
     const campersByEmail = new Map<string, CamperRow>()
-    campers?.forEach(c => campersByEmail.set(c.email, c))
+    campers?.forEach(c => {
+      if (c.email) campersByEmail.set(c.email.trim().toLowerCase(), c)
+    })
 
     const campersById_ = new Map<string, CamperRow>()
     campers?.forEach(c => campersById_.set(c.id, c))
@@ -61,7 +63,7 @@ export default function CampersPage() {
 
     const entries: CamperDirectory[] = (profiles || []).map(p => ({
       profile: p,
-      camper: campersByEmail.get(p.email) || null,
+      camper: campersByEmail.get((p.email || '').trim().toLowerCase()) || null,
       photos: photosByUser.get(p.id) || [],
     }))
 
