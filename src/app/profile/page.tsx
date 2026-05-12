@@ -332,7 +332,7 @@ export default function ProfilePage() {
       }
 
       const fileExt = file.name.split('.').pop()
-      const fileName = `${profile.id}/${nextOrder}.${fileExt}`
+      const fileName = `${profile.id}/${nextOrder}-${Date.now()}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('camper-photos')
