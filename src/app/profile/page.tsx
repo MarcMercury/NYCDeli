@@ -104,7 +104,7 @@ export default function ProfilePage() {
           if (camperData) {
             await supabase
               .from('user_profiles')
-              .update({ camper_id: camperData.id })
+              .update({ camper_id: camperData.id } as never)
               .eq('id', user.id)
           }
         }
