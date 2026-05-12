@@ -89,13 +89,25 @@ export default function ProfilePage() {
           .single() as unknown as { data: CamperRow | null }
         camperData = result.data
       } else {
-        // Try matching by email
-        const result = await supabase
-          .from('campers')
-          .select('*')
-          .eq('email', profileResult.data.email)
-          .single() as unknown as { data: CamperRow | null }
-        camperData = result.data || null
+        // Fallback: case-insensitive email match (auth emails are lowercased,
+        // but imported camper rows may have mixed case).
+        const normalizedEmail = (profileResult.data.email || '').trim()
+        if (normalizedEmail) {
+          const result = await supabase
+            .from('campers')
+            .select('*')
+            .ilike('email', normalizedEmail)
+            .limit(1) as unknown as { data: CamperRow[] | null }
+          camperData = result.data?.[0] || null
+
+          // Persist the link so subsequent loads are fast and reliable
+          if (camperData) {
+            await supabase
+              .from('user_profiles')
+              .update({ camper_id: camperData.id })
+              .eq('id', user.id)
+          }
+        }
       }
       setCamper(camperData)
       if (camperData) {
@@ -442,7 +454,7 @@ export default function ProfilePage() {
                 variant="secondary"
                 className="bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300"
               >
-                {bioGenerating ? '⏳ Writing...' : '✨ AI Write My Bio'}
+                {bioGenerating ? '⏳ Writing...' : '✨ Write it for me'}
               </Button>
             )}
           </CardFooter>
