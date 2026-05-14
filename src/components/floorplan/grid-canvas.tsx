@@ -515,19 +515,52 @@ export function GridCanvas({
               </div>
             )}
 
-            {/* Shade structure corner poles — clickable to select the shade */}
-            {obj.object_type === 'shade_structure' && (
-              <>
-                {[['top-0 left-0', '-top-1 -left-1'], ['top-0 right-0', '-top-1 -right-1'], ['bottom-0 left-0', '-bottom-1 -left-1'], ['bottom-0 right-0', '-bottom-1 -right-1']].map(([pos, _offset], i) => (
-                  <div
-                    key={i}
-                    className={cn('absolute bg-gray-700 border-2 border-gray-900 rounded-full cursor-move z-10', pos)}
-                    style={{ width: Math.max(1.5 * scale, 8), height: Math.max(1.5 * scale, 8), pointerEvents: 'auto' }}
-                    onPointerDown={e => handleObjectPointerDown(e, obj)}
-                  />
-                ))}
-              </>
-            )}
+            {/* Shade structure support posts — corners + every 10 ft along the perimeter */}
+            {obj.object_type === 'shade_structure' && (() => {
+              const POST_SPACING = 10 // feet
+              const postSize = Math.max(1.5 * scale, 8)
+              const w = obj.width_ft
+              const h = obj.height_ft
+              // Build edge stops: always include 0 and length; intermediate every POST_SPACING ft.
+              const stops = (len: number) => {
+                const arr: number[] = [0]
+                for (let v = POST_SPACING; v < len - 0.001; v += POST_SPACING) arr.push(v)
+                arr.push(len)
+                return arr
+              }
+              const xs = stops(w)
+              const ys = stops(h)
+              // Collect unique perimeter points
+              const seen = new Set<string>()
+              const points: Array<{ x: number; y: number }> = []
+              const push = (x: number, y: number) => {
+                const k = `${x.toFixed(3)}_${y.toFixed(3)}`
+                if (seen.has(k)) return
+                seen.add(k)
+                points.push({ x, y })
+              }
+              xs.forEach(x => { push(x, 0); push(x, h) })
+              ys.forEach(y => { push(0, y); push(w, y) })
+              return (
+                <>
+                  {points.map((p, i) => (
+                    <div
+                      key={i}
+                      className="absolute bg-gray-700 border-2 border-gray-900 rounded-full cursor-move z-10"
+                      style={{
+                        width: postSize,
+                        height: postSize,
+                        left: p.x * scale,
+                        top: p.y * scale,
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'auto',
+                      }}
+                      onPointerDown={e => handleObjectPointerDown(e, obj)}
+                    />
+                  ))}
+                </>
+              )
+            })()}
 
             {/* Label */}
             {showLabels && (exporting || obj.width_ft * scale > 24) && !isDistanceMarker && (
