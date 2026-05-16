@@ -433,7 +433,9 @@ export function GridCanvas({
         const isDashed = DASHED_BORDER_TYPES.has(obj.object_type)
         const isDistanceMarker = obj.object_type === 'distance_marker'
         const isShade = obj.object_type === 'shade_structure' || obj.object_type === 'shade_sail'
-        const isShadeBackground = isShade && !isSelected
+        // Only shade_structures act as background (they have clickable perimeter posts);
+        // shade_sails have no posts, so the body must remain clickable.
+        const isShadeBackground = obj.object_type === 'shade_structure' && !isSelected
 
         return (
           <div
