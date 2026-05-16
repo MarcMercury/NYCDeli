@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Html, ContactShadows, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import type { FloorplanConfigRow, FloorplanObjectRow, CampSpotWithReservation, CamperRow, RoofShape } from '@/types/database'
+import { computeShadePosts, type ShadePost } from '@/lib/shade-posts'
 
 // ─── Color Helpers ─────────────────────────────────────────────
 function hexToThreeColor(hex: string): THREE.Color {
@@ -971,6 +972,7 @@ function ProceduralObject({
   heightM,
   color,
   roofShape,
+  shadePosts,
 }: {
   obj: FloorplanObjectRow
   widthM: number
@@ -978,6 +980,7 @@ function ProceduralObject({
   heightM: number
   color: string
   roofShape: RoofShape
+  shadePosts?: ShadePost[]
 }) {
   const threeColor = hexToThreeColor(color)
   const darkerColor = threeColor.clone().multiplyScalar(0.7)
@@ -1036,16 +1039,82 @@ function ProceduralObject({
       return <ArtCar3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
   }
 
-  // Shade structures: open canopy with 4 corner poles (no solid box body)
+  // Shade structures: open canopy with perimeter poles every 10 ft.
+  // Shared posts (used by an adjacent shade_structure) collapse to one — the
+  // non-owner skips rendering them.
   if (obj.object_type === 'shade_structure') {
     const postRadius = 0.04
+    const SPACING_FT = 10
+    const stops = (lenM: number) => {
+      // Convert spacing back to meters for evenly distributed local positions.
+      // We work in normalized 0..1 ratios so we don't need feetToMeters here.
+      const lenFt = obj.width_ft // placeholder, overridden below per axis
+      void lenFt
+      // Build stops in meters: 0, spacing, 2*spacing, ..., lenM
+      const arr: number[] = [0]
+      // 10ft in meters = obj.width_ft? Use ratio: spacingM = (SPACING / widthFt) * widthM
+      return arr
+    }
+    void stops // intentionally unused — we compute stops inline below to keep ratios correct.
+
+    // Compute local-meter stops along each axis from the FT-based spacing.
+    const axisStops = (lenFt: number, lenM: number) => {
+      const arr: number[] = [0]
+      for (let v = SPACING_FT; v < lenFt - 0.001; v += SPACING_FT) {
+        arr.push((v / lenFt) * lenM)
+      }
+      arr.push(lenM)
+      return arr
+    }
+    const xs = axisStops(obj.width_ft, widthM)
+    const zs = axisStops(obj.height_ft, depthM)
+
+    // Build unique perimeter point set in local meters (top-left origin),
+    // then convert to centered coordinates for three.js.
+    const seen = new Set<string>()
+    const pts: Array<{ x: number; z: number; shared: boolean }> = []
+    const sharedKeys = new Set<string>()
+    const ownedKeys = new Set<string>()
+    if (shadePosts) {
+      for (const p of shadePosts) {
+        const k = `${p.xLocal.toFixed(2)}_${p.yLocal.toFixed(2)}`
+        if (p.shared) sharedKeys.add(k)
+        if (p.owned) ownedKeys.add(k)
+      }
+    }
+    const push = (lxFt: number, lyFt: number, xM: number, zM: number) => {
+      const key = `${lxFt.toFixed(2)}_${lyFt.toFixed(2)}`
+      if (seen.has(key)) return
+      seen.add(key)
+      const shared = sharedKeys.has(key)
+      // Skip rendering posts owned by a different shade structure.
+      if (shadePosts && shared && !ownedKeys.has(key)) return
+      pts.push({ x: xM - widthM / 2, z: zM - depthM / 2, shared })
+    }
+    // x-edges: top (y=0) and bottom (y=height)
+    xs.forEach((xM, i) => {
+      const xFt = i === xs.length - 1 ? obj.width_ft : i * SPACING_FT
+      push(xFt, 0, xM, 0)
+      push(xFt, obj.height_ft, xM, depthM)
+    })
+    // z-edges: left (x=0) and right (x=width)
+    zs.forEach((zM, j) => {
+      const yFt = j === zs.length - 1 ? obj.height_ft : j * SPACING_FT
+      push(0, yFt, 0, zM)
+      push(obj.width_ft, yFt, widthM, zM)
+    })
+
     return (
       <group>
-        {/* 4 corner poles */}
-        {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-          <mesh key={i} castShadow position={[sx * widthM * 0.47, heightM / 2, sz * depthM * 0.47]}>
+        {/* Perimeter poles */}
+        {pts.map((p, i) => (
+          <mesh key={i} castShadow position={[p.x, heightM / 2, p.z]}>
             <cylinderGeometry args={[postRadius, postRadius, heightM, 8]} />
-            <meshStandardMaterial color="#555555" metalness={0.9} roughness={0.2} />
+            <meshStandardMaterial
+              color={p.shared ? '#d97706' : '#555555'}
+              metalness={0.9}
+              roughness={0.2}
+            />
           </mesh>
         ))}
         {/* Thin translucent canopy on top */}

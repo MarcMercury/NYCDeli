@@ -108,7 +108,6 @@ export const fieldHelp = {
   orientationPreference: "Which way do you want your door to face? 'Any' is fine.",
   powerRequired: "Do you need electrical power? Be honest.",
   powerType: "Low = phone charger. Medium = CPAP. High = you better explain yourself.",
-  shadeRequired: "Do you need to be under shade? Depends on your shelter.",
   specialRequests: "Keep it reasonable. We're not a resort.",
   kitchenParticipation: "Everyone helps. This isn't optional. The question is how.",
   preferredShifts: "When do you want to work? We'll try to accommodate. Try.",

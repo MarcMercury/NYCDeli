@@ -9,6 +9,7 @@ import { fetchSpotsWithReservations, reserveSpot, releaseReservation, doesTentFi
 import { createClient } from '@/lib/supabase/client'
 import { getTemplateForType } from '@/components/floorplan/object-templates'
 import { ObjectDetailSVG } from '@/components/floorplan/object-detail-svg'
+import { computeShadePosts } from '@/lib/shade-posts'
 
 // Lazy-load the heavy Three.js 3D component
 const CampMap3D = lazy(() => import('@/components/camp-map-3d').then(m => ({ default: m.CampMap3D })))
@@ -481,6 +482,7 @@ export function CampMap() {
 
   // Sorted objects by z-index — all always visible
   const visibleObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
+  const shadePostsByObj = computeShadePosts(objects)
 
   // My reservation (supports tent sharing — find the spot where I'm one of the campers)
   const myReservation = camper ? spots.find(s => s.reservations.some(r => r.camper_id === camper.id)) : undefined
@@ -827,15 +829,37 @@ export function CampMap() {
                         color={obj.color}
                       />
 
-                      {/* Shade structure corner posts + open interior */}
-                      {obj.object_type === 'shade_structure' && (
-                        <>
-                          <div className="absolute top-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                          <div className="absolute top-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                          <div className="absolute bottom-0 left-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                          <div className="absolute bottom-0 right-0 bg-gray-700 border border-gray-900 rounded-full" style={{ width: Math.max(1 * scale, 4), height: Math.max(1 * scale, 4) }} />
-                        </>
-                      )}
+                      {/* Shade structure support posts — corners + every 10 ft along the perimeter.
+                          Shared posts (between adjacent shade structures) render once with an
+                          amber outline; the non-owner skips rendering. */}
+                      {obj.object_type === 'shade_structure' && (() => {
+                        const posts = shadePostsByObj.get(obj.id) ?? []
+                        const sz = Math.max(1 * scale, 4)
+                        return (
+                          <>
+                            {posts.map((p, i) => {
+                              if (p.shared && !p.owned) return null
+                              return (
+                                <div
+                                  key={i}
+                                  title={p.shared ? 'Shared post (used by adjacent shade structure)' : undefined}
+                                  className={cn(
+                                    'absolute rounded-full border',
+                                    p.shared ? 'bg-amber-400 border-amber-700' : 'bg-gray-700 border-gray-900',
+                                  )}
+                                  style={{
+                                    width: sz,
+                                    height: sz,
+                                    left: p.xLocal * scale,
+                                    top: p.yLocal * scale,
+                                    transform: 'translate(-50%, -50%)',
+                                  }}
+                                />
+                              )
+                            })}
+                          </>
+                        )
+                      })()}
 
                       {/* Labels */}
                       {showLabels && objWidthPx > 20 && (

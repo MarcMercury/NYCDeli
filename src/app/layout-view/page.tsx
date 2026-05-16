@@ -271,12 +271,6 @@ export default function LayoutPage() {
                         {selectedCamper.power_required ? selectedCamper.power_type : 'None'}
                       </Badge>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Shade:</span>
-                      <Badge variant={selectedCamper.shade_required ? 'info' : 'default'}>
-                        {selectedCamper.shade_required ? 'Yes' : 'No'}
-                      </Badge>
-                    </div>
                   </div>
                 </CardContent>
               </Card>

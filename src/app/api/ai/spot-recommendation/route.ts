@@ -66,7 +66,6 @@ export async function POST(request: NextRequest) {
   const userPrompt = `Camper: ${c.full_name}
 Shelter: ${c.shelter_type} (${c.shelter_width_ft}W × ${c.shelter_length_ft}L ft)
 Power Needs: ${c.power_type} (required: ${c.power_required || 'No'})
-Shade Required: ${c.shade_required || 'No'}
 
 Available spots:
 ${JSON.stringify(spotSummaries, null, 1)}

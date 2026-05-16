@@ -6,6 +6,7 @@ import type { FloorplanObjectRow, UtilityLineRow, UtilityLineType, UtilityLinePo
 import { getTemplateForType } from './object-templates'
 import { computeSafetyZones } from './validation-engine'
 import { ObjectDetailSVG } from './object-detail-svg'
+import { computeShadePosts } from '@/lib/shade-posts'
 
 export type DrawingMode = null | 'power' | 'water'
 
@@ -274,6 +275,8 @@ export function GridCanvas({
 
   // Sort by z_index for rendering order
   const sortedObjects = [...objects].sort((a, b) => a.z_index - b.z_index)
+  // Posts on overlapping shade structures collapse to a single shared post.
+  const shadePostsByObj = computeShadePosts(objects)
 
   const hasBorderLabels = borderLabels && (borderLabels.north || borderLabels.south || borderLabels.east || borderLabels.west)
 
@@ -515,49 +518,38 @@ export function GridCanvas({
               </div>
             )}
 
-            {/* Shade structure support posts — corners + every 10 ft along the perimeter */}
+            {/* Shade structure support posts — corners + every 10 ft along the perimeter.
+                Posts shared with another adjacent shade_structure are rendered once
+                (by the owning structure) and styled distinctly. */}
             {obj.object_type === 'shade_structure' && (() => {
-              const POST_SPACING = 10 // feet
+              const posts = shadePostsByObj.get(obj.id) ?? []
               const postSize = Math.max(1.5 * scale, 8)
-              const w = obj.width_ft
-              const h = obj.height_ft
-              // Build edge stops: always include 0 and length; intermediate every POST_SPACING ft.
-              const stops = (len: number) => {
-                const arr: number[] = [0]
-                for (let v = POST_SPACING; v < len - 0.001; v += POST_SPACING) arr.push(v)
-                arr.push(len)
-                return arr
-              }
-              const xs = stops(w)
-              const ys = stops(h)
-              // Collect unique perimeter points
-              const seen = new Set<string>()
-              const points: Array<{ x: number; y: number }> = []
-              const push = (x: number, y: number) => {
-                const k = `${x.toFixed(3)}_${y.toFixed(3)}`
-                if (seen.has(k)) return
-                seen.add(k)
-                points.push({ x, y })
-              }
-              xs.forEach(x => { push(x, 0); push(x, h) })
-              ys.forEach(y => { push(0, y); push(w, y) })
               return (
                 <>
-                  {points.map((p, i) => (
-                    <div
-                      key={i}
-                      className="absolute bg-gray-700 border-2 border-gray-900 rounded-full cursor-move z-10"
-                      style={{
-                        width: postSize,
-                        height: postSize,
-                        left: p.x * scale,
-                        top: p.y * scale,
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'auto',
-                      }}
-                      onPointerDown={e => handleObjectPointerDown(e, obj)}
-                    />
-                  ))}
+                  {posts.map((p, i) => {
+                    if (p.shared && !p.owned) return null
+                    return (
+                      <div
+                        key={i}
+                        title={p.shared ? 'Shared post (used by adjacent shade structure)' : undefined}
+                        className={cn(
+                          'absolute rounded-full cursor-move z-10 border-2',
+                          p.shared
+                            ? 'bg-amber-400 border-amber-700'
+                            : 'bg-gray-700 border-gray-900',
+                        )}
+                        style={{
+                          width: postSize,
+                          height: postSize,
+                          left: p.xLocal * scale,
+                          top: p.yLocal * scale,
+                          transform: 'translate(-50%, -50%)',
+                          pointerEvents: 'auto',
+                        }}
+                        onPointerDown={e => handleObjectPointerDown(e, obj)}
+                      />
+                    )
+                  })}
                 </>
               )
             })()}

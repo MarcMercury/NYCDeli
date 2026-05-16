@@ -57,7 +57,6 @@ Arrival: ${c.arrival_date} via ${c.arrival_method}
 Departure: ${c.departure_date}
 Early Arrival: ${c.early_arrival || 'No'}
 Power Needs: ${c.power_type} (required: ${c.power_required || 'No'})
-Shade Required: ${c.shade_required || 'No'}
 
 Skills: ${c.skills || 'None listed'}
 Custom Skills: ${c.custom_skills || 'None'}

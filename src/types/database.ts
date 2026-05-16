@@ -50,7 +50,6 @@ export interface CamperRow {
   tent_opening_side: TentOpeningSide | null
   power_required: boolean
   power_type: PowerType
-  shade_required: boolean
   special_requests: string | null
   kitchen_participation: boolean
   preferred_shift_types: ShiftType[]
@@ -108,7 +107,6 @@ export interface CamperInsert {
   tent_opening_side?: TentOpeningSide | null
   power_required?: boolean
   power_type?: PowerType
-  shade_required?: boolean
   special_requests?: string | null
   kitchen_participation?: boolean
   preferred_shift_types?: ShiftType[]
@@ -165,7 +163,6 @@ export interface CamperUpdate {
   tent_opening_side?: TentOpeningSide | null
   power_required?: boolean
   power_type?: PowerType
-  shade_required?: boolean
   special_requests?: string | null
   kitchen_participation?: boolean
   preferred_shift_types?: ShiftType[]

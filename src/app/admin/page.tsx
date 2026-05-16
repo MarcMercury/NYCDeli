@@ -627,14 +627,6 @@ export default function AdminPage() {
                             />
                             <span className="text-sm">Power Req.</span>
                           </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedCamper.shade_required}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, shade_required: e.target.checked})}
-                            />
-                            <span className="text-sm">Shade Req.</span>
-                          </label>
                         </div>
                         <div>
                           <label className="text-xs font-bold uppercase">Special Requests</label>

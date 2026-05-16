@@ -254,7 +254,6 @@ export default function ProfilePage() {
         tent_opening_side: editCamper.tent_opening_side || null,
         power_required: editCamper.power_required,
         power_type: editCamper.power_type,
-        shade_required: editCamper.shade_required,
         special_requests: editCamper.special_requests || null,
         kitchen_participation: editCamper.kitchen_participation,
         preferred_shift_types: editCamper.preferred_shift_types,
@@ -800,11 +799,6 @@ export default function ProfilePage() {
                       required
                     />
                   )}
-                  <Checkbox
-                    label="I need to be under camp shade structure"
-                    checked={editCamper.shade_required ?? false}
-                    onChange={(e) => updateField('shade_required', e.target.checked)}
-                  />
                   <Textarea
                     label="Special Requests"
                     value={editCamper.special_requests || ''}
