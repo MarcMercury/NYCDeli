@@ -104,6 +104,17 @@ export const OBJECT_TEMPLATES: ObjectTemplate[] = [
     defaultProperties: {},
   },
   {
+    type: 'stairs_ladder',
+    label: 'Stairs / Ladder',
+    icon: '🪜',
+    defaultWidth: 12,
+    defaultHeight: 5,
+    defaultColor: '#475569',
+    category: 'structures',
+    description: 'Airplane-style rolling staircase — customizable width, depth, and platform elevation',
+    defaultProperties: { elevation_ft: 10 },
+  },
+  {
     type: 'custom',
     label: 'Custom',
     icon: '✏️',

@@ -62,6 +62,8 @@ export function ObjectDetailSVG({ objectType, width, height, color: _color, entr
       return <StorageDetail width={width} height={height} />
     case 'art_car':
       return <ArtCarDetail width={width} height={height} />
+    case 'stairs_ladder':
+      return <StairsLadderDetail width={width} height={height} />
     default:
       return null
   }
@@ -715,3 +717,66 @@ function ArtCarDetail({ width, height }: { width: number; height: number }) {
     </svg>
   )
 }
+
+/* ── Stairs / Ladder (airplane-style rolling staircase) ────────── */
+function StairsLadderDetail({ width, height }: { width: number; height: number }) {
+  // Render as a top-down view: stairs run along the longer axis, platform at the "top" end.
+  const isH = width >= height
+  // Long dimension = run of stairs + platform; short = stair tread width
+  const runPx = isH ? width : height
+  const treadPx = isH ? height : width
+  // Last 22% of the run is the platform
+  const platformFrac = 0.22
+  const stairLen = runPx * (1 - platformFrac)
+  const platLen = runPx * platformFrac
+  const stepCount = Math.max(4, Math.floor(stairLen / Math.max(6, treadPx * 0.18)))
+  const stepGap = stairLen / stepCount
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <g transform={isH ? '' : `rotate(90 ${width / 2} ${height / 2}) translate(${(width - height) / 2} ${(height - width) / 2})`}>
+        {/* Side rails (handrails) */}
+        <rect x={1} y={1} width={runPx - 2} height={2} fill="rgba(0,0,0,0.4)" />
+        <rect x={1} y={(isH ? height : width) - 3} width={runPx - 2} height={2} fill="rgba(0,0,0,0.4)" />
+        {/* Steps — perpendicular lines across the tread */}
+        {Array.from({ length: stepCount }, (_, i) => {
+          const x = i * stepGap + stepGap / 2
+          return (
+            <line
+              key={i}
+              x1={x}
+              y1={3}
+              x2={x}
+              y2={(isH ? height : width) - 3}
+              stroke="rgba(255,255,255,0.5)"
+              strokeWidth={1}
+            />
+          )
+        })}
+        {/* Top platform */}
+        <rect
+          x={stairLen}
+          y={2}
+          width={platLen - 2}
+          height={(isH ? height : width) - 4}
+          fill="rgba(255,255,255,0.25)"
+          stroke="rgba(0,0,0,0.45)"
+          strokeWidth={1}
+        />
+        {/* Wheels at the base */}
+        <circle cx={4} cy={4} r={2.5} fill="rgba(0,0,0,0.55)" />
+        <circle cx={4} cy={(isH ? height : width) - 4} r={2.5} fill="rgba(0,0,0,0.55)" />
+        {/* Platform edge handrail accent */}
+        <line
+          x1={runPx - 2}
+          y1={2}
+          x2={runPx - 2}
+          y2={(isH ? height : width) - 2}
+          stroke="rgba(0,0,0,0.6)"
+          strokeWidth={1.5}
+        />
+      </g>
+    </svg>
+  )
+}
+

@@ -909,6 +909,7 @@ export type FloorplanObjectType =
   | 'sign'
   | 'distance_marker'
   | 'neighbor_zone'
+  | 'stairs_ladder'
   | 'custom'
 
 export type FrontageSide = 'north' | 'south' | 'east' | 'west'

@@ -124,6 +124,7 @@ const ELECTRICAL_DEFAULTS: Partial<Record<FloorplanObjectType, { wattage: number
 const SKIP_TYPES: Set<FloorplanObjectType> = new Set([
   'fire_lane', 'road', 'path_of_travel', 'entrance',
   'distance_marker', 'neighbor_zone', 'custom',
+  'stairs_ladder',
   'tent', 'rv', 'vehicle', 'art_car', // handled by camp_spots / not camp-owned
 ])
 

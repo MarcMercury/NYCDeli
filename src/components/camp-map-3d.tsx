@@ -22,6 +22,7 @@ function getDefaultElevation(type: string): number {
     service_area: 8, fuel_storage: 3, propane_storage: 3,
     fire_extinguisher: 2, fire_pit: 1, grill: 4, flame_effect: 3,
     fence: 6, sign: 5, entrance: 8, bike_parking: 3, table: 3,
+    stairs_ladder: 10,
     fire_lane: 0, road: 0, path_of_travel: 0, distance_marker: 0, neighbor_zone: 0,
   }
   return heights[type] ?? 5
@@ -965,6 +966,183 @@ function ArtCar3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: 
   )
 }
 
+// ─── Stairs / Ladder (airplane-style rolling staircase) ─────────
+// widthM = footprint along the ramp direction (X)
+// depthM = tread width (Z)
+// heightM = top platform elevation
+function StairsLadder3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+  const frame = hexToThreeColor(color)
+  const dark = frame.clone().multiplyScalar(0.55)
+  const tread = frame.clone().lerp(new THREE.Color('#1f2937'), 0.4)
+
+  // Top 22% of length = platform; rest = sloped staircase
+  const platformFrac = 0.22
+  const platLen = widthM * platformFrac
+  const stairLen = widthM - platLen
+  const platHeight = heightM
+  const platThick = Math.max(0.08, heightM * 0.04)
+
+  // Step layout — ~7" risers (~0.18m). Floorplan units are meters here (1 ft = 0.3048m).
+  // Use rise of ~0.5 ft (~0.15m) for compact look at small scales.
+  const stepRise = 0.18
+  const stepCount = Math.max(3, Math.round(platHeight / stepRise))
+  const stepRun = stairLen / stepCount
+  const treadW = depthM * 0.85
+  const treadThick = Math.max(0.04, platThick * 0.6)
+
+  // Wheel radius based on depth
+  const wheelR = Math.min(depthM * 0.15, 0.3)
+
+  // Stair base X = -widthM/2, platform centered at +widthM/2 - platLen/2
+  const stairStartX = -widthM / 2
+
+  // Side stringers (the diagonal beams holding the steps)
+  const stringerThick = Math.max(0.05, depthM * 0.04)
+  const stringerLen = Math.sqrt(stairLen * stairLen + platHeight * platHeight)
+  const stringerAngle = Math.atan2(platHeight, stairLen)
+  const stringerDepth = Math.max(0.18, platHeight * 0.15)
+
+  // Handrail height above steps/platform
+  const railH = 1.0
+  const railThick = 0.035
+
+  return (
+    <group>
+      {/* ─── Steps ─── */}
+      {Array.from({ length: stepCount }, (_, i) => {
+        const x = stairStartX + i * stepRun + stepRun / 2
+        const y = (i + 1) * (platHeight / stepCount) - treadThick / 2
+        return (
+          <mesh key={i} castShadow receiveShadow position={[x, y, 0]}>
+            <boxGeometry args={[stepRun * 1.02, treadThick, treadW]} />
+            <meshStandardMaterial color={tread} roughness={0.85} metalness={0.3} />
+          </mesh>
+        )
+      })}
+
+      {/* ─── Side stringers (two diagonal beams) ─── */}
+      {[-1, 1].map(side => (
+        <mesh
+          key={`stringer-${side}`}
+          castShadow
+          position={[
+            stairStartX + stairLen / 2,
+            platHeight / 2,
+            (side * treadW) / 2 + (side * stringerThick) / 2,
+          ]}
+          rotation={[0, 0, stringerAngle]}
+        >
+          <boxGeometry args={[stringerLen, stringerDepth, stringerThick]} />
+          <meshStandardMaterial color={dark} roughness={0.7} metalness={0.5} />
+        </mesh>
+      ))}
+
+      {/* ─── Top Platform ─── */}
+      <mesh
+        castShadow
+        receiveShadow
+        position={[widthM / 2 - platLen / 2, platHeight - platThick / 2, 0]}
+      >
+        <boxGeometry args={[platLen, platThick, depthM * 0.95]} />
+        <meshStandardMaterial color={tread} roughness={0.85} metalness={0.3} />
+      </mesh>
+
+      {/* Platform support legs */}
+      {[-1, 1].map(side => (
+        <mesh
+          key={`leg-${side}`}
+          castShadow
+          position={[
+            widthM / 2 - stringerThick / 2,
+            platHeight / 2,
+            (side * depthM * 0.95) / 2,
+          ]}
+        >
+          <boxGeometry args={[stringerThick * 1.2, platHeight, stringerThick * 1.2]} />
+          <meshStandardMaterial color={dark} roughness={0.7} metalness={0.5} />
+        </mesh>
+      ))}
+
+      {/* ─── Platform railing (top guardrail around 3 sides) ─── */}
+      {/* Back rail (far end opposite the stairs) */}
+      <mesh position={[widthM / 2 - railThick / 2, platHeight + railH / 2, 0]}>
+        <boxGeometry args={[railThick, railH, depthM]} />
+        <meshStandardMaterial color={frame} metalness={0.6} roughness={0.4} />
+      </mesh>
+      {/* Side rails on platform */}
+      {[-1, 1].map(side => (
+        <mesh
+          key={`prail-${side}`}
+          position={[
+            widthM / 2 - platLen / 2,
+            platHeight + railH / 2,
+            (side * depthM) / 2 - (side * railThick) / 2,
+          ]}
+        >
+          <boxGeometry args={[platLen, railH, railThick]} />
+          <meshStandardMaterial color={frame} metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Top cap rail across the back */}
+      <mesh position={[widthM / 2 - railThick, platHeight + railH, 0]}>
+        <boxGeometry args={[railThick * 2, railThick, depthM + railThick]} />
+        <meshStandardMaterial color={frame} metalness={0.7} roughness={0.3} />
+      </mesh>
+
+      {/* ─── Sloped handrails along the stairs ─── */}
+      {[-1, 1].map(side => (
+        <mesh
+          key={`shrail-${side}`}
+          position={[
+            stairStartX + stairLen / 2,
+            platHeight / 2 + railH,
+            (side * treadW) / 2 + (side * railThick) / 2,
+          ]}
+          rotation={[0, 0, stringerAngle]}
+        >
+          <boxGeometry args={[stringerLen, railThick, railThick]} />
+          <meshStandardMaterial color={frame} metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+
+      {/* Vertical balusters every ~2 steps along the stair handrails */}
+      {Array.from({ length: stepCount }, (_, i) => {
+        if (i % 2 !== 0) return null
+        const x = stairStartX + i * stepRun + stepRun / 2
+        const y = (i + 1) * (platHeight / stepCount)
+        return (
+          <group key={`bal-${i}`}>
+            {[-1, 1].map(side => (
+              <mesh
+                key={side}
+                position={[x, y + railH / 2, (side * treadW) / 2 + (side * railThick) / 2]}
+              >
+                <boxGeometry args={[railThick * 0.7, railH, railThick * 0.7]} />
+                <meshStandardMaterial color={frame} metalness={0.5} roughness={0.5} />
+              </mesh>
+            ))}
+          </group>
+        )
+      })}
+
+      {/* ─── Wheels (4 wheels at base — 2 at bottom of stairs, 2 under platform) ─── */}
+      <Wheel position={[stairStartX + wheelR * 0.4, wheelR, depthM / 2 - wheelR * 0.2]} radius={wheelR} />
+      <Wheel position={[stairStartX + wheelR * 0.4, wheelR, -depthM / 2 + wheelR * 0.2]} radius={wheelR} />
+      <Wheel position={[widthM / 2 - wheelR * 0.4, wheelR, depthM / 2 - wheelR * 0.2]} radius={wheelR} />
+      <Wheel position={[widthM / 2 - wheelR * 0.4, wheelR, -depthM / 2 + wheelR * 0.2]} radius={wheelR} />
+
+      {/* Cross brace under stairs for structural look */}
+      <mesh
+        position={[stairStartX + stairLen * 0.5, platHeight * 0.25, 0]}
+        rotation={[0, 0, stringerAngle]}
+      >
+        <boxGeometry args={[stringerLen * 0.9, stringerThick * 0.6, treadW * 0.9]} />
+        <meshStandardMaterial color={dark} roughness={0.85} metalness={0.4} transparent opacity={0.0} />
+      </mesh>
+    </group>
+  )
+}
+
 // ─── Fallback Procedural Object ────────────────────────────────
 function ProceduralObject({
   obj,
@@ -1038,6 +1216,8 @@ function ProceduralObject({
       return <Storage3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'art_car':
       return <ArtCar3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
+    case 'stairs_ladder':
+      return <StairsLadder3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
   }
 
   // Shade sail: just a thin translucent off-white sail at canopy height — no posts.
