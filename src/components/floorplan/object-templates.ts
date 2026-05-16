@@ -38,6 +38,17 @@ export const OBJECT_TEMPLATES: ObjectTemplate[] = [
     defaultProperties: { background: true },
   },
   {
+    type: 'shade_sail',
+    label: 'Shade Sail',
+    icon: '🪁',
+    defaultWidth: 15,
+    defaultHeight: 15,
+    defaultColor: '#f5f0e6',
+    category: 'structures',
+    description: 'Adjustable shade sail covering — no posts',
+    defaultProperties: { background: true },
+  },
+  {
     type: 'common_area',
     label: 'Common Area',
     icon: '🏕️',

@@ -432,7 +432,7 @@ export function GridCanvas({
         const isInfra = INFRASTRUCTURE_TYPES.has(obj.object_type)
         const isDashed = DASHED_BORDER_TYPES.has(obj.object_type)
         const isDistanceMarker = obj.object_type === 'distance_marker'
-        const isShade = obj.object_type === 'shade_structure'
+        const isShade = obj.object_type === 'shade_structure' || obj.object_type === 'shade_sail'
         const isShadeBackground = isShade && !isSelected
 
         return (

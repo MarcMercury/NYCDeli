@@ -15,6 +15,7 @@ function hexToThreeColor(hex: string): THREE.Color {
 function getDefaultElevation(type: string): number {
   const heights: Record<string, number> = {
     shade_structure: 12, tent: 7, kitchen: 10, bar: 10, stage: 8,
+    shade_sail: 12,
     common_area: 10, refrigerated_truck: 10, shower_container: 9,
     pc_container: 9, rv: 10, vehicle: 5, generator: 4, porta_potty: 8,
     water_station: 3, first_aid: 8, storage: 6, prep_area: 8,
@@ -1039,23 +1040,37 @@ function ProceduralObject({
       return <ArtCar3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
   }
 
+  // Shade sail: just a thin translucent off-white sail at canopy height — no posts.
+  if (obj.object_type === 'shade_sail') {
+    const sailColor = obj.color && obj.color.toLowerCase() !== '#93c5fd' ? obj.color : '#f5f0e6'
+    return (
+      <group>
+        <mesh
+          castShadow
+          receiveShadow
+          position={[0, heightM, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[widthM, depthM, 1, 1]} />
+          <meshStandardMaterial
+            color={sailColor}
+            side={THREE.DoubleSide}
+            transparent
+            opacity={0.35}
+            roughness={0.9}
+            metalness={0}
+          />
+        </mesh>
+      </group>
+    )
+  }
+
   // Shade structures: open canopy with perimeter poles every 10 ft.
   // Shared posts (used by an adjacent shade_structure) collapse to one — the
   // non-owner skips rendering them.
   if (obj.object_type === 'shade_structure') {
     const postRadius = 0.04
     const SPACING_FT = 10
-    const stops = (lenM: number) => {
-      // Convert spacing back to meters for evenly distributed local positions.
-      // We work in normalized 0..1 ratios so we don't need feetToMeters here.
-      const lenFt = obj.width_ft // placeholder, overridden below per axis
-      void lenFt
-      // Build stops in meters: 0, spacing, 2*spacing, ..., lenM
-      const arr: number[] = [0]
-      // 10ft in meters = obj.width_ft? Use ratio: spacingM = (SPACING / widthFt) * widthM
-      return arr
-    }
-    void stops // intentionally unused — we compute stops inline below to keep ratios correct.
 
     // Compute local-meter stops along each axis from the FT-based spacing.
     const axisStops = (lenFt: number, lenM: number) => {
@@ -1245,6 +1260,7 @@ function MapObject3D({
   onHover,
   spots,
   camper,
+  shadePosts,
 }: {
   obj: FloorplanObjectRow
   feetToMeters: number
@@ -1257,6 +1273,7 @@ function MapObject3D({
   onHover: (id: string | null) => void
   spots: CampSpotWithReservation[]
   camper: CamperRow | null
+  shadePosts?: ShadePost[]
 }) {
   const groupRef = useRef<THREE.Group>(null)
 
@@ -1322,6 +1339,7 @@ function MapObject3D({
           heightM={heightM}
           color={obj.color}
           roofShape={roofShape}
+          shadePosts={shadePosts}
         />
       }>
         {hasModel && modelUrl ? (
@@ -1338,6 +1356,7 @@ function MapObject3D({
             heightM={heightM}
             color={obj.color}
             roofShape={roofShape}
+            shadePosts={shadePosts}
           />
         )}
       </Suspense>
@@ -1481,6 +1500,10 @@ export function CampMap3D({
     [objects]
   )
 
+  // Shared posts between adjacent shade_structures are deduped so the inventory
+  // is accurate and the renderer doesn't double-draw them.
+  const shadePostsByObj = useMemo(() => computeShadePosts(objects), [objects])
+
   return (
     <div className="w-full h-full">
       <Canvas
@@ -1562,6 +1585,7 @@ export function CampMap3D({
             onHover={onHoverObject}
             spots={spots}
             camper={camper}
+            shadePosts={shadePostsByObj.get(obj.id)}
           />
         ))}
 

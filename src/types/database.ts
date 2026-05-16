@@ -875,6 +875,7 @@ export type FloorplanObjectType =
   | 'prep_area'
   | 'service_area'
   | 'shade_structure'
+  | 'shade_sail'
   | 'common_area'
   | 'stage'
   | 'bar'
