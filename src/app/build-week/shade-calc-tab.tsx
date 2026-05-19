@@ -198,6 +198,36 @@ function getPerimeterRailsByDir(cells: CellGrid) {
   return out
 }
 
+// ─────────────────────── Custom Panels (shade sails / big rectangles) ───────────────────────
+// Panels are arbitrary-sized rectangles (e.g. 30×50) with poles only along the perimeter —
+// NOT at every 10ft intersection like the cell grid. This matches how shade sails actually
+// build out: corner posts + optional intermediate edge posts, no internal supports.
+export type FrameType = 'sail' | 'rail'
+export type Panel = {
+  id: string
+  label: string
+  wFt: number
+  hFt: number
+  poleHeight: 8 | 10
+  edgeSpacingFt: number   // 0 = corners only; otherwise place an edge pole every N ft
+  frameType: FrameType    // sail = corner-tensioned fabric, rail = full EMT perimeter
+}
+
+function panelPoleCount(p: Panel): { total: number; corners: 4; teesW: number; teesH: number; tees: number } {
+  const teesW = p.edgeSpacingFt > 0 ? Math.max(0, Math.round(p.wFt / p.edgeSpacingFt) - 1) : 0
+  const teesH = p.edgeSpacingFt > 0 ? Math.max(0, Math.round(p.hFt / p.edgeSpacingFt) - 1) : 0
+  const tees = 2 * teesW + 2 * teesH
+  return { total: 4 + tees, corners: 4, teesW, teesH, tees }
+}
+
+function panelStats(p: Panel) {
+  const { total, corners, tees } = panelPoleCount(p)
+  const perimFt = 2 * (p.wFt + p.hFt)
+  const sqft = p.wFt * p.hFt
+  const railSegments = p.frameType === 'rail' ? Math.ceil(perimFt / 10) : 0
+  return { polesTotal: total, corners, tees, perimFt, sqft, railSegments }
+}
+
 type BOMItem = Product & { key: string; qty: number; customNote?: string }
 type BOM = {
   items: BOMItem[]
@@ -207,10 +237,11 @@ type BOM = {
   tarps: Tarp[]
   bounds: ReturnType<typeof getBounds>
   bungeesNeeded: number
-  stats: { cells: number; area: number; poleTotal: number; anchors: number; crewHours: number; connectorTotal: number }
+  panelsTotalArea: number
+  stats: { cells: number; area: number; poleTotal: number; anchors: number; crewHours: number; connectorTotal: number; panelsCount: number }
 }
 
-function calculateBOM(cells: CellGrid, wallSegments: WallSegments, ground: GroundKey, tarpStrategy: 'auto' | 'all_small'): BOM {
+function calculateBOM(cells: CellGrid, wallSegments: WallSegments, panels: Panel[], ground: GroundKey, tarpStrategy: 'auto' | 'all_small'): BOM {
   const inters = getIntersections(cells)
   const rails = getRails(cells)
   const tarps = packTarps(cells, tarpStrategy)
@@ -234,79 +265,159 @@ function calculateBOM(cells: CellGrid, wallSegments: WallSegments, ground: Groun
   const bungeesNeeded =
     tarps.reduce((s, t) => s + (t.size === '20x20' ? 36 : t.size === '10x20' ? 22 : 14), 0) +
     wallTarps * 10
-  const bungeePacks = Math.max(1, Math.ceil(bungeesNeeded / 50))
 
   const items: BOMItem[] = []
-  const push = (key: keyof typeof PRODUCTS, qty: number, customNote?: string) => {
+  const itemIndex = new Map<string, BOMItem>()
+  const bump = (key: string, product: Product, qty: number, customNote?: string) => {
     if (qty <= 0) return
-    items.push({ ...PRODUCTS[key], key, qty, customNote })
+    const ex = itemIndex.get(key)
+    if (ex) {
+      ex.qty += qty
+      if (customNote && !ex.customNote) ex.customNote = customNote
+    } else {
+      const item: BOMItem = { ...product, key, qty, customNote }
+      items.push(item)
+      itemIndex.set(key, item)
+    }
   }
-  push('pole_10ft',   stock10ft, at8 > 0 ? `Cut ${at8} of these to 8' for low-headroom cells.` : undefined)
-  push('corner_3way', cCorner)
-  push('tee_3way',    cTee3)
-  push('tee_4way',    cTee4)
-  push('cross_5way',  cCross)
-  push('base_flange', polesVertical)
-  push(gd.anchor,     anchorQty)
-  push('ratchet_strap', perimInters)
-  push('tarp_10x10',  tarpCount['10x10'])
-  push('tarp_10x20',  tarpCount['10x20'])
-  push('tarp_20x20',  tarpCount['20x20'])
-  push('wall_tarp',   wallTarps)
-  push('bungee_pack', bungeePacks, `${bungeesNeeded} bungees needed · ${bungeePacks * 50} in ${bungeePacks} pack${bungeePacks > 1 ? 's' : ''} (${bungeePacks * 50 - bungeesNeeded} spare).`)
+  const pushP = (key: keyof typeof PRODUCTS, qty: number, customNote?: string) =>
+    bump(key, PRODUCTS[key], qty, customNote)
+
+  pushP('pole_10ft',   stock10ft, at8 > 0 ? `Cut ${at8} of these to 8' for low-headroom cells.` : undefined)
+  pushP('corner_3way', cCorner)
+  pushP('tee_3way',    cTee3)
+  pushP('tee_4way',    cTee4)
+  pushP('cross_5way',  cCross)
+  pushP('base_flange', polesVertical)
+  pushP(gd.anchor,     anchorQty)
+  pushP('ratchet_strap', perimInters)
+  pushP('tarp_10x10',  tarpCount['10x10'])
+  pushP('tarp_10x20',  tarpCount['10x20'])
+  pushP('tarp_20x20',  tarpCount['20x20'])
+  pushP('wall_tarp',   wallTarps)
+
+  // ── Merge in Custom Panels ──
+  let panelPolesTotal = 0
+  let panelAnchorsTotal = 0
+  let panelConnectorsTotal = 0
+  let panelsArea = 0
+  let panelBungees = 0
+  panels.forEach(p => {
+    const ps = panelStats(p)
+    panelPolesTotal += ps.polesTotal
+    panelsArea += ps.sqft
+    // Verticals
+    pushP('pole_10ft', ps.polesTotal, p.poleHeight === 8
+      ? `${ps.polesTotal} cut to 8′ for panel "${p.label}"`
+      : `For panel "${p.label}" (${p.wFt}×${p.hFt})`)
+    pushP('base_flange', ps.polesTotal)
+    pushP('ratchet_strap', ps.polesTotal)
+    const pAnchor = Math.ceil(ps.polesTotal * gd.multiplier)
+    pushP(gd.anchor, pAnchor)
+    panelAnchorsTotal += ps.polesTotal
+    // Perimeter rails (only for 'rail' frame type)
+    if (p.frameType === 'rail') {
+      pushP('pole_10ft', ps.railSegments, `Horizontal rails around panel "${p.label}"`)
+      pushP('corner_3way', ps.corners)
+      pushP('tee_3way', ps.tees)
+      panelConnectorsTotal += ps.corners + ps.tees
+    } else if (ps.tees > 0) {
+      // Sail with intermediate edge poles — still need flanges, no rails/connectors
+      // (sail attaches via D-rings at each pole)
+    }
+    // Custom-sized tarp / sail — unique line item per size
+    const sizeKey = `${p.wFt}x${p.hFt}`
+    const tarpKey = p.frameType === 'sail' ? `tarp_sail_${sizeKey}` : `tarp_custom_${sizeKey}`
+    const sailFabric: Product = {
+      name: p.frameType === 'sail'
+        ? `Custom Shade Sail — ${p.wFt}′ × ${p.hFt}′`
+        : `Custom Reflective Tarp — ${p.wFt}′ × ${p.hFt}′`,
+      sku: p.frameType === 'sail' ? `SAIL-${sizeKey}` : `TARP-CUSTOM-${sizeKey}`,
+      note: p.frameType === 'sail'
+        ? `D-rings at each corner${p.edgeSpacingFt > 0 ? ` + every ${p.edgeSpacingFt} ft along edges` : ''}. Tension with ratchet straps.`
+        : `Reinforced grommets every 18". Bungees to perimeter rail.`,
+      weight: Math.round(ps.sqft * 0.05),
+    }
+    bump(tarpKey, sailFabric, 1, `for "${p.label}"`)
+    // Bungees: sails ~ 1 per pole; rails ~ perim/3 ft
+    panelBungees += p.frameType === 'sail' ? ps.polesTotal : Math.ceil(ps.perimFt / 3)
+  })
+
+  const totalBungees = bungeesNeeded + panelBungees
+  const totalBungeePacks = totalBungees > 0 ? Math.max(1, Math.ceil(totalBungees / 50)) : 0
+  pushP('bungee_pack', totalBungeePacks,
+    totalBungees > 0
+      ? `${totalBungees} bungees needed · ${totalBungeePacks * 50} in ${totalBungeePacks} pack${totalBungeePacks > 1 ? 's' : ''} (${totalBungeePacks * 50 - totalBungees} spare).`
+      : undefined)
 
   const totalWeight = items.reduce((s, i) => s + i.weight * i.qty, 0)
+  const totalCells = bounds?.count ?? 0
   return {
     items,
     totalWeight: Math.round(totalWeight),
-    inters, rails, tarps, bounds, bungeesNeeded,
+    inters, rails, tarps, bounds,
+    bungeesNeeded: totalBungees,
+    panelsTotalArea: panelsArea,
     stats: {
-      cells: bounds?.count ?? 0,
-      area: (bounds?.count ?? 0) * 100,
-      poleTotal: stock10ft,
-      anchors: perimInters,
-      crewHours: Math.max(2, Math.ceil((bounds?.count ?? 0) * 0.5 + 1.5)),
-      connectorTotal: cCorner + cTee3 + cTee4 + cCross,
+      cells: totalCells,
+      area: totalCells * 100 + panelsArea,
+      poleTotal: stock10ft + panelPolesTotal + panels.reduce((s, p) => s + (p.frameType === 'rail' ? panelStats(p).railSegments : 0), 0),
+      anchors: perimInters + panelAnchorsTotal,
+      crewHours: Math.max(2, Math.ceil(totalCells * 0.5 + panels.length * 1.5 + 1.5)),
+      connectorTotal: cCorner + cTee3 + cTee4 + cCross + panelConnectorsTotal,
+      panelsCount: panels.length,
     },
   }
 }
 
-// ─────────────────────── Layout → Cells importer ───────────────────────
+// ─────────────────────── Layout → cells + panels importer ───────────────────────
 /**
- * Snap every shade_structure / shade_sail on the floorplan onto the 10 ft cell
- * grid.  We translate the bounding box of all shade objects to the grid origin
- * (so the calculator's 10×10 axis lines up with the smallest x/y on the map),
- * then mark every cell that the object's footprint touches.
+ * Pulls every shade object off the active floorplan and splits it two ways:
+ *  • shade_structure → cell grid (orthogonal 10ft frame with internal poles)
+ *  • shade_sail      → custom Panel (perimeter poles only, fabric tensioned corner-to-corner)
  *
- * Returns the grid plus a summary of what we found.
+ * Translates the bounding box of all shade objects to the grid origin so the
+ * calculator's 10×10 axis lines up with the smallest x/y on the map.
  */
-function objectsToCells(objects: FloorplanObjectRow[]): {
+function objectsToImport(objects: FloorplanObjectRow[]): {
   cells: CellGrid
+  panels: Panel[]
   imported: { count: number; structures: number; sails: number; totalArea: number; bbox: { wFt: number; hFt: number } | null }
 } {
   const shadeObjs = objects.filter(o =>
     o.object_type === 'shade_structure' || o.object_type === 'shade_sail'
   )
   const cells = emptyCells()
+  const panels: Panel[] = []
   if (shadeObjs.length === 0) {
-    return { cells, imported: { count: 0, structures: 0, sails: 0, totalArea: 0, bbox: null } }
+    return { cells, panels, imported: { count: 0, structures: 0, sails: 0, totalArea: 0, bbox: null } }
   }
-  // Translate so the bounding box origin sits at (0,0) on the grid.
   const minX = Math.min(...shadeObjs.map(o => o.x))
   const minY = Math.min(...shadeObjs.map(o => o.y))
   let structures = 0, sails = 0, totalArea = 0
   let maxX = -Infinity, maxY = -Infinity
-  shadeObjs.forEach(obj => {
-    if (obj.object_type === 'shade_structure') structures++
-    else sails++
+  shadeObjs.forEach((obj, idx) => {
     totalArea += obj.width_ft * obj.height_ft
+    maxX = Math.max(maxX, obj.x + obj.width_ft)
+    maxY = Math.max(maxY, obj.y + obj.height_ft)
+    if (obj.object_type === 'shade_sail') {
+      sails++
+      panels.push({
+        id: `imported-${obj.id ?? idx}`,
+        label: `Sail ${sails} (${obj.width_ft}×${obj.height_ft})`,
+        wFt: Math.round(obj.width_ft),
+        hFt: Math.round(obj.height_ft),
+        poleHeight: 10,
+        edgeSpacingFt: 10,
+        frameType: 'sail',
+      })
+      return
+    }
+    structures++
     const left   = obj.x - minX
     const top    = obj.y - minY
     const right  = left + obj.width_ft
     const bottom = top  + obj.height_ft
-    maxX = Math.max(maxX, obj.x + obj.width_ft)
-    maxY = Math.max(maxY, obj.y + obj.height_ft)
-    // Snap to 10ft cells — any cell whose centre is inside the footprint counts.
     const c0 = Math.max(0, Math.floor(left / CELL_FT))
     const r0 = Math.max(0, Math.floor(top / CELL_FT))
     const c1 = Math.min(MAX_C - 1, Math.ceil(right / CELL_FT) - 1)
@@ -319,6 +430,7 @@ function objectsToCells(objects: FloorplanObjectRow[]): {
   })
   return {
     cells,
+    panels,
     imported: {
       count: shadeObjs.length,
       structures,
@@ -330,10 +442,11 @@ function objectsToCells(objects: FloorplanObjectRow[]): {
 }
 
 // ───────────────────────────── Component ─────────────────────────────
-const STORAGE_KEY = 'shade_calc_state_v1'
+const STORAGE_KEY = 'shade_calc_state_v2'
 
 export default function ShadeCalcTab() {
   const [cells, setCells] = useState<CellGrid>(() => emptyCells())
+  const [panels, setPanels] = useState<Panel[]>([])
   const [wallSegments, setWallSegments] = useState<WallSegments>({})
   const [ground, setGround] = useState<GroundKey>('playa')
   const [tarpStrategy, setTarpStrategy] = useState<'auto' | 'all_small'>('auto')
@@ -357,8 +470,9 @@ export default function ShadeCalcTab() {
       }
       setFloorplanName(fp.name ?? '')
       const objs = await fetchFloorplanObjects(fp.id)
-      const { cells: nextCells, imported } = objectsToCells(objs)
+      const { cells: nextCells, panels: nextPanels, imported } = objectsToImport(objs)
       setCells(nextCells)
+      setPanels(nextPanels)
       setWallSegments({})  // walls don't survive a resync — they're user intent on top of layout
       setImportSummary(imported)
       setLastSync(new Date())
@@ -378,9 +492,11 @@ export default function ShadeCalcTab() {
         const s = JSON.parse(raw) as {
           cells: CellGrid; wallSegments: WallSegments; ground: GroundKey
           tarpStrategy: 'auto' | 'all_small'; defaultHeight: 8 | 10
+          panels?: Panel[]
         }
         if (s.cells?.length === MAX_R) {
           setCells(s.cells)
+          setPanels(Array.isArray(s.panels) ? s.panels : [])
           setWallSegments(s.wallSegments ?? {})
           setGround(s.ground ?? 'playa')
           setTarpStrategy(s.tarpStrategy ?? 'auto')
@@ -394,7 +510,7 @@ export default function ShadeCalcTab() {
               if (fp) {
                 setFloorplanName(fp.name ?? '')
                 const objs = await fetchFloorplanObjects(fp.id)
-                const { imported } = objectsToCells(objs)
+                const { imported } = objectsToImport(objs)
                 if (!cancelled) setImportSummary(imported)
               }
             } catch { /* non-fatal */ }
@@ -413,10 +529,10 @@ export default function ShadeCalcTab() {
     if (!hydrated) return
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        cells, wallSegments, ground, tarpStrategy, defaultHeight,
+        cells, panels, wallSegments, ground, tarpStrategy, defaultHeight,
       }))
     } catch { /* quota — non-fatal */ }
-  }, [cells, wallSegments, ground, tarpStrategy, defaultHeight, hydrated])
+  }, [cells, panels, wallSegments, ground, tarpStrategy, defaultHeight, hydrated])
 
   // Drag-paint cells.
   useEffect(() => {
@@ -426,8 +542,8 @@ export default function ShadeCalcTab() {
   }, [])
 
   const bom = useMemo(
-    () => calculateBOM(cells, wallSegments, ground, tarpStrategy),
-    [cells, wallSegments, ground, tarpStrategy]
+    () => calculateBOM(cells, wallSegments, panels, ground, tarpStrategy),
+    [cells, wallSegments, panels, ground, tarpStrategy]
   )
   const bounds = bom.bounds
   const perimByDir = useMemo(() => getPerimeterRailsByDir(cells), [cells])
@@ -475,6 +591,18 @@ export default function ShadeCalcTab() {
   const flipHeights = () =>
     setCells(prev => prev.map(row => row.map(c => c.active ? { ...c, height: c.height === 10 ? 8 : 10 } : c)))
 
+  // Panel handlers
+  const addPanel = () =>
+    setPanels(prev => [...prev, {
+      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      label: `Sail ${prev.length + 1}`,
+      wFt: 30, hFt: 50, poleHeight: 10, edgeSpacingFt: 10, frameType: 'sail',
+    }])
+  const updatePanel = (id: string, patch: Partial<Panel>) =>
+    setPanels(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
+  const removePanel = (id: string) =>
+    setPanels(prev => prev.filter(p => p.id !== id))
+
   // Group items for display.
   const grouped = useMemo(() => {
     const g: Record<string, BOMItem[]> = { Frame: [], Connectors: [], Anchoring: [], 'Shade & Walls': [], Hardware: [] }
@@ -482,7 +610,7 @@ export default function ShadeCalcTab() {
       if (it.sku.startsWith('EMT')) g.Frame.push(it)
       else if (it.sku.startsWith('MP-')) g.Connectors.push(it)
       else if (['LAG','AUGER','SANDBAG','RATCH'].some(p => it.sku.startsWith(p))) g.Anchoring.push(it)
-      else if (it.sku.startsWith('TARP') || it.sku.startsWith('WALL')) g['Shade & Walls'].push(it)
+      else if (it.sku.startsWith('TARP') || it.sku.startsWith('WALL') || it.sku.startsWith('SAIL')) g['Shade & Walls'].push(it)
       else g.Hardware.push(it)
     })
     return g
@@ -608,6 +736,112 @@ export default function ShadeCalcTab() {
                 <button onClick={flipHeights} className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-gray-400 text-gray-700 hover:bg-gray-100">Flip Heights</button>
                 <button onClick={clearAll} className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-red-400 text-red-700 hover:bg-red-50">Clear</button>
               </div>
+            </div>
+
+            {/* Custom Panels — arbitrary-sized rectangles (e.g. 30×50 sails) */}
+            <div className="border-2 border-black bg-white p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                  Custom Panels — {panels.length} section{panels.length === 1 ? '' : 's'}
+                  {panels.length > 0 && (
+                    <span className="text-gray-400 ml-2">
+                      · {panels.reduce((s, p) => s + p.wFt * p.hFt, 0).toLocaleString()} ft² total
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={addPanel}
+                  className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white hover:bg-amber-600"
+                >
+                  + Add Panel
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-500 mb-2 leading-snug">
+                Use Panels for shade sails or any big rectangle where poles only go <em>around the outside</em> —
+                no internal 10ft grid. Set edge spacing to <strong>0</strong> for corners only, or <strong>10ft</strong>/<strong>20ft</strong> for intermediate posts.
+              </p>
+              {panels.length > 0 && (
+                <div className="space-y-1.5">
+                  {/* Header */}
+                  <div className="grid grid-cols-[1fr_60px_60px_70px_80px_70px_80px_28px] gap-1.5 text-[9px] font-bold uppercase tracking-wider text-gray-500 px-1">
+                    <div>Label</div>
+                    <div>W (ft)</div>
+                    <div>H (ft)</div>
+                    <div>Pole H</div>
+                    <div>Edge Poles</div>
+                    <div>Frame</div>
+                    <div>Coverage</div>
+                    <div></div>
+                  </div>
+                  {panels.map(p => {
+                    const ps = panelStats(p)
+                    return (
+                      <div key={p.id} className="grid grid-cols-[1fr_60px_60px_70px_80px_70px_80px_28px] gap-1.5 items-center text-xs">
+                        <input
+                          value={p.label}
+                          onChange={e => updatePanel(p.id, { label: e.target.value })}
+                          className="border border-gray-300 px-1.5 py-1 text-xs font-medium focus:outline-none focus:border-black"
+                        />
+                        <input
+                          type="number" min={1} step={1} value={p.wFt}
+                          onChange={e => updatePanel(p.id, { wFt: Math.max(1, +e.target.value || 0) })}
+                          className="border border-gray-300 px-1.5 py-1 text-xs text-center focus:outline-none focus:border-black"
+                        />
+                        <input
+                          type="number" min={1} step={1} value={p.hFt}
+                          onChange={e => updatePanel(p.id, { hFt: Math.max(1, +e.target.value || 0) })}
+                          className="border border-gray-300 px-1.5 py-1 text-xs text-center focus:outline-none focus:border-black"
+                        />
+                        <select
+                          value={p.poleHeight}
+                          onChange={e => updatePanel(p.id, { poleHeight: +e.target.value as 8 | 10 })}
+                          className="border border-gray-300 px-1 py-1 text-xs focus:outline-none focus:border-black"
+                        >
+                          <option value={8}>8′</option>
+                          <option value={10}>10′</option>
+                        </select>
+                        <select
+                          value={p.edgeSpacingFt}
+                          onChange={e => updatePanel(p.id, { edgeSpacingFt: +e.target.value })}
+                          className="border border-gray-300 px-1 py-1 text-xs focus:outline-none focus:border-black"
+                          title="Distance between poles along each side"
+                        >
+                          <option value={0}>Corners</option>
+                          <option value={10}>Every 10′</option>
+                          <option value={15}>Every 15′</option>
+                          <option value={20}>Every 20′</option>
+                          <option value={25}>Every 25′</option>
+                        </select>
+                        <select
+                          value={p.frameType}
+                          onChange={e => updatePanel(p.id, { frameType: e.target.value as FrameType })}
+                          className="border border-gray-300 px-1 py-1 text-xs focus:outline-none focus:border-black"
+                          title="Sail = fabric tensioned corner-to-corner. Rail = full EMT perimeter."
+                        >
+                          <option value="sail">Sail</option>
+                          <option value="rail">Rail</option>
+                        </select>
+                        <div className="text-[10px] text-gray-600 text-center">
+                          {ps.sqft.toLocaleString()} ft²<br />
+                          <span className="text-gray-400">{ps.polesTotal} poles</span>
+                        </div>
+                        <button
+                          onClick={() => removePanel(p.id)}
+                          className="text-red-600 hover:bg-red-50 text-base leading-none w-6 h-6 flex items-center justify-center"
+                          title="Delete panel"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {panels.length === 0 && (
+                <div className="text-[11px] text-gray-400 py-3 text-center border border-dashed border-gray-300">
+                  No custom panels yet. Click <strong>+ Add Panel</strong> for a 30×50 sail, or add shade sails to the Layout Builder.
+                </div>
+              )}
             </div>
 
             {/* Cell Grid */}
