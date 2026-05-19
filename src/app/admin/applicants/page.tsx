@@ -323,7 +323,8 @@ export default function ApplicantReviewPage() {
                         <div><span className="text-gray-500">Shelter:</span> {selectedApplicant.camper.shelter_type}</div>
                         <div>
                           <span className="text-gray-500">Dimensions:</span>{' '}
-                          {selectedApplicant.camper.shelter_length_ft}×{selectedApplicant.camper.shelter_width_ft} ft
+                          {selectedApplicant.camper.shelter_length_ft}L × {selectedApplicant.camper.shelter_width_ft}W ft
+                          {selectedApplicant.camper.shelter_height_ft ? <> × {selectedApplicant.camper.shelter_height_ft}H ft</> : null}
                         </div>
                       </div>
                     </div>

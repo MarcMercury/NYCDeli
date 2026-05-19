@@ -687,6 +687,7 @@ export default function ProfilePage() {
                       onChange={(e) => updateField('shelter_length_ft', parseFloat(e.target.value))}
                       min={3} max={50} step={0.5}
                       required
+                      helpText="How long (longest footprint side)"
                     />
                     <Input
                       label="Width (ft)"
@@ -695,6 +696,7 @@ export default function ProfilePage() {
                       onChange={(e) => updateField('shelter_width_ft', parseFloat(e.target.value))}
                       min={3} max={30} step={0.5}
                       required
+                      helpText="How wide (shorter footprint side)"
                     />
                     <Input
                       label="Height (ft)"
@@ -702,6 +704,7 @@ export default function ProfilePage() {
                       value={editCamper.shelter_height_ft ?? ''}
                       onChange={(e) => updateField('shelter_height_ft', e.target.value ? parseFloat(e.target.value) : null)}
                       min={3} max={15} step={0.5}
+                      helpText="How tall (vertical, peak to ground)"
                     />
                   </div>
                   <div className="border-t-2 border-black pt-4 mt-2">

@@ -259,7 +259,7 @@ export default function LayoutPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Size:</span>
-                      <span>{selectedCamper.shelter_length_ft} × {selectedCamper.shelter_width_ft} ft</span>
+                      <span>{selectedCamper.shelter_length_ft}L × {selectedCamper.shelter_width_ft}W ft</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Position:</span>
@@ -338,7 +338,7 @@ export default function LayoutPage() {
                         height: camper.displayHeight * viewScale,
                       }}
                       onClick={() => setSelectedCamper(camper)}
-                      title={`${camper.playa_name || camper.full_name} (${camper.shelter_length_ft}×${camper.shelter_width_ft}ft)`}
+                      title={`${camper.playa_name || camper.full_name} (${camper.shelter_length_ft}L × ${camper.shelter_width_ft}W ft)`}
                     >
                       {camper.displayWidth * viewScale > 30 && (
                         <span className="text-[10px] truncate px-1">

@@ -572,7 +572,7 @@ export function CampMap() {
                       <span>{template?.icon || '📦'}</span>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-white truncate">{obj.label || obj.object_type.replace(/_/g, ' ')}</div>
-                        <div className="text-gray-400 text-[10px]">{obj.object_type.replace(/_/g, ' ')} • {obj.width_ft}×{obj.height_ft}ft</div>
+                        <div className="text-gray-400 text-[10px]">{obj.object_type.replace(/_/g, ' ')} • {obj.width_ft}W × {obj.height_ft}L ft</div>
                       </div>
                       {spot && spot.reservations.length >= spot.max_occupants && (
                         <span className="text-[10px] bg-red-500/20 text-red-400 px-1 rounded">Full</span>
@@ -971,8 +971,14 @@ export function CampMap() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Size</span>
-                  <span className="font-bold">{selectedObject.object.width_ft}×{selectedObject.object.height_ft}ft</span>
+                  <span className="font-bold">{selectedObject.object.width_ft}W × {selectedObject.object.height_ft}L ft</span>
                 </div>
+                {typeof selectedObject.object.properties?.elevation_ft === 'number' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Height</span>
+                    <span className="font-bold">{selectedObject.object.properties.elevation_ft}H ft</span>
+                  </div>
+                )}
                 {selectedObject.object.properties?.capacity && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Capacity</span>

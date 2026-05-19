@@ -527,7 +527,7 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
       const l = Math.max(obj.width_ft, obj.height_ft)
       return {
         id: obj.id,
-        label: obj.label || `${obj.width_ft}×${obj.height_ft}`,
+        label: obj.label || `${obj.width_ft}W × ${obj.height_ft}L`,
         shortSide: s,
         longSide: l,
         bucket: classifySpot(obj),

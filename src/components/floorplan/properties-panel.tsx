@@ -159,13 +159,15 @@ export function PropertiesPanel({
               min={1}
               value={selectedObject.width_ft}
               onChange={e => onUpdateObject(selectedObject.id, { width_ft: Number(e.target.value) })}
+              helpText="Footprint side along X (how wide)"
             />
             <Input
-              label="Height (ft)"
+              label="Length (ft)"
               type="number"
               min={1}
               value={selectedObject.height_ft}
               onChange={e => onUpdateObject(selectedObject.id, { height_ft: Number(e.target.value) })}
+              helpText="Footprint side along Y (how long / deep)"
             />
           </div>
           <div className="mt-2">
@@ -205,13 +207,13 @@ export function PropertiesPanel({
           </p>
           <div className="space-y-2">
             <Input
-              label="Elevation / Height (ft)"
+              label="Height (ft)"
               type="number"
               min={0}
               step={1}
               value={selectedObject.properties?.elevation_ft ?? ''}
               onChange={e => updateProp('elevation_ft', e.target.value ? Number(e.target.value) : undefined)}
-              helpText="How tall the structure is above ground (used in 3D view)"
+              helpText="How tall the structure stands above ground (vertical height, used in 3D view)"
             />
             <Select
               label="Roof Shape"

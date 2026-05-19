@@ -662,7 +662,7 @@ export function GridCanvas({
             {/* Size tooltip when selected */}
             {isSelected && (
               <div className="absolute -bottom-5 left-0 text-[8px] font-mono bg-black text-white px-1 whitespace-nowrap pointer-events-none z-50">
-                {obj.width_ft}×{obj.height_ft}ft at ({obj.x},{obj.y})
+                {obj.width_ft}W × {obj.height_ft}L ft at ({obj.x},{obj.y})
               </div>
             )}
           </div>

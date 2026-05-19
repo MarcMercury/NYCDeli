@@ -47,9 +47,9 @@ Rules:
     const userPrompt = `Generate a 3D model prompt for this Burning Man camp object:
 - Type: ${sanitizeForPrompt(object_type).replace(/_/g, ' ')}
 - Label: "${sanitizeForPrompt(label)}"
-- Real-world size: ${width_ft}ft × ${height_ft}ft
+- Real-world footprint: ${width_ft}ft wide × ${height_ft}ft long
 - Base color: ${sanitizeForPrompt(color)}
-- Elevation/height: ${properties?.elevation_ft || 'standard'}ft tall
+- Height (how tall): ${properties?.elevation_ft || 'standard'}ft
 - Roof shape: ${sanitizeForPrompt(properties?.roof_shape) || 'flat'}
 - Additional properties: ${sanitizeForPrompt(JSON.stringify(properties))}
 
