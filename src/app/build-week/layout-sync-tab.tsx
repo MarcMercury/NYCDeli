@@ -28,6 +28,9 @@ export default function LayoutSyncTab() {
     inventoryCreated: number
     electricalCreated: number
     scheduleCreated: number
+    componentsCreated: number
+    utilityInventoryCreated: number
+    utilityElectricalCreated: number
   } | null>(null)
   const [showUnlinked, setShowUnlinked] = useState(false)
 
@@ -102,14 +105,14 @@ export default function LayoutSyncTab() {
   return (
     <div className="space-y-3">
       {/* ── Compact summary row ── */}
-      <div className="grid grid-cols-3 gap-3 text-xs">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
         <div>
           <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Map Objects</div>
           <div className="text-lg font-black">{audit.totalPlaced}</div>
           <div className="text-[10px] text-gray-400">{Object.keys(audit.typeCounts).length} types</div>
         </div>
         <div>
-          <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Inventory Coverage</div>
+          <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Inventory</div>
           <div className={cn('text-lg font-black', inventoryPct === 100 ? 'text-green-600' : 'text-red-600')}>
             {inventoryPct}%
           </div>
@@ -119,13 +122,27 @@ export default function LayoutSyncTab() {
           </div>
         </div>
         <div>
-          <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Electrical Coverage</div>
+          <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Electrical</div>
           <div className={cn('text-lg font-black', electricalPct === 100 ? 'text-green-600' : 'text-red-600')}>
             {electricalPct}%
           </div>
           <ProgressBar value={electricalPct} />
           <div className="text-[10px] text-gray-400 mt-0.5">
             {audit.totalLinkedElectrical} linked · {audit.totalUnlinkedElectrical} missing
+          </div>
+        </div>
+        <div>
+          <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Utility Lines</div>
+          <div className="text-lg font-black">{audit.totalUtilityLines}</div>
+          <div className="text-[10px] text-gray-400">
+            {audit.utilityLinesLinkedInventory} → inv · {audit.utilityLinesLinkedElectrical} → elec
+          </div>
+        </div>
+        <div>
+          <div className="font-bold uppercase text-gray-500 text-[10px] mb-0.5">Components</div>
+          <div className="text-lg font-black">{audit.componentsTotal}</div>
+          <div className="text-[10px] text-gray-400">
+            {audit.inventoryWithComponents}/{audit.inventoryTotal} items detailed
           </div>
         </div>
       </div>
@@ -163,7 +180,7 @@ export default function LayoutSyncTab() {
 
         {syncResult && (
           <div className="text-[11px] text-green-700 bg-green-50 border border-green-300 px-2 py-1">
-            Created: {syncResult.inventoryCreated} inv · {syncResult.electricalCreated} elec · {syncResult.scheduleCreated} sched
+            Created: {syncResult.inventoryCreated} inv · {syncResult.electricalCreated} elec · {syncResult.scheduleCreated} sched · {syncResult.componentsCreated} comp · {syncResult.utilityInventoryCreated + syncResult.utilityElectricalCreated} util
           </div>
         )}
       </div>

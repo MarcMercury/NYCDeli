@@ -555,6 +555,12 @@ export interface Database {
         Update: Partial<Omit<BuildInventoryRow, 'id' | 'created_at' | 'updated_at'>>
         Relationships: []
       }
+      build_inventory_components: {
+        Row: BuildInventoryComponentRow
+        Insert: Omit<BuildInventoryComponentRow, 'id' | 'created_at' | 'updated_at' | 'needed_qty'> & { needed_qty?: number }
+        Update: Partial<Omit<BuildInventoryComponentRow, 'id' | 'created_at' | 'updated_at'>>
+        Relationships: []
+      }
       build_schedule_items: {
         Row: BuildScheduleItemRow
         Insert: Omit<BuildScheduleItemRow, 'id' | 'created_at' | 'updated_at'>
@@ -1080,6 +1086,12 @@ export interface UtilityLineRow {
   line_type: UtilityLineType
   points: UtilityLinePoint[]
   label: string
+  length_ft: number
+  wire_gauge: string | null
+  amp_rating: number | null
+  source_object_id: string | null
+  target_object_id: string | null
+  notes: string | null
   created_at: string
   updated_at: string
 }
@@ -1089,12 +1101,24 @@ export interface UtilityLineInsert {
   line_type: UtilityLineType
   points: UtilityLinePoint[]
   label?: string
+  length_ft?: number
+  wire_gauge?: string | null
+  amp_rating?: number | null
+  source_object_id?: string | null
+  target_object_id?: string | null
+  notes?: string | null
 }
 
 export interface UtilityLineUpdate {
   line_type?: UtilityLineType
   points?: UtilityLinePoint[]
   label?: string
+  length_ft?: number
+  wire_gauge?: string | null
+  amp_rating?: number | null
+  source_object_id?: string | null
+  target_object_id?: string | null
+  notes?: string | null
 }
 
 // ==========================================
@@ -1256,6 +1280,29 @@ export interface BuildInventoryRow {
   notes: string | null
   install_day: string | null
   floorplan_object_id: string | null
+  electrical_load_item_id: string | null
+  utility_line_id: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export type InventoryComponentCategory =
+  | 'hardware' | 'fastener' | 'wire' | 'fitting' | 'fabric'
+  | 'lumber' | 'fuel' | 'consumable' | 'other'
+
+export interface BuildInventoryComponentRow {
+  id: string
+  parent_inventory_id: string
+  name: string
+  qty_per_parent: number
+  unit: string
+  category: InventoryComponentCategory | string | null
+  size: string | null
+  description: string | null
+  notes: string | null
+  have_qty: number
+  needed_qty: number
   sort_order: number
   created_at: string
   updated_at: string
@@ -1277,8 +1324,12 @@ export interface BuildScheduleItemRow {
   assigned_to: string | null
   notes: string | null
   floorplan_object_id: string | null
+  utility_line_id: string | null
+  inventory_id: string | null
+  electrical_load_item_id: string | null
   goal_id: string | null
   stage_id: string | null
+  depends_on: string[]
   created_at: string
   updated_at: string
 }
@@ -1319,6 +1370,8 @@ export interface ElectricalLoadItemRow {
   notes: string | null
   distro_box_id: string | null
   floorplan_object_id: string | null
+  utility_line_id: string | null
+  inventory_id: string | null
   sort_order: number
   created_at: string
   updated_at: string
@@ -1377,6 +1430,7 @@ export type BuildResource = BuildResourceRow
 export type BuildProcedure = BuildProcedureRow
 export type BuildQuestion = BuildQuestionRow
 export type BuildInventory = BuildInventoryRow
+export type BuildInventoryComponent = BuildInventoryComponentRow
 export type BuildScheduleItem = BuildScheduleItemRow
 export type ElectricalLoadConfig = ElectricalLoadConfigRow
 export type ElectricalDistroBox = ElectricalDistroBoxRow

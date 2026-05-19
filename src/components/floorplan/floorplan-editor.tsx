@@ -535,6 +535,12 @@ export function FloorplanEditor() {
       line_type: lineType,
       points,
       label: '',
+      length_ft: 0,
+      wire_gauge: null,
+      amp_rating: null,
+      source_object_id: null,
+      target_object_id: null,
+      notes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }

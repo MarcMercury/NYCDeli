@@ -7,6 +7,7 @@ import type {
   BuildQuestion,
   BuildStageWithGoals,
   BuildInventory,
+  BuildInventoryComponent,
   BuildScheduleItem,
   ElectricalLoadConfig,
   ElectricalDistroBox,
@@ -352,6 +353,109 @@ export async function deleteInventoryItem(itemId: string) {
     .from('build_inventory')
     .delete()
     .eq('id', itemId)
+  if (error) throw error
+}
+
+// ==========================================
+// Inventory Components (sub-items: lag bolts, wire, hardware…)
+// ==========================================
+
+export const COMPONENT_UNITS = [
+  'each', 'pair', 'set', 'box', 'pack',
+  'ft', 'in', 'yd', 'm',
+  'lb', 'oz', 'kg', 'gal', 'qt', 'L',
+] as const
+
+export const COMPONENT_CATEGORIES = [
+  'hardware', 'fastener', 'wire', 'fitting', 'fabric',
+  'lumber', 'fuel', 'consumable', 'other',
+] as const
+
+export const COMPONENT_CATEGORY_ICONS: Record<string, string> = {
+  hardware: '🔩',
+  fastener: '🔗',
+  wire: '🔌',
+  fitting: '🧰',
+  fabric: '🧵',
+  lumber: '🪵',
+  fuel: '⛽',
+  consumable: '🧴',
+  other: '🏷️',
+}
+
+export async function fetchInventoryComponents(parentInventoryId: string): Promise<BuildInventoryComponent[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_inventory_components')
+    .select('*')
+    .eq('parent_inventory_id', parentInventoryId)
+    .order('sort_order')
+  if (error) throw error
+  return (data as BuildInventoryComponent[]) || []
+}
+
+export async function fetchAllInventoryComponents(): Promise<BuildInventoryComponent[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('build_inventory_components')
+    .select('*')
+    .order('sort_order')
+  if (error) throw error
+  return (data as BuildInventoryComponent[]) || []
+}
+
+export async function createInventoryComponent(component: {
+  parent_inventory_id: string
+  name: string
+  qty_per_parent?: number
+  unit?: string
+  category?: string | null
+  size?: string | null
+  description?: string | null
+  notes?: string | null
+  have_qty?: number
+}): Promise<BuildInventoryComponent> {
+  const supabase = createClient()
+  const { data: existing } = await supabase
+    .from('build_inventory_components')
+    .select('sort_order')
+    .eq('parent_inventory_id', component.parent_inventory_id)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order + 1 : 0
+  const { data, error } = await supabase
+    .from('build_inventory_components')
+    .insert({
+      qty_per_parent: 1,
+      unit: 'each',
+      have_qty: 0,
+      ...component,
+      sort_order: nextOrder,
+    } as never)
+    .select()
+    .single()
+  if (error) throw error
+  return data as BuildInventoryComponent
+}
+
+export async function updateInventoryComponent(
+  id: string,
+  updates: Partial<Omit<BuildInventoryComponent, 'id' | 'created_at' | 'updated_at' | 'needed_qty'>>
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_inventory_components')
+    .update(updates as never)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteInventoryComponent(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('build_inventory_components')
+    .delete()
+    .eq('id', id)
   if (error) throw error
 }
 

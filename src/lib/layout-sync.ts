@@ -17,6 +17,9 @@ import type {
   InventoryCategory,
   BuildCategory,
   BuildScheduleCategory,
+  BuildScheduleDay,
+  UtilityLineRow,
+  UtilityLinePoint,
 } from '@/types/database'
 
 // ============================================================
@@ -113,11 +116,171 @@ const SCHEDULE_CATEGORY_MAP: Partial<Record<FloorplanObjectType, BuildScheduleCa
   bike_parking:       'logistics',
 }
 
-/** Default wattage estimates for electrical objects on the map */
+/** Default wattage / amperage / voltage / plug per electrical-relevant object type.
+ *  Only listed types auto-create electrical_load_items rows. Zero-draw or
+ *  source objects (e.g. the generator itself) are intentionally omitted. */
 const ELECTRICAL_DEFAULTS: Partial<Record<FloorplanObjectType, { wattage: number; amperage: number; voltage: number; plug_type: string }>> = {
-  generator:          { wattage: 0, amperage: 0, voltage: 120, plug_type: 'generator_output' },
-  swamp_cooler:       { wattage: 250, amperage: 2.1, voltage: 120, plug_type: 'standard' },
+  swamp_cooler:       { wattage: 250,  amperage: 2.1,  voltage: 120, plug_type: 'standard' },
   refrigerated_truck: { wattage: 2000, amperage: 16.7, voltage: 120, plug_type: '20A' },
+  kitchen:            { wattage: 1500, amperage: 12.5, voltage: 120, plug_type: '20A' },
+  prep_area:          { wattage: 500,  amperage: 4.2,  voltage: 120, plug_type: 'standard' },
+  service_area:       { wattage: 750,  amperage: 6.3,  voltage: 120, plug_type: 'standard' },
+  common_area:        { wattage: 600,  amperage: 5.0,  voltage: 120, plug_type: 'standard' },
+  stage:              { wattage: 2000, amperage: 16.7, voltage: 120, plug_type: '20A' },
+  bar:                { wattage: 1000, amperage: 8.3,  voltage: 120, plug_type: 'standard' },
+  first_aid:          { wattage: 200,  amperage: 1.7,  voltage: 120, plug_type: 'standard' },
+  storage:            { wattage: 100,  amperage: 0.8,  voltage: 120, plug_type: 'standard' },
+  pc_container:       { wattage: 500,  amperage: 4.2,  voltage: 120, plug_type: 'standard' },
+  shower_container:   { wattage: 2000, amperage: 16.7, voltage: 120, plug_type: '20A' },
+}
+
+/** Default install day per schedule category — drives smarter schedule sync. */
+const CATEGORY_DEFAULT_DAY: Record<BuildScheduleCategory, BuildScheduleDay> = {
+  delivery:       'pre_build',
+  layout:         'sunday',
+  infrastructure: 'sunday',
+  shade:          'monday',
+  electrical:     'sunday',
+  plumbing:       'monday',
+  kitchen:        'tuesday',
+  decoration:     'thursday',
+  safety:         'thursday',
+  logistics:      'pre_build',
+  other:          'tuesday',
+}
+
+/** Component template — recipe of sub-items each unit of an object type needs.
+ *  Drives auto-population down to the lag-bolt level when an inventory item
+ *  is synced from the layout and has no children yet. */
+interface ComponentTemplate {
+  name: string
+  qty_per_parent: number
+  unit: string
+  category: string
+  size?: string
+  notes?: string
+}
+
+const COMPONENT_TEMPLATES: Partial<Record<FloorplanObjectType, ComponentTemplate[]>> = {
+  shade_structure: [
+    { name: 'Lag bolt',          qty_per_parent: 16, unit: 'each', category: 'fastener', size: '1/2" x 4"', notes: 'Anchoring posts to ground plate' },
+    { name: 'Ground stake',      qty_per_parent: 8,  unit: 'each', category: 'hardware', size: '24"', notes: 'Guy-line anchors' },
+    { name: 'Ratchet strap',     qty_per_parent: 8,  unit: 'each', category: 'hardware', size: '1" x 15ft' },
+    { name: 'Aluminet shade',    qty_per_parent: 1,  unit: 'each', category: 'fabric',   size: '20x30 ft' },
+    { name: 'Zip ties',          qty_per_parent: 50, unit: 'each', category: 'fastener', size: '11" UV' },
+  ],
+  shade_sail: [
+    { name: 'Eye bolt',          qty_per_parent: 4,  unit: 'each', category: 'fastener', size: '3/8"' },
+    { name: 'Turnbuckle',        qty_per_parent: 4,  unit: 'each', category: 'hardware', size: '5/16"' },
+    { name: 'Sail',              qty_per_parent: 1,  unit: 'each', category: 'fabric' },
+  ],
+  kitchen: [
+    { name: 'Folding table',     qty_per_parent: 2,  unit: 'each', category: 'other',    size: '6 ft' },
+    { name: 'Power strip',       qty_per_parent: 2,  unit: 'each', category: 'wire' },
+    { name: 'Extension cord',    qty_per_parent: 2,  unit: 'each', category: 'wire',     size: '12/3 x 25ft' },
+    { name: 'Hand-wash station', qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+  ],
+  grill: [
+    { name: 'Propane tank',      qty_per_parent: 2,  unit: 'each', category: 'fuel',     size: '20 lb' },
+    { name: 'Regulator hose',    qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+    { name: 'Grill brush',       qty_per_parent: 1,  unit: 'each', category: 'consumable' },
+  ],
+  prep_area: [
+    { name: 'Folding table',     qty_per_parent: 2,  unit: 'each', category: 'other',    size: '6 ft' },
+    { name: 'Cutting board',     qty_per_parent: 2,  unit: 'each', category: 'consumable' },
+  ],
+  service_area: [
+    { name: 'Folding table',     qty_per_parent: 2,  unit: 'each', category: 'other',    size: '6 ft' },
+    { name: 'Tablecloth',        qty_per_parent: 2,  unit: 'each', category: 'fabric' },
+  ],
+  generator: [
+    { name: 'Generator',         qty_per_parent: 1,  unit: 'each', category: 'other' },
+    { name: 'Fuel',              qty_per_parent: 50, unit: 'gal',  category: 'fuel',     notes: 'Diesel/propane per gen spec' },
+    { name: 'Oil',               qty_per_parent: 2,  unit: 'qt',   category: 'consumable' },
+    { name: 'Distro tail',       qty_per_parent: 1,  unit: 'each', category: 'wire',     size: '6/3 SOOW' },
+  ],
+  porta_potty: [
+    { name: 'Toilet paper',      qty_per_parent: 12, unit: 'each', category: 'consumable' },
+    { name: 'Hand sanitizer',    qty_per_parent: 1,  unit: 'each', category: 'consumable' },
+  ],
+  shower_container: [
+    { name: 'Water heater',      qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+    { name: 'Shower head',       qty_per_parent: 2,  unit: 'each', category: 'fitting' },
+    { name: 'Drain hose',        qty_per_parent: 1,  unit: 'each', category: 'fitting',  size: '3/4" x 25ft' },
+  ],
+  sink_hose: [
+    { name: 'Garden hose',       qty_per_parent: 1,  unit: 'each', category: 'fitting',  size: '5/8" x 50ft' },
+    { name: 'Spray nozzle',      qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+  ],
+  water_station: [
+    { name: 'Igloo cooler',      qty_per_parent: 1,  unit: 'each', category: 'other',    size: '5 gal' },
+    { name: 'Cup',               qty_per_parent: 100,unit: 'each', category: 'consumable' },
+  ],
+  greywater_tank: [
+    { name: 'Tank',              qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+    { name: 'Pump-out fitting',  qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+  ],
+  bar: [
+    { name: 'Folding table',     qty_per_parent: 1,  unit: 'each', category: 'other',    size: '6 ft' },
+    { name: 'Cup',               qty_per_parent: 200,unit: 'each', category: 'consumable' },
+  ],
+  stage: [
+    { name: 'Pallet',            qty_per_parent: 4,  unit: 'each', category: 'lumber' },
+    { name: 'Plywood deck',      qty_per_parent: 2,  unit: 'each', category: 'lumber',   size: '4x8 x 3/4"' },
+    { name: 'Lag bolt',          qty_per_parent: 12, unit: 'each', category: 'fastener', size: '3/8" x 3"' },
+  ],
+  fence: [
+    { name: 'T-post',            qty_per_parent: 1,  unit: 'each', category: 'hardware', size: '6 ft', notes: '1 post per 8 ft of fence — adjust' },
+    { name: 'Snow fence',        qty_per_parent: 8,  unit: 'ft',   category: 'fabric' },
+    { name: 'Zip ties',          qty_per_parent: 6,  unit: 'each', category: 'fastener' },
+  ],
+  fire_extinguisher: [
+    { name: 'Extinguisher',      qty_per_parent: 1,  unit: 'each', category: 'other' },
+    { name: 'Wall bracket',      qty_per_parent: 1,  unit: 'each', category: 'hardware' },
+  ],
+  fire_pit: [
+    { name: 'Burn barrel',       qty_per_parent: 1,  unit: 'each', category: 'other' },
+    { name: 'Sand bag',          qty_per_parent: 4,  unit: 'each', category: 'consumable', notes: 'Safety perimeter' },
+  ],
+  storage: [
+    { name: 'Padlock',           qty_per_parent: 1,  unit: 'each', category: 'hardware' },
+  ],
+  pc_container: [
+    { name: 'Padlock',           qty_per_parent: 1,  unit: 'each', category: 'hardware' },
+    { name: 'LED light strip',   qty_per_parent: 1,  unit: 'each', category: 'wire' },
+  ],
+  refrigerated_truck: [
+    { name: 'Power tail',        qty_per_parent: 1,  unit: 'each', category: 'wire',     size: '10/3 SOOW' },
+    { name: 'Wheel chock',       qty_per_parent: 2,  unit: 'each', category: 'hardware' },
+  ],
+  sign: [
+    { name: 'Coroplast panel',   qty_per_parent: 1,  unit: 'each', category: 'fabric',   size: '24x36' },
+    { name: 'Stake',             qty_per_parent: 2,  unit: 'each', category: 'hardware' },
+  ],
+  common_area: [
+    { name: 'Folding chair',     qty_per_parent: 8,  unit: 'each', category: 'other' },
+    { name: 'Rug',               qty_per_parent: 1,  unit: 'each', category: 'fabric' },
+  ],
+  table: [
+    { name: 'Folding table',     qty_per_parent: 1,  unit: 'each', category: 'other',    size: '6 ft' },
+  ],
+  bike_parking: [
+    { name: 'Bike rack rebar',   qty_per_parent: 6,  unit: 'each', category: 'hardware', size: '1/2" x 4 ft' },
+  ],
+  swamp_cooler: [
+    { name: 'Power cord',        qty_per_parent: 1,  unit: 'each', category: 'wire',     size: '12/3 x 25ft' },
+    { name: 'Water inlet hose',  qty_per_parent: 1,  unit: 'each', category: 'fitting' },
+  ],
+  fuel_storage: [
+    { name: 'Fuel can',          qty_per_parent: 2,  unit: 'each', category: 'other',    size: '5 gal' },
+    { name: 'Spill kit',         qty_per_parent: 1,  unit: 'each', category: 'consumable' },
+  ],
+  propane_storage: [
+    { name: 'Propane tank',      qty_per_parent: 4,  unit: 'each', category: 'fuel',     size: '20 lb' },
+  ],
+  trash_receptacle: [
+    { name: 'Trash bag',         qty_per_parent: 20, unit: 'each', category: 'consumable', size: '55 gal' },
+  ],
 }
 
 /** Object types that are boundaries/annotations and should NOT generate inventory */
@@ -163,6 +326,14 @@ export interface LayoutAuditSummary {
   totalUnlinkedInventory: number
   totalLinkedElectrical: number
   totalUnlinkedElectrical: number
+  /** Utility line coverage */
+  totalUtilityLines: number
+  utilityLinesLinkedInventory: number
+  utilityLinesLinkedElectrical: number
+  /** Inventory rows that have at least one component child */
+  inventoryWithComponents: number
+  inventoryTotal: number
+  componentsTotal: number
 }
 
 // ============================================================
@@ -182,11 +353,13 @@ export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAudit
   const supabase = createClient()
 
   // Fetch all data in parallel
-  const [objRes, invAllRes, resRes, elecAllRes] = await Promise.all([
+  const [objRes, invAllRes, resRes, elecAllRes, linesRes, compRes] = await Promise.all([
     supabase.from('floorplan_objects').select('*').eq('floorplan_id', floorplanId),
     supabase.from('build_inventory').select('*'),
     supabase.from('build_resources').select('*').not('floorplan_object_id', 'is', null),
     supabase.from('electrical_load_items').select('*'),
+    supabase.from('floorplan_utility_lines').select('id, utility_line_id:id, line_type').eq('floorplan_id', floorplanId),
+    supabase.from('build_inventory_components').select('parent_inventory_id'),
   ])
 
   const objects = (objRes.data || []) as FloorplanObjectRow[]
@@ -322,6 +495,12 @@ export async function fetchLayoutAudit(floorplanId: string): Promise<LayoutAudit
     totalUnlinkedInventory,
     totalLinkedElectrical,
     totalUnlinkedElectrical,
+    totalUtilityLines: ((linesRes.data || []) as { id: string }[]).length,
+    utilityLinesLinkedInventory: allInventory.filter(r => (r as BuildInventoryRow & { utility_line_id?: string | null }).utility_line_id).length,
+    utilityLinesLinkedElectrical: allElectrical.filter(r => (r as ElectricalLoadItemRow & { utility_line_id?: string | null }).utility_line_id).length,
+    inventoryWithComponents: new Set(((compRes.data || []) as { parent_inventory_id: string }[]).map(r => r.parent_inventory_id)).size,
+    inventoryTotal: allInventory.length,
+    componentsTotal: ((compRes.data || []) as unknown[]).length,
   }
 }
 
@@ -389,7 +568,7 @@ export async function syncLayoutToInventory(floorplanId: string): Promise<number
     const { error } = await supabase.from('build_inventory').insert({
       name: obj.label || obj.object_type.replace(/_/g, ' '),
       category,
-      description: `Auto-synced from layout: ${obj.width_ft}×${obj.height_ft} ft`,
+      description: `Auto-synced from layout: ${obj.width_ft}W × ${obj.height_ft}L ft`,
       quantity_expected: 1,
       floorplan_object_id: obj.id,
       size_w: String(obj.width_ft),
@@ -485,8 +664,9 @@ export async function syncLayoutToElectrical(floorplanId: string): Promise<numbe
 
 /**
  * Sync placed floorplan objects to build_schedule_items as setup tasks.
- * Creates one "Install <label>" schedule task per trackable object.
- * Returns count of items created.
+ * Groups objects by type and creates ONE task per type with a count
+ * (e.g. "Install 12 swamp coolers"). Default day is picked per
+ * schedule category. Returns count of tasks created.
  */
 export async function syncLayoutToSchedule(floorplanId: string): Promise<number> {
   const supabase = createClient()
@@ -504,15 +684,20 @@ export async function syncLayoutToSchedule(floorplanId: string): Promise<number>
       .filter(Boolean)
   )
 
-  // Build type-level coverage: if there's already a schedule item for any
-  // object of this type, consider the type covered (schedule items are tasks,
-  // not quantity based)
-  const coveredTypes = new Set<FloorplanObjectType>()
+  // Group placed objects by type (skipping non-trackable types and those
+  // that already have any linked schedule task).
+  const objectsByType = new Map<FloorplanObjectType, FloorplanObjectRow[]>()
+  const typesWithExistingTask = new Set<FloorplanObjectType>()
   for (const obj of objects) {
     if (SKIP_TYPES.has(obj.object_type)) continue
+    if (!SCHEDULE_CATEGORY_MAP[obj.object_type]) continue
     if (linkedIds.has(obj.id)) {
-      coveredTypes.add(obj.object_type)
+      typesWithExistingTask.add(obj.object_type)
+      continue
     }
+    const arr = objectsByType.get(obj.object_type) || []
+    arr.push(obj)
+    objectsByType.set(obj.object_type, arr)
   }
 
   const { data: maxRow } = await supabase
@@ -523,46 +708,220 @@ export async function syncLayoutToSchedule(floorplanId: string): Promise<number>
   let nextOrder = maxRow && maxRow.length > 0 ? (maxRow[0] as { sort_order: number }).sort_order + 1 : 0
 
   let created = 0
-  for (const obj of objects) {
-    if (SKIP_TYPES.has(obj.object_type)) continue
-    if (linkedIds.has(obj.id)) continue
-    if (coveredTypes.has(obj.object_type)) continue // already has schedule items for this type
-
-    const category = SCHEDULE_CATEGORY_MAP[obj.object_type]
-    if (!category) continue
-
-    const label = obj.label || obj.object_type.replace(/_/g, ' ')
+  for (const [objType, list] of objectsByType) {
+    if (typesWithExistingTask.has(objType)) continue
+    const category = SCHEDULE_CATEGORY_MAP[objType]!
+    const day = CATEGORY_DEFAULT_DAY[category] ?? 'tuesday'
+    const typeLabel = objectTypeLabel(objType)
+    const count = list.length
+    const representative = list[0]
     const { error } = await supabase.from('build_schedule_items').insert({
-      title: `Install ${label}`,
-      description: `Setup ${label} (${obj.width_ft}×${obj.height_ft} ft) at layout position`,
-      day: 'tuesday', // default build day — admin can change
+      title: count > 1 ? `Install ${count} × ${typeLabel}` : `Install ${representative.label || typeLabel}`,
+      description: count > 1
+        ? `Place and set up ${count} ${typeLabel.toLowerCase()} objects per layout.`
+        : `Setup ${representative.label || typeLabel} (${representative.width_ft}W × ${representative.height_ft}L ft).`,
+      day,
       category,
-      floorplan_object_id: obj.id,
+      floorplan_object_id: representative.id,
       sort_order: nextOrder++,
       is_delivery: false,
       completed: false,
     } as never)
-
     if (!error) created++
   }
 
   return created
 }
 
+// ============================================================
+// Utility line geometry helpers
+// ============================================================
+
+/** Polyline length in feet from an array of grid coords. */
+function polylineLengthFt(points: UtilityLinePoint[]): number {
+  let total = 0
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x
+    const dy = points[i].y - points[i - 1].y
+    total += Math.sqrt(dx * dx + dy * dy)
+  }
+  return Math.round(total * 10) / 10
+}
+
+/** Inventory-row "name" we use for a utility line cable run. */
+function utilityLineInventoryName(line: UtilityLineRow): string {
+  const length = line.length_ft || polylineLengthFt(line.points)
+  const gauge = line.wire_gauge || (line.line_type === 'power' ? '12/3 SOOW' : '3/4" hose')
+  const kind = line.line_type === 'power' ? 'Power cable' : 'Water line'
+  return `${kind} — ${gauge} × ${Math.ceil(length)} ft`
+}
+
 /**
- * Run all three syncs at once: inventory, electrical, and schedule.
+ * Sync floorplan utility lines into build_inventory + electrical_load_items.
+ * Each drawn line generates an inventory row for the cable/hose footage, and
+ * (for power lines) an electrical_load_items row that documents the run.
+ * Caches polyline length back onto the utility line row.
+ */
+export async function syncUtilityLines(floorplanId: string): Promise<{
+  inventoryCreated: number
+  electricalCreated: number
+}> {
+  const supabase = createClient()
+  const [linesRes, invRes, elecRes] = await Promise.all([
+    supabase.from('floorplan_utility_lines').select('*').eq('floorplan_id', floorplanId),
+    supabase.from('build_inventory').select('id, utility_line_id'),
+    supabase.from('electrical_load_items').select('id, utility_line_id'),
+  ])
+  const lines = (linesRes.data || []) as UtilityLineRow[]
+  const linkedInv = new Set(((invRes.data || []) as { utility_line_id: string | null }[])
+    .map(r => r.utility_line_id).filter(Boolean))
+  const linkedElec = new Set(((elecRes.data || []) as { utility_line_id: string | null }[])
+    .map(r => r.utility_line_id).filter(Boolean))
+
+  const { data: maxInv } = await supabase
+    .from('build_inventory').select('sort_order')
+    .order('sort_order', { ascending: false }).limit(1)
+  let invOrder = maxInv && maxInv.length > 0 ? (maxInv[0] as { sort_order: number }).sort_order + 1 : 0
+
+  const { data: maxElec } = await supabase
+    .from('electrical_load_items').select('sort_order')
+    .order('sort_order', { ascending: false }).limit(1)
+  let elecOrder = maxElec && maxElec.length > 0 ? (maxElec[0] as { sort_order: number }).sort_order + 1 : 0
+
+  let inventoryCreated = 0
+  let electricalCreated = 0
+
+  for (const line of lines) {
+    // Refresh cached length if missing/stale
+    const computedLength = polylineLengthFt(line.points)
+    if (Math.abs((line.length_ft || 0) - computedLength) > 0.5) {
+      await supabase.from('floorplan_utility_lines')
+        .update({ length_ft: computedLength } as never)
+        .eq('id', line.id)
+      line.length_ft = computedLength
+    }
+
+    if (!linkedInv.has(line.id)) {
+      const category: InventoryCategory = line.line_type === 'power' ? 'electrical' : 'plumbing'
+      const { error } = await supabase.from('build_inventory').insert({
+        name: utilityLineInventoryName(line),
+        category,
+        description: `Auto-synced from layout utility line — ${line.label || line.line_type}`,
+        quantity_expected: 1,
+        size_l: `${Math.ceil(line.length_ft || computedLength)} ft`,
+        utility_line_id: line.id,
+        sort_order: invOrder++,
+      } as never)
+      if (!error) inventoryCreated++
+    }
+
+    if (line.line_type === 'power' && !linkedElec.has(line.id)) {
+      const amps = line.amp_rating ?? 20
+      const { error } = await supabase.from('electrical_load_items').insert({
+        name: utilityLineInventoryName(line),
+        location: line.label || 'Utility line',
+        voltage: 120,
+        amperage: 0,
+        wattage: 0,
+        plug_type: line.wire_gauge || 'standard',
+        quantity: 1,
+        total_amps: 0,
+        total_wattage: 0,
+        notes: `Cable run — carry capacity ${amps}A`,
+        utility_line_id: line.id,
+        sort_order: elecOrder++,
+      } as never)
+      if (!error) electricalCreated++
+    }
+  }
+
+  return { inventoryCreated, electricalCreated }
+}
+
+/**
+ * Seed component templates for inventory items that were auto-created from
+ * the layout but have no children yet. Returns count of components created.
+ */
+export async function syncLayoutComponents(floorplanId: string): Promise<number> {
+  const supabase = createClient()
+  const [objRes, invRes, compRes] = await Promise.all([
+    supabase.from('floorplan_objects').select('*').eq('floorplan_id', floorplanId),
+    supabase.from('build_inventory').select('*'),
+    supabase.from('build_inventory_components').select('parent_inventory_id'),
+  ])
+  const objects = (objRes.data || []) as FloorplanObjectRow[]
+  const allInventory = (invRes.data || []) as BuildInventoryRow[]
+  const parentsWithComponents = new Set(
+    ((compRes.data || []) as { parent_inventory_id: string }[]).map(r => r.parent_inventory_id)
+  )
+
+  // Build inventory rows indexed by floorplan_object_id
+  const invByObj = new Map<string, BuildInventoryRow>()
+  for (const row of allInventory) {
+    if (row.floorplan_object_id) invByObj.set(row.floorplan_object_id, row)
+  }
+
+  // Avoid duplicating templates for the same parent across multiple object
+  // placements of the same type (one inventory row may cover many objects).
+  const seededParents = new Set<string>()
+  let created = 0
+  for (const obj of objects) {
+    const template = COMPONENT_TEMPLATES[obj.object_type]
+    if (!template || template.length === 0) continue
+    const parent = invByObj.get(obj.id)
+    if (!parent) continue
+    if (parentsWithComponents.has(parent.id)) continue
+    if (seededParents.has(parent.id)) continue
+    seededParents.add(parent.id)
+
+    let order = 0
+    for (const tmpl of template) {
+      const { error } = await supabase.from('build_inventory_components').insert({
+        parent_inventory_id: parent.id,
+        name: tmpl.name,
+        qty_per_parent: tmpl.qty_per_parent,
+        unit: tmpl.unit,
+        category: tmpl.category,
+        size: tmpl.size ?? null,
+        notes: tmpl.notes ?? null,
+        have_qty: 0,
+        sort_order: order++,
+      } as never)
+      if (!error) created++
+    }
+  }
+  return created
+}
+
+/**
+ * Run every sync at once: inventory, components, electrical, utility lines,
+ * and schedule. Components MUST run after inventory so parent rows exist.
  */
 export async function syncLayoutAll(floorplanId: string): Promise<{
   inventoryCreated: number
   electricalCreated: number
   scheduleCreated: number
+  componentsCreated: number
+  utilityInventoryCreated: number
+  utilityElectricalCreated: number
 }> {
-  const [inventoryCreated, electricalCreated, scheduleCreated] = await Promise.all([
-    syncLayoutToInventory(floorplanId),
+  // 1) inventory rows first (some downstream syncs depend on these existing)
+  const inventoryCreated = await syncLayoutToInventory(floorplanId)
+  // 2) anything that doesn't depend on inventory can run in parallel
+  const [electricalCreated, scheduleCreated, utility, componentsCreated] = await Promise.all([
     syncLayoutToElectrical(floorplanId),
     syncLayoutToSchedule(floorplanId),
+    syncUtilityLines(floorplanId),
+    syncLayoutComponents(floorplanId),
   ])
-  return { inventoryCreated, electricalCreated, scheduleCreated }
+  return {
+    inventoryCreated,
+    electricalCreated,
+    scheduleCreated,
+    componentsCreated,
+    utilityInventoryCreated: utility.inventoryCreated,
+    utilityElectricalCreated: utility.electricalCreated,
+  }
 }
 
 // ============================================================
