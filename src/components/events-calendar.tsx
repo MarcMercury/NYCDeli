@@ -19,7 +19,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { CampEvent, EventCategory } from '@/types/database'
 import { cn } from '@/lib/utils'
 
-const BURN_DATE = new Date(2026, 7, 30) // Aug 30, 2026
+const BURN_DATE = new Date(2026, 8, 5) // Sep 5, 2026 — the Man burns (Burning Man 2026: Aug 30–Sep 7)
 
 const CATEGORY_COLORS: Record<EventCategory, string> = {
   general: 'bg-gray-200 text-gray-800',
