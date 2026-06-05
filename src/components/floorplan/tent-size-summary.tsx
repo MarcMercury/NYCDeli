@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { buildTentShareGroups } from '@/lib/union-find'
 import type { FloorplanObjectRow } from '@/types/database'
 
 /* ── CSV path (served from public/) ─────────────────────────────── */
@@ -349,31 +350,9 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
 
       // Build sharing groups via union-find over BOTH sharing_tent_with FK
       // columns so that 3-person tents (A↔B, A↔C) collapse into one group.
-      const parent = new Map<string, string>()
-      for (const row of rows) parent.set(row.id, row.id)
-      const find = (id: string): string => {
-        let cur = id
-        while (parent.get(cur) !== cur) cur = parent.get(cur)!
-        // Path compression
-        let walker = id
-        while (parent.get(walker) !== cur) {
-          const next = parent.get(walker)!
-          parent.set(walker, cur)
-          walker = next
-        }
-        return cur
-      }
-      const union = (a: string, b: string) => {
-        const ra = find(a), rb = find(b)
-        if (ra !== rb) parent.set(ra, rb)
-      }
-      for (const row of rows) {
-        for (const partnerId of [row.sharing_tent_with, row.sharing_tent_with_2]) {
-          if (!partnerId) continue
-          if (!parent.has(partnerId)) continue // partner missing/deleted
-          union(row.id, partnerId)
-        }
-      }
+      // (shared with src/lib/tent-mates.ts and src/lib/tent-needs.ts)
+      const uf = buildTentShareGroups(rows)
+      const find = (id: string): string => uf.find(id)
 
       // Bucket camper IDs by their group root, but only keep groups of size ≥ 2.
       const groupMap = new Map<string, string[]>()

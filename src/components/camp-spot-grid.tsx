@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { CampSpotWithReservation, SpotSize } from '@/types/database'
 import { doesTentFitSpot } from '@/lib/camp-spots'
@@ -52,15 +52,16 @@ export function SpotGrid({
 }: SpotGridProps) {
   const [hoveredSpot, setHoveredSpot] = useState<CampSpotWithReservation | null>(null)
 
-  // Group spots by row
-  const rows = new Map<string, CampSpotWithReservation[]>()
-  for (const spot of spots) {
-    const existing = rows.get(spot.row_label) ?? []
-    existing.push(spot)
-    rows.set(spot.row_label, existing)
-  }
-
-  const sortedRows = Array.from(rows.entries()).sort(([a], [b]) => a.localeCompare(b))
+  // Group spots by row (memoized — only changes when spots change)
+  const sortedRows = useMemo(() => {
+    const rows = new Map<string, CampSpotWithReservation[]>()
+    for (const spot of spots) {
+      const existing = rows.get(spot.row_label) ?? []
+      existing.push(spot)
+      rows.set(spot.row_label, existing)
+    }
+    return Array.from(rows.entries()).sort(([a], [b]) => a.localeCompare(b))
+  }, [spots])
 
   function getSpotState(spot: CampSpotWithReservation) {
     if (!spot.is_available) return 'unavailable'
@@ -106,9 +107,11 @@ export function SpotGrid({
   }
 
   // Stats
-  const totalSpots = spots.length
-  const availableSpots = spots.filter(s => s.is_available && s.reservations.length < s.max_occupants).length
-  const fullSpots = spots.filter(s => s.reservations.length >= s.max_occupants).length
+  const { totalSpots, availableSpots, fullSpots } = useMemo(() => ({
+    totalSpots: spots.length,
+    availableSpots: spots.filter(s => s.is_available && s.reservations.length < s.max_occupants).length,
+    fullSpots: spots.filter(s => s.reservations.length >= s.max_occupants).length,
+  }), [spots])
 
   return (
     <div className="space-y-6">

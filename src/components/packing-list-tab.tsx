@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Button, Input, Alert, Badge, Select } from '@/components/ui'
 import {
   getPackingListAction,
@@ -54,7 +54,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
 
   // Collapsed categories (start with all collapsed)
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
-  const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false)
+  const collapseInitialized = useRef(false)
 
   // Add item form
   const [showAddForm, setShowAddForm] = useState(false)
@@ -73,6 +73,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   const fetchItems = useCallback(async () => {
     const result = await getPackingListAction(camper.id)
     if (result.success && result.items) {
+      let finalItems = result.items
       // Sync any missing items from the base list (e.g. newly added categories)
       if (result.items.length > 0) {
         const syncResult = await syncMissingBaseItemsAction(
@@ -85,29 +86,23 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
           }))
         )
         if (syncResult.success && syncResult.items) {
-          setItems(syncResult.items)
-        } else {
-          setItems(result.items)
+          finalItems = syncResult.items
         }
-      } else {
-        setItems(result.items)
+      }
+      setItems(finalItems)
+      // Collapse all categories by default the first time items load
+      if (!collapseInitialized.current && finalItems.length > 0) {
+        setCollapsedCats(new Set(finalItems.map(i => i.category || 'Uncategorized')))
+        collapseInitialized.current = true
       }
     }
     setLoading(false)
   }, [camper.id])
 
   useEffect(() => {
-    fetchItems()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
+    void fetchItems()
   }, [fetchItems])
-
-  // Collapse all categories by default once items first load
-  useEffect(() => {
-    if (!hasInitializedCollapse && items.length > 0) {
-      const allCats = new Set(items.map(i => i.category || 'Uncategorized'))
-      setCollapsedCats(allCats)
-      setHasInitializedCollapse(true)
-    }
-  }, [items, hasInitializedCollapse])
 
   const loadBaseList = async () => {
     setPopulating(true)
@@ -222,36 +217,36 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   }
 
   // Filter items
-  const filteredItems = items.filter(i => {
+  const filteredItems = useMemo(() => items.filter(i => {
     if (priorityFilter !== 'all' && i.priority !== priorityFilter) return false
     if (statusFilter !== 'all' && i.status !== statusFilter) return false
     return true
-  })
+  }), [items, priorityFilter, statusFilter])
 
   // Group by category
-  const grouped = filteredItems.reduce<Record<string, PackingListItemRow[]>>((acc, item) => {
+  const grouped = useMemo(() => filteredItems.reduce<Record<string, PackingListItemRow[]>>((acc, item) => {
     const cat = item.category || 'Uncategorized'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(item)
     return acc
-  }, {})
+  }, {}), [filteredItems])
 
-  const sortedCategories = Object.keys(grouped).sort((a, b) => {
+  const sortedCategories = useMemo(() => Object.keys(grouped).sort((a, b) => {
     const idxA = (PACKING_CATEGORIES as readonly string[]).indexOf(a)
     const idxB = (PACKING_CATEGORIES as readonly string[]).indexOf(b)
     if (idxA >= 0 && idxB >= 0) return idxA - idxB
     if (idxA >= 0) return -1
     if (idxB >= 0) return 1
     return a.localeCompare(b)
-  })
+  }), [grouped])
 
   // Stats
-  const statusCounts = {
+  const statusCounts = useMemo(() => ({
     need: items.filter(i => i.status === 'need').length,
     ordered: items.filter(i => i.status === 'ordered').length,
     have: items.filter(i => i.status === 'have').length,
     packed: items.filter(i => i.status === 'packed').length,
-  }
+  }), [items])
   const totalItems = items.length
 
   if (loading) {

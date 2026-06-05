@@ -14,6 +14,8 @@
  * panel, and layout builder all agree on who is in which tent.
  */
 
+import { buildTentShareGroups } from '@/lib/union-find'
+
 export interface TentMateRow {
   id: string
   sharing_tent_with: string | null
@@ -31,36 +33,14 @@ export function resolveTentMateIds<T extends TentMateRow>(
   for (const c of campers) byId.set(c.id, c)
   if (!byId.has(camperId)) return []
 
-  // Union-find over both sharing slots.
-  const parent = new Map<string, string>()
-  for (const c of campers) parent.set(c.id, c.id)
-  const find = (id: string): string => {
-    let cur = id
-    while (parent.get(cur) !== cur) cur = parent.get(cur)!
-    let walker = id
-    while (parent.get(walker) !== cur) {
-      const next = parent.get(walker)!
-      parent.set(walker, cur)
-      walker = next
-    }
-    return cur
-  }
-  const union = (a: string, b: string) => {
-    const ra = find(a)
-    const rb = find(b)
-    if (ra !== rb) parent.set(ra, rb)
-  }
-  for (const c of campers) {
-    for (const partnerId of [c.sharing_tent_with, c.sharing_tent_with_2]) {
-      if (partnerId && byId.has(partnerId)) union(c.id, partnerId)
-    }
-  }
+  // Union-find over both sharing slots (shared with src/lib/tent-needs.ts).
+  const uf = buildTentShareGroups(campers)
 
-  const root = find(camperId)
+  const root = uf.find(camperId)
   const mates: string[] = []
   for (const c of campers) {
     if (c.id === camperId) continue
-    if (find(c.id) === root) mates.push(c.id)
+    if (uf.find(c.id) === root) mates.push(c.id)
   }
   return mates
 }

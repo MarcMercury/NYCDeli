@@ -109,36 +109,37 @@ export default function SchedulePage() {
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
-    
-    const [rolesRes, shiftsRes, assignmentsRes, campersRes] = await Promise.all([
-      supabase.from('kitchen_roles').select('*'),
-      supabase.from('kitchen_shifts').select('*').order('date').order('start_time'),
-      supabase.from('schedule_assignments').select('*'),
-      supabase.from('campers').select('*'),
-    ])
 
-    const roles = (rolesRes.data as KitchenRole[]) || []
-    const shiftsData = (shiftsRes.data as KitchenShift[]) || []
-    const assignmentsData = (assignmentsRes.data as ScheduleAssignment[]) || []
-    const campers = (campersRes.data as Camper[]) || []
+    try {
+      const [rolesRes, shiftsRes, assignmentsRes, campersRes] = await Promise.all([
+        supabase.from('kitchen_roles').select('*'),
+        supabase.from('kitchen_shifts').select('*').order('date').order('start_time'),
+        supabase.from('schedule_assignments').select('*'),
+        supabase.from('campers').select('*'),
+      ])
 
-    const enrichedShifts = shiftsData.map(shift => ({
-      ...shift,
-      role: roles.find(r => r.id === shift.role_id),
-    }))
+      const roles = (rolesRes.data as KitchenRole[]) || []
+      const shiftsData = (shiftsRes.data as KitchenShift[]) || []
+      const assignmentsData = (assignmentsRes.data as ScheduleAssignment[]) || []
+      const campers = (campersRes.data as Camper[]) || []
 
-    const enrichedAssignments = assignmentsData.map(assignment => ({
-      ...assignment,
-      shift: enrichedShifts.find(s => s.id === assignment.shift_id),
-      camper: campers.find(c => c.id === assignment.camper_id),
-    }))
-    setAssignments(enrichedAssignments)
+      const enrichedShifts = shiftsData.map(shift => ({
+        ...shift,
+        role: roles.find(r => r.id === shift.role_id),
+      }))
 
-    setLoading(false)
+      const enrichedAssignments = assignmentsData.map(assignment => ({
+        ...assignment,
+        shift: enrichedShifts.find(s => s.id === assignment.shift_id),
+        camper: campers.find(c => c.id === assignment.camper_id),
+      }))
+      setAssignments(enrichedAssignments)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     void fetchData()
   }, [fetchData])
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
@@ -452,7 +452,7 @@ export default function BuildWeekPage() {
   const needCount = resources.filter(r => r.status === 'need').length
 
   // ── Unified inventory: merge resources + checklist items ──
-  const unifiedItems: UnifiedItem[] = [
+  const unifiedItems = useMemo<UnifiedItem[]>(() => [
     ...resources.map(r => ({
       id: r.id,
       source: 'resource' as const,
@@ -481,14 +481,15 @@ export default function BuildWeekPage() {
       installDay: i.install_day || '',
       originalInventory: i,
     })),
-  ]
+  ], [resources, inventory])
 
-  const allCategories = Array.from(new Set(unifiedItems.map(i => i.category))).sort()
-  const allStatuses = Array.from(new Set(unifiedItems.map(i => i.status))).sort()
+  const allCategories = useMemo(() => Array.from(new Set(unifiedItems.map(i => i.category))).sort(), [unifiedItems])
+  const allStatuses = useMemo(() => Array.from(new Set(unifiedItems.map(i => i.status))).sort(), [unifiedItems])
 
-  const filteredUnifiedItems = unifiedItems
+  const filteredUnifiedItems = useMemo(() => unifiedItems
     .filter(i => unifiedCategoryFilter === 'all' || i.category === unifiedCategoryFilter)
-    .filter(i => unifiedStatusFilter === 'all' || i.status === unifiedStatusFilter)
+    .filter(i => unifiedStatusFilter === 'all' || i.status === unifiedStatusFilter),
+    [unifiedItems, unifiedCategoryFilter, unifiedStatusFilter])
 
   const handleExportInventory = () => {
     const headers = ['Item', 'Category', 'Type', 'Size', 'Size (W)', 'Size (L)', 'Count', '# Needed', 'Status', 'Install Day']

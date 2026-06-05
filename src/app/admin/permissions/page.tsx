@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Card, CardContent,
-  Badge, Alert, Button, Input, Select
+  Badge, Alert, Input, Select
 } from '@/components/ui'
 import { updateUserRoleAction } from '@/app/actions/admin'
 import type { UserProfileRow, UserRole } from '@/types/database'

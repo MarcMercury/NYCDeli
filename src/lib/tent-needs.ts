@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { buildTentShareGroups } from '@/lib/union-find'
 
 /**
  * A "tent need" represents a single tent that must be placed on the layout
@@ -62,32 +63,9 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   const rows = data as unknown as CamperRow[]
 
   // Union-find over both partner columns so 3-person shares (A↔B, A↔C)
-  // collapse into a single group.
-  const parent = new Map<string, string>()
-  for (const r of rows) parent.set(r.id, r.id)
-  const find = (id: string): string => {
-    let cur = id
-    while (parent.get(cur) !== cur) cur = parent.get(cur)!
-    let walker = id
-    while (parent.get(walker) !== cur) {
-      const next = parent.get(walker)!
-      parent.set(walker, cur)
-      walker = next
-    }
-    return cur
-  }
-  const union = (a: string, b: string) => {
-    const ra = find(a)
-    const rb = find(b)
-    if (ra !== rb) parent.set(ra, rb)
-  }
-  for (const r of rows) {
-    for (const partnerId of [r.sharing_tent_with, r.sharing_tent_with_2]) {
-      if (!partnerId) continue
-      if (!parent.has(partnerId)) continue
-      union(r.id, partnerId)
-    }
-  }
+  // collapse into a single group (shared with src/lib/tent-mates.ts).
+  const uf = buildTentShareGroups(rows)
+  const find = (id: string): string => uf.find(id)
 
   // Bucket rows by group root
   const groups = new Map<string, CamperRow[]>()
@@ -99,8 +77,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   }
 
   const tents: TentNeed[] = []
-  let counter = 0
-  const newId = () => `pending-tent-${Date.now()}-${counter++}`
+  const newId = () => `pending-tent-${crypto.randomUUID()}`
 
   for (const members of groups.values()) {
     const names = members.map(m => m.full_name).filter(Boolean)

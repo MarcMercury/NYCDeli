@@ -5,25 +5,28 @@ import type { CampSpotRow, CampReservationRow, CampSpotWithReservation, CampSpot
 export async function fetchSpotsWithReservations(): Promise<CampSpotWithReservation[]> {
   const supabase = createClient()
 
-  const { data: spots, error: spotsError } = await supabase
-    .from('camp_spots' as never)
-    .select('*')
-    .order('row_label' as never)
-    .order('spot_number' as never) as unknown as { data: CampSpotRow[] | null; error: Error | null }
+  // Spots and reservations are independent — fetch them in parallel.
+  const [spotsRes, reservationsRes] = await Promise.all([
+    supabase
+      .from('camp_spots' as never)
+      .select('*')
+      .order('row_label' as never)
+      .order('spot_number' as never) as unknown as Promise<{ data: CampSpotRow[] | null; error: Error | null }>,
+    supabase
+      .from('camp_reservations' as never)
+      .select('*')
+      .eq('status' as never, 'reserved') as unknown as Promise<{ data: CampReservationRow[] | null; error: Error | null }>,
+  ])
 
+  const { data: spots, error: spotsError } = spotsRes
   if (spotsError) throw spotsError
   if (!spots) return []
 
-  const { data: reservations, error: resError } = await supabase
-    .from('camp_reservations' as never)
-    .select('*') as unknown as { data: CampReservationRow[] | null; error: Error | null }
-
+  const { data: reservations, error: resError } = reservationsRes
   if (resError) throw resError
 
   // Fetch camper info for all active reservations
-  const camperIds = (reservations ?? [])
-    .filter((r) => r.status === 'reserved')
-    .map((r) => r.camper_id)
+  const camperIds = (reservations ?? []).map((r) => r.camper_id)
 
   const uniqueCamperIds = [...new Set(camperIds)]
 
@@ -40,7 +43,7 @@ export async function fetchSpotsWithReservations(): Promise<CampSpotWithReservat
 
   // Group reservations by spot (supports multiple per spot for tent sharing)
   const reservationsBySpot = new Map<string, CampReservationRow[]>()
-  for (const r of (reservations ?? []).filter((r) => r.status === 'reserved')) {
+  for (const r of (reservations ?? [])) {
     const existing = reservationsBySpot.get(r.spot_id) ?? []
     existing.push(r)
     reservationsBySpot.set(r.spot_id, existing)

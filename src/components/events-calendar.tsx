@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   format,
   startOfMonth,
@@ -13,11 +13,12 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
-  parseISO,
 } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import type { CampEvent, EventCategory } from '@/types/database'
 import { cn } from '@/lib/utils'
+
+const supabase = createClient()
 
 const BURN_DATE = new Date(2026, 8, 5) // Sep 5, 2026 — the Man burns (Burning Man 2026: Aug 30–Sep 7)
 
@@ -58,6 +59,8 @@ export function EventsCalendar() {
   const [editingEvent, setEditingEvent] = useState<CampEvent | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<{
     title: string
@@ -77,25 +80,42 @@ export function EventsCalendar() {
     category: 'general',
   })
 
-  const supabase = createClient()
-
   const fetchEvents = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('camp_events')
       .select('*')
       .order('event_date', { ascending: true })
 
-    if (!error && data) {
+    if (fetchError) {
+      setError('Could not load events. Please refresh.')
+    } else if (data) {
       setEvents(data as CampEvent[])
     }
     setLoading(false)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load
     void fetchEvents()
   }, [fetchEvents])
+
+  // Determine whether the current user can edit (admins only)
+  useEffect(() => {
+    let active = true
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (active && (profile as { role?: string } | null)?.role === 'admin') {
+        setIsAdmin(true)
+      }
+    })
+    return () => { active = false }
+  }, [])
 
   const openAddForm = (date: Date) => {
     setEditingEvent(null)
@@ -128,6 +148,7 @@ export function EventsCalendar() {
   const handleSave = async () => {
     if (!formData.title.trim() || !formData.event_date) return
     setSaving(true)
+    setError(null)
 
     const payload = {
       title: formData.title.trim(),
@@ -139,43 +160,68 @@ export function EventsCalendar() {
       category: formData.category,
     }
 
-    if (editingEvent) {
+    const { error: saveError } = editingEvent
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('camp_events') as any).update(payload).eq('id', editingEvent.id)
-    } else {
+      ? await (supabase.from('camp_events') as any).update(payload).eq('id', editingEvent.id)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('camp_events') as any).insert(payload)
+      : await (supabase.from('camp_events') as any).insert(payload)
+
+    setSaving(false)
+
+    if (saveError) {
+      setError(saveError.message || 'Could not save event.')
+      return
     }
 
     setShowForm(false)
     setEditingEvent(null)
-    setSaving(false)
     fetchEvents()
   }
 
   const handleDelete = async (id: string) => {
+    setError(null)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('camp_events') as any).delete().eq('id', id)
+    const { error: deleteError } = await (supabase.from('camp_events') as any).delete().eq('id', id)
+    if (deleteError) {
+      setError(deleteError.message || 'Could not delete event.')
+      return
+    }
     setShowForm(false)
     setEditingEvent(null)
     fetchEvents()
   }
 
   // Calendar grid generation
+  const days = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth)
+    const calStart = startOfWeek(monthStart)
+    const calEnd = endOfWeek(endOfMonth(monthStart))
+    const result: Date[] = []
+    let day = calStart
+    while (day <= calEnd) {
+      result.push(day)
+      day = addDays(day, 1)
+    }
+    return result
+  }, [currentMonth])
+
   const monthStart = startOfMonth(currentMonth)
-  const monthEnd = endOfMonth(monthStart)
-  const calStart = startOfWeek(monthStart)
-  const calEnd = endOfWeek(monthEnd)
 
-  const days: Date[] = []
-  let day = calStart
-  while (day <= calEnd) {
-    days.push(day)
-    day = addDays(day, 1)
-  }
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CampEvent[]>()
+    for (const e of events) {
+      const key = e.event_date
+      const list = map.get(key)
+      if (list) list.push(e)
+      else map.set(key, [e])
+    }
+    return map
+  }, [events])
 
-  const getEventsForDate = (date: Date) =>
-    events.filter((e) => isSameDay(parseISO(e.event_date), date))
+  const getEventsForDate = useCallback(
+    (date: Date) => eventsByDate.get(format(date, 'yyyy-MM-dd')) ?? [],
+    [eventsByDate]
+  )
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : []
 
@@ -274,6 +320,12 @@ export function EventsCalendar() {
         <div className="text-center text-gray-500 text-sm">Loading events...</div>
       )}
 
+      {error && (
+        <div className="text-center text-red-600 text-sm font-medium border-2 border-red-600 bg-red-50 p-2">
+          {error}
+        </div>
+      )}
+
       {/* Selected Date Panel */}
       {selectedDate && (
         <div className="border-2 border-black p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
@@ -281,12 +333,14 @@ export function EventsCalendar() {
             <h3 className="text-lg font-black uppercase tracking-wider">
               {format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </h3>
-            <button
-              onClick={() => openAddForm(selectedDate)}
-              className="px-4 py-2 bg-yellow-400 border-2 border-black font-bold text-sm uppercase hover:bg-yellow-500 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-            >
-              + Add Event
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => openAddForm(selectedDate)}
+                className="px-4 py-2 bg-yellow-400 border-2 border-black font-bold text-sm uppercase hover:bg-yellow-500 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              >
+                + Add Event
+              </button>
+            )}
           </div>
 
           {selectedDateEvents.length === 0 ? (
@@ -329,7 +383,7 @@ export function EventsCalendar() {
                     onClick={() => openEditForm(evt)}
                     className="text-xs px-3 py-1 border border-gray-300 hover:bg-gray-100 transition-colors font-medium flex-shrink-0"
                   >
-                    Edit
+                    {isAdmin ? 'Edit' : 'View'}
                   </button>
                 </div>
               ))}
@@ -445,7 +499,7 @@ export function EventsCalendar() {
 
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
               <div>
-                {editingEvent && (
+                {editingEvent && isAdmin && (
                   <button
                     onClick={() => handleDelete(editingEvent.id)}
                     className="text-xs text-red-600 hover:text-red-800 font-bold uppercase"
@@ -462,15 +516,17 @@ export function EventsCalendar() {
                   }}
                   className="px-4 py-2 border-2 border-black text-sm font-bold uppercase hover:bg-gray-100 transition-colors"
                 >
-                  Cancel
+                  {isAdmin ? 'Cancel' : 'Close'}
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !formData.title.trim() || !formData.event_date}
-                  className="px-4 py-2 bg-yellow-400 border-2 border-black text-sm font-bold uppercase hover:bg-yellow-500 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : editingEvent ? 'Update' : 'Add Event'}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !formData.title.trim() || !formData.event_date}
+                    className="px-4 py-2 bg-yellow-400 border-2 border-black text-sm font-bold uppercase hover:bg-yellow-500 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : editingEvent ? 'Update' : 'Add Event'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

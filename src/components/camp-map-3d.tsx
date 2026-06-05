@@ -51,17 +51,24 @@ function GLBModel({ url, scale, position }: { url: string; scale: [number, numbe
 
 // ─── Corrugated wall geometry helper ──────────────────────────
 function useCorrugatedGeometry(w: number, h: number, ridges: number, depth: number) {
-  return useMemo(() => {
+  const geo = useMemo(() => {
     const segs = ridges * 4
-    const geo = new THREE.PlaneGeometry(w, h, segs, 1)
-    const pos = geo.attributes.position as THREE.BufferAttribute
+    const g = new THREE.PlaneGeometry(w, h, segs, 1)
+    const pos = g.attributes.position as THREE.BufferAttribute
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       pos.setZ(i, Math.sin((x / w) * ridges * Math.PI * 2) * depth)
     }
-    geo.computeVertexNormals()
-    return geo
+    g.computeVertexNormals()
+    return g
   }, [w, h, ridges, depth])
+
+  // Dispose the previous geometry when params change or on unmount (prevents VRAM leak)
+  useEffect(() => {
+    return () => { geo.dispose() }
+  }, [geo])
+
+  return geo
 }
 
 // ─── Wheel helper ──────────────────────────────────────────────

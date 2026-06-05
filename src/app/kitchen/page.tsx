@@ -20,12 +20,9 @@ import {
   upsertCamperRanking,
   clearCamperRanking,
   applyShiftCategoryOverrides,
-  type ShiftOverrides,
 } from '@/lib/shift-draft'
 
 type Tab = { id: string; label: string; icon?: React.ReactNode }
-
-const DELI_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 const tabs: Tab[] = [
   { id: 'roles', label: 'Roles & Descriptions' },
@@ -240,21 +237,6 @@ interface ShiftWithAssignments extends KitchenShift {
 }
 
 /** Deduplicate positions by role+time for grid rows */
-function getUniquePositions(categories: ShiftCategory[]): ShiftPosition[] {
-  const seen = new Set<string>()
-  const result: ShiftPosition[] = []
-  for (const cat of categories) {
-    for (const pos of cat.positions) {
-      const key = `${pos.role}|${pos.time ?? ''}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        result.push(pos)
-      }
-    }
-  }
-  return result
-}
-
 interface ConsolidatedPosition extends ShiftPosition {
   count: number
 }
@@ -275,20 +257,8 @@ function consolidatePositions(positions: ShiftPosition[]): ConsolidatedPosition[
   return groups
 }
 
-/** Count how many slots exist for a given role+time */
-function countSlots(categories: ShiftCategory[], role: string, time?: string): number {
-  let count = 0
-  for (const cat of categories) {
-    for (const pos of cat.positions) {
-      if (pos.role === role && (pos.time ?? '') === (time ?? '')) count++
-    }
-  }
-  return count
-}
-
 export default function KitchenPage() {
   const [activeTab, setActiveTab] = useState('roles')
-  const [_roles, setRoles] = useState<KitchenRole[]>([])
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -297,7 +267,6 @@ export default function KitchenPage() {
   const [offerings, setOfferings] = useState<ShiftOfferingRow[]>([])
   const [myRankings, setMyRankings] = useState<ShiftDraftRankingRow[]>([])
   const [myAssignments, setMyAssignments] = useState<ShiftDraftAssignmentRow[]>([])
-  const [allCampers, setAllCampers] = useState<Camper[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; camperId: string | null }>({ id: '', camperId: null })
   const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [savingOffering, setSavingOffering] = useState<string | null>(null)
@@ -311,7 +280,6 @@ export default function KitchenPage() {
   const [displayDeliCategories, setDisplayDeliCategories] = useState<ShiftCategory[]>(deliShiftCategories)
   const [displaySpecialCategories, setDisplaySpecialCategories] = useState<ShiftCategory[]>(specialShiftCategories)
   const [displayStrikeCategories, setDisplayStrikeCategories] = useState<ShiftCategory[]>(strikeCategories)
-  const [shiftOverrides, setShiftOverrides] = useState<ShiftOverrides>({})
   // Collapsible state for roles tab (all collapsed by default)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -357,9 +325,7 @@ export default function KitchenPage() {
 
     const typedRoles = rolesData as KitchenRole[] | null
     const typedShifts = shiftsData as KitchenShift[] | null
-    
-    if (typedRoles) setRoles(typedRoles)
-    
+
     if (typedShifts && typedRoles) {
       const enrichedShifts = typedShifts.map(shift => ({
         ...shift,
@@ -399,18 +365,11 @@ export default function KitchenPage() {
       if (overrideSetting) {
         try {
           const overrides = JSON.parse(overrideSetting.value) as Record<string, unknown>
-          setShiftOverrides(overrides)
           setDisplayDeliCategories(applyShiftCategoryOverrides(deliShiftCategories, overrides, 'deli'))
           setDisplaySpecialCategories(applyShiftCategoryOverrides(specialShiftCategories, overrides, 'special'))
           setDisplayStrikeCategories(applyShiftCategoryOverrides(strikeCategories, overrides, 'strike'))
         } catch { /* ignore malformed */ }
       }
-
-      const { data: camperData } = await supabase
-        .from('campers')
-        .select('*')
-        .order('full_name')
-      setAllCampers(camperData || [])
 
       const activeDraft = await fetchActiveDraft()
       if (activeDraft) {
@@ -476,8 +435,6 @@ export default function KitchenPage() {
     }
     return map
   })()
-
-  const getCamperById = (id: string) => allCampers.find(c => c.id === id)
 
   // Optimistic update helper for admin position edits (roles tab)
   const updateDisplayPosition = (catIdx: number, posIdx: number, field: 'role' | 'time' | 'description', value: string) => {

@@ -773,7 +773,6 @@ export function CampMap() {
                 const objWidthPx = obj.width_ft * scale
                 const objHeightPx = obj.height_ft * scale
 
-                const isShade = obj.object_type === 'shade_structure' || obj.object_type === 'shade_sail'
                 const isShadeBackground = obj.object_type === 'shade_structure' && !isSelected
 
                 return (

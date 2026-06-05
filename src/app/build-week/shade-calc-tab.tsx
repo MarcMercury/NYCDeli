@@ -306,7 +306,7 @@ export default function ShadeCalcTab() {
   // Panel handlers
   const addPanel = () =>
     setPanels(prev => [...prev, {
-      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `panel-${crypto.randomUUID()}`,
       label: `Sail ${prev.length + 1}`,
       wFt: 30,
       hFt: 50,

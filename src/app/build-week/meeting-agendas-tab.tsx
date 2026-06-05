@@ -121,6 +121,7 @@ function NotesEditor({ meetingId, sectionId, initial, placeholder }: NotesEditor
   const lastSaved = useRef(initial)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync editor to new section/meeting
     setValue(initial)
     lastSaved.current = initial
     setState('idle')
