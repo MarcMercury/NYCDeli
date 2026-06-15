@@ -75,10 +75,11 @@ interface BMMutantVehicle {
 
 type Tab = 'camp' | 'art' | 'event' | 'mv'
 
+// Events live in the dedicated "What's On" browser, so the directory focuses on
+// who/what is on playa (camps, art, mutant vehicles).
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'camp', label: 'Theme Camps', icon: '🏕️' },
   { key: 'art', label: 'Art', icon: '🎨' },
-  { key: 'event', label: 'Events', icon: '📅' },
   { key: 'mv', label: 'Mutant Vehicles', icon: '🚙' },
 ]
 

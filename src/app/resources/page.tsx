@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ResourceEditRow } from '@/types/database'
 import BrcDirectory from '@/components/brc-directory'
+import WhatsOn from '@/components/whats-on'
 
 /* ------------------------------------------------------------------ */
 /*  Data types                                                        */
@@ -1775,6 +1776,13 @@ export default function ResourcesPage() {
       <section className="py-8 px-4 border-b-2 border-black/10">
         <div className="max-w-5xl mx-auto">
           <BrcDirectory />
+        </div>
+      </section>
+
+      {/* What's On — Playa Events feed (Burning Man Public API) */}
+      <section className="py-8 px-4 border-b-2 border-black/10">
+        <div className="max-w-5xl mx-auto">
+          <WhatsOn />
         </div>
       </section>
 

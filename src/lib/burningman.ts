@@ -92,6 +92,7 @@ export interface BMEvent {
   print_description: string | null
   event_type: { abbr: string; label: string } | null
   hosted_by_camp: string | null
+  located_at_art: string | null
   other_location: string | null
   check_location: boolean | null
   all_day: boolean | null
