@@ -56,7 +56,7 @@ const POST_TYPE_META: Record<DeliPostType, {
   },
 }
 
-export default function IdeasPage() {
+export default function IdeasPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [activeType, setActiveType] = useState<DeliPostType>('idea')
   const [posts, setPosts] = useState<DeliIdeaRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -191,8 +191,9 @@ export default function IdeasPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className={embedded ? '' : 'min-h-screen'}>
       {/* Header */}
+      {!embedded && (
       <section className="bg-yellow-400 border-b-4 border-black py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-black mb-2">
@@ -203,6 +204,7 @@ export default function IdeasPage() {
           </p>
         </div>
       </section>
+      )}
 
       <section className="py-8 px-4">
         <div className="max-w-4xl mx-auto">

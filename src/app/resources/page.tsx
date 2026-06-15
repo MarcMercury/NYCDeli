@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { ResourceEditRow } from '@/types/database'
 import BrcDirectory from '@/components/brc-directory'
 import WhatsOn from '@/components/whats-on'
+import DeliForum from '@/app/ideas/page'
 
 /* ------------------------------------------------------------------ */
 /*  Data types                                                        */
@@ -1591,12 +1592,13 @@ function toResourceKey(title: string): string {
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
-type MainTab = 'guide' | 'directory' | 'events'
+type MainTab = 'guide' | 'directory' | 'events' | 'forum'
 
 const MAIN_TABS: { key: MainTab; label: string; icon: string; blurb: string }[] = [
   { key: 'guide', label: 'Camp Guide', icon: '📖', blurb: 'NYC Deli & Burning Man know-how' },
   { key: 'directory', label: 'BRC Directory', icon: '🔥', blurb: 'Camps, art & mutant vehicles' },
   { key: 'events', label: "What's On", icon: '📅', blurb: 'Live playa events calendar' },
+  { key: 'forum', label: 'Forum', icon: '💡', blurb: 'Ideas & questions for camp leads' },
 ]
 
 export default function ResourcesPage() {
@@ -1670,7 +1672,7 @@ export default function ResourcesPage() {
     const hash = window.location.hash.replace('#', '')
     if (!hash) return
 
-    if (hash === 'directory' || hash === 'events') {
+    if (hash === 'directory' || hash === 'events' || hash === 'forum') {
       setMainTab(hash)
       return
     }
@@ -1835,6 +1837,9 @@ export default function ResourcesPage() {
           </div>
         </section>
       )}
+
+      {/* ── Forum tab — Deli Ideas & Questions (reuses the embeddable forum) ── */}
+      {mainTab === 'forum' && <DeliForum embedded />}
 
       {/* ── Camp Guide tab (static curated resources) ── */}
       {mainTab === 'guide' && (
