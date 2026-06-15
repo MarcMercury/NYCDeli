@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ResourceEditRow } from '@/types/database'
+import BrcDirectory from '@/components/brc-directory'
 
 /* ------------------------------------------------------------------ */
 /*  Data types                                                        */
@@ -1767,6 +1768,13 @@ export default function ResourcesPage() {
           <p className="text-lg text-black/70 max-w-2xl">
             One page can&apos;t possibly tell you everything you need to know about Burning Man and NYC Deli, so talk to people, engage, ask, question, be resourceful on your own. Do NOT rely on this page alone — it&apos;s just some shit that others thought was helpful at some point.
           </p>
+        </div>
+      </section>
+
+      {/* Black Rock City Live Directory (Burning Man Public API) */}
+      <section className="py-8 px-4 border-b-2 border-black/10">
+        <div className="max-w-5xl mx-auto">
+          <BrcDirectory />
         </div>
       </section>
 
