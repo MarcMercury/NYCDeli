@@ -1591,7 +1591,16 @@ function toResourceKey(title: string): string {
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
+type MainTab = 'guide' | 'directory' | 'events'
+
+const MAIN_TABS: { key: MainTab; label: string; icon: string; blurb: string }[] = [
+  { key: 'guide', label: 'Camp Guide', icon: '📖', blurb: 'NYC Deli & Burning Man know-how' },
+  { key: 'directory', label: 'BRC Directory', icon: '🔥', blurb: 'Camps, art & mutant vehicles' },
+  { key: 'events', label: "What's On", icon: '📅', blurb: 'Live playa events calendar' },
+]
+
 export default function ResourcesPage() {
+  const [mainTab, setMainTab] = useState<MainTab>('guide')
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | 'all'>('all')
   const [openSlug, setOpenSlug] = useState<string | null>(null)
@@ -1655,20 +1664,28 @@ export default function ResourcesPage() {
     })
   }, [edits])
 
-  // Deep link: if URL has #slug, filter to camp-amenities and open that resource
+  // Deep link: #directory / #events jump to those tabs; a category key or a
+  // resource slug opens the Camp Guide tab focused on that item.
   useEffect(() => {
     const hash = window.location.hash.replace('#', '')
-    if (hash) {
-      // Check if hash matches a category key first
-      if (hash in CATEGORIES) {
-        setActiveCategory(hash as ResourceCategory)
-      } else {
-        const matchingResource = RESOURCES.find(r => r.slug === hash)
-        if (matchingResource) {
-          setActiveCategory(matchingResource.category)
-          setOpenSlug(hash)
-          scrolledRef.current = false
-        }
+    if (!hash) return
+
+    if (hash === 'directory' || hash === 'events') {
+      setMainTab(hash)
+      return
+    }
+
+    // Check if hash matches a category key first
+    if (hash in CATEGORIES) {
+      setMainTab('guide')
+      setActiveCategory(hash as ResourceCategory)
+    } else {
+      const matchingResource = RESOURCES.find(r => r.slug === hash)
+      if (matchingResource) {
+        setMainTab('guide')
+        setActiveCategory(matchingResource.category)
+        setOpenSlug(hash)
+        scrolledRef.current = false
       }
     }
   }, [])
@@ -1761,7 +1778,7 @@ export default function ResourcesPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <section className="bg-yellow-400 border-b-4 border-black py-12 px-4">
+      <section className="bg-yellow-400 border-b-4 border-black pt-12 pb-6 px-4">
         <div className="max-w-5xl mx-auto">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-black mb-2">
             Resources
@@ -1772,20 +1789,56 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      {/* Black Rock City Live Directory (Burning Man Public API) */}
-      <section className="py-8 px-4 border-b-2 border-black/10">
-        <div className="max-w-5xl mx-auto">
-          <BrcDirectory />
+      {/* Top-level tabs (sticky so they stay reachable while scrolling) */}
+      <div className="sticky top-0 z-20 bg-yellow-400 border-b-4 border-black shadow-[0_4px_0_0_rgba(0,0,0,0.08)]">
+        <div className="max-w-5xl mx-auto px-4 flex gap-0" role="tablist" aria-label="Resource sections">
+          {MAIN_TABS.map((t) => {
+            const active = mainTab === t.key
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMainTab(t.key)}
+                className={`flex-1 px-3 py-3 text-left border-r-2 border-black last:border-r-0 -mb-1 border-b-4 transition-colors ${
+                  active
+                    ? 'bg-black text-yellow-400 border-b-yellow-400'
+                    : 'bg-yellow-400 text-black/70 border-b-transparent hover:bg-yellow-300'
+                }`}
+              >
+                <span className="block text-sm md:text-base font-black uppercase tracking-tight leading-none">
+                  {t.icon} {t.label}
+                </span>
+                <span className={`hidden sm:block text-[11px] font-medium mt-1 leading-tight ${active ? 'text-yellow-200/80' : 'text-black/50'}`}>
+                  {t.blurb}
+                </span>
+              </button>
+            )
+          })}
         </div>
-      </section>
+      </div>
 
-      {/* What's On — Playa Events feed (Burning Man Public API) */}
-      <section className="py-8 px-4 border-b-2 border-black/10">
-        <div className="max-w-5xl mx-auto">
-          <WhatsOn />
-        </div>
-      </section>
+      {/* ── BRC Directory tab (Burning Man Public API) ── */}
+      {mainTab === 'directory' && (
+        <section className="py-8 px-4">
+          <div className="max-w-5xl mx-auto">
+            <BrcDirectory />
+          </div>
+        </section>
+      )}
 
+      {/* ── What's On tab — Playa Events feed (Burning Man Public API) ── */}
+      {mainTab === 'events' && (
+        <section className="py-8 px-4">
+          <div className="max-w-5xl mx-auto">
+            <WhatsOn />
+          </div>
+        </section>
+      )}
+
+      {/* ── Camp Guide tab (static curated resources) ── */}
+      {mainTab === 'guide' && (
+      <>
       {/* Search & Filters */}
       <section className="py-8 px-4 border-b-2 border-black/10">
         <div className="max-w-5xl mx-auto space-y-4">
@@ -1994,6 +2047,8 @@ export default function ResourcesPage() {
           )}
         </div>
       </section>
+      </>
+      )}
 
       {/* Footer CTA */}
       <section className="pb-12 px-4">
