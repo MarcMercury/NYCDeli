@@ -931,6 +931,12 @@ export default function KitchenPage() {
                       {draftIsDrafted && <p>The auto-draft has been run. Your assignments are highlighted below.</p>}
                     </div>
                   </div>
+                  {draftIsOpen && (
+                    <p className="mt-2 text-xs text-gray-600 border-t border-gray-200 pt-2">
+                      <Badge variant="warning" className="text-[9px] mr-1">2×</Badge> counts as two shifts toward your quota.{' '}
+                      <Badge variant="default" className="text-[9px] mx-1">EXP</Badge> experience helpful — just a hint, not a requirement. Rank it if you&apos;re up for it.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -1028,7 +1034,15 @@ export default function KitchenPage() {
                                         <td className="py-1 pr-2">
                                           <span className="font-bold">{o.role}</span>
                                           {o.counts_double && <Badge variant="warning" className="ml-2 text-[9px]">2×</Badge>}
-                                          {o.requires_exp && <Badge variant="default" className="ml-1 text-[9px]">EXP</Badge>}
+                                          {o.requires_exp && (
+                                            <Badge
+                                              variant="default"
+                                              className="ml-1 text-[9px]"
+                                              title="Experience helpful — a hint, not a requirement. Anyone can rank this."
+                                            >
+                                              EXP
+                                            </Badge>
+                                          )}
                                         </td>
                                         <td className="py-1 pr-2 text-gray-600">{o.time_label ?? '—'}</td>
                                         <td className="py-1 pr-2">{o.capacity}</td>

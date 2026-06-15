@@ -32,8 +32,10 @@ import {
   unfreezeDraftRankings,
   publishDraft,
   runAutoDraft,
+  swapAssignments,
   type AutoDraftResult,
 } from '@/lib/shift-draft'
+import { OfferingsEditor } from './offerings-editor'
 
 export default function AdminShiftDraftPage() {
   const supabase = createClient()
@@ -66,6 +68,12 @@ export default function AdminShiftDraftPage() {
   // Auto-draft preview
   const [seedInput, setSeedInput] = useState<string>('')
   const [preview, setPreview] = useState<AutoDraftResult | null>(null)
+
+  // Offerings editor
+  const [showOfferingsEditor, setShowOfferingsEditor] = useState(false)
+
+  // Assignment swapping
+  const [swapSelected, setSwapSelected] = useState<string[]>([])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -267,13 +275,42 @@ export default function AdminShiftDraftPage() {
       const seed = seedInput.trim() === '' ? undefined : Number(seedInput)
       const result = await runAutoDraft(activeDraft.id, { seed, dryRun })
       setPreview(result)
+      // After a dry run, lock the seed into the box so that Commit reproduces
+      // exactly what was previewed. Admin can clear it to reshuffle.
+      if (dryRun) setSeedInput(String(result.seed))
       setMsg({
         type: 'success',
-        text: `${dryRun ? 'Dry run' : 'Auto-draft committed'}: ${result.count} assignments (seed ${result.seed}).`,
+        text: dryRun
+          ? `Dry run: ${result.count} assignments (seed ${result.seed}). Seed locked in — Commit will reproduce this exact result. Clear the seed to reshuffle.`
+          : `Auto-draft committed: ${result.count} assignments (seed ${result.seed}).`,
       })
       if (!dryRun) await loadDraftDetails(activeDraft.id)
     } catch (e) {
       setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Auto-draft failed' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // ===== Manual assignment swap =====
+  const toggleSwapSelect = (assignmentId: string) => {
+    setSwapSelected(prev => {
+      if (prev.includes(assignmentId)) return prev.filter(x => x !== assignmentId)
+      if (prev.length >= 2) return [prev[1], assignmentId] // keep most recent two
+      return [...prev, assignmentId]
+    })
+  }
+
+  const handleSwap = async () => {
+    if (swapSelected.length !== 2 || !activeDraft) return
+    setBusy('swap')
+    try {
+      await swapAssignments(swapSelected[0], swapSelected[1])
+      setMsg({ type: 'success', text: 'Swapped the two campers’ shifts.' })
+      setSwapSelected([])
+      await loadDraftDetails(activeDraft.id)
+    } catch (e) {
+      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Swap failed' })
     } finally {
       setBusy(null)
     }
@@ -298,6 +335,26 @@ export default function AdminShiftDraftPage() {
     }
     return m
   })()
+
+  // Campers who ranked shifts but are NOT in the draft order — these would be
+  // silently dropped by the auto-draft (it only iterates shift_draft_order).
+  const orderedIds = new Set(order.map(o => o.camper_id))
+  const rankedNotInOrder = Array.from(rankingCountByCamper.keys()).filter(id => !orderedIds.has(id))
+
+  const handleAddMissingToOrder = async () => {
+    if (!activeDraft || rankedNotInOrder.length === 0) return
+    setBusy('order')
+    try {
+      const next = [...orderList, ...rankedNotInOrder.filter(id => !orderList.includes(id))]
+      await setDraftOrder(activeDraft.id, next)
+      setMsg({ type: 'success', text: `Added ${rankedNotInOrder.length} ranked camper(s) to the order.` })
+      await loadDraftDetails(activeDraft.id)
+    } catch (e) {
+      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Update failed' })
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const offeringsByPool = (() => {
     const g: Record<'deli'|'special'|'strike', ShiftOfferingRow[]> = { deli: [], special: [], strike: [] }
@@ -444,13 +501,26 @@ export default function AdminShiftDraftPage() {
                   <Button onClick={handleSeedDefaults} disabled={busy === 'seed'}>
                     {offerings.length === 0 ? 'Load default catalog' : 'Re-seed missing defaults'}
                   </Button>
+                  <Button variant="secondary" onClick={() => setShowOfferingsEditor(s => !s)}>
+                    {showOfferingsEditor ? 'Hide editor' : 'Edit offerings'}
+                  </Button>
                   <span className="text-xs text-gray-600">
                     Deli: {offeringsByPool.deli.length} · Special: {offeringsByPool.special.length} · Strike: {offeringsByPool.strike.length}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500">
-                  Inline offering editing UI coming soon. For now: use the seed function or edit rows directly in the database.
-                </div>
+                {showOfferingsEditor && (
+                  <OfferingsEditor
+                    draftId={activeDraft.id}
+                    offerings={offerings}
+                    locked={status !== 'open'}
+                    lockedReason={
+                      status === 'archived'
+                        ? 'This draft is published/archived — offerings are read-only.'
+                        : 'Rankings are frozen. Editing offerings now can invalidate camper rankings — unfreeze first.'
+                    }
+                    onChange={() => loadDraftDetails(activeDraft.id)}
+                  />
+                )}
               </CardContent>
             </Card>
 
@@ -514,6 +584,21 @@ export default function AdminShiftDraftPage() {
                 <CardDescription>How many shifts each camper has ranked.</CardDescription>
               </CardHeader>
               <CardContent>
+                {rankedNotInOrder.length > 0 && (
+                  <Alert variant="error" className="mb-3">
+                    <strong>{rankedNotInOrder.length} camper{rankedNotInOrder.length === 1 ? '' : 's'} ranked shifts but {rankedNotInOrder.length === 1 ? 'is' : 'are'} not in the draft order.</strong>{' '}
+                    The auto-draft only assigns campers in the order list — these campers will be skipped entirely.
+                    <ul className="mt-1 list-disc list-inside">
+                      {rankedNotInOrder.map(id => {
+                        const c = camperById(id)
+                        return <li key={id}>{c ? (c.playa_name || c.full_name) : id} <span className="text-gray-600">({rankingCountByCamper.get(id) ?? 0} ranked)</span></li>
+                      })}
+                    </ul>
+                    <Button size="sm" className="mt-2" onClick={handleAddMissingToOrder} disabled={busy === 'order'}>
+                      Add {rankedNotInOrder.length === 1 ? 'them' : 'all'} to order (bottom)
+                    </Button>
+                  </Alert>
+                )}
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b-2 border-black">
@@ -588,13 +673,29 @@ export default function AdminShiftDraftPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Assignments ({assignments.length})</CardTitle>
-                  <CardDescription>Result of the auto-draft. Manual swaps coming next.</CardDescription>
+                  <CardDescription>
+                    Result of the auto-draft. Select two rows to swap the campers between those slots.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-xs text-gray-600">
+                      {swapSelected.length === 0 && 'Select two assignments to swap.'}
+                      {swapSelected.length === 1 && 'Select one more assignment.'}
+                      {swapSelected.length === 2 && 'Ready to swap.'}
+                    </span>
+                    <Button size="sm" onClick={handleSwap} disabled={swapSelected.length !== 2 || busy === 'swap'}>
+                      Swap selected
+                    </Button>
+                    {swapSelected.length > 0 && (
+                      <Button size="sm" variant="secondary" onClick={() => setSwapSelected([])}>Clear</Button>
+                    )}
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b-2 border-black">
+                          <th className="text-left py-1 font-black w-8"></th>
                           <th className="text-left py-1 font-black">Camper</th>
                           <th className="text-left py-1 font-black">Pool</th>
                           <th className="text-left py-1 font-black">Role</th>
@@ -609,8 +710,20 @@ export default function AdminShiftDraftPage() {
                         {assignments.map(a => {
                           const c = camperById(a.camper_id)
                           const o = offeringById(a.offering_id)
+                          const selected = swapSelected.includes(a.id)
                           return (
-                            <tr key={a.id} className="border-b border-gray-100">
+                            <tr
+                              key={a.id}
+                              className={cn("border-b border-gray-100", selected && "bg-yellow-100")}
+                            >
+                              <td className="py-1">
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() => toggleSwapSelect(a.id)}
+                                  aria-label="Select for swap"
+                                />
+                              </td>
                               <td className="py-1">{c ? (c.playa_name || c.full_name) : a.camper_id}</td>
                               <td className="py-1">{o?.pool}</td>
                               <td className="py-1">{o?.role}</td>
