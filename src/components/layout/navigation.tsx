@@ -21,7 +21,6 @@ const baseNavItems = [
   { href: '/events', label: 'Events', icon: '🗓️' },
   { href: '/map', label: 'Camp Map', icon: '🏕️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
-  { href: '/ideas', label: 'Forum', icon: '💡' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
