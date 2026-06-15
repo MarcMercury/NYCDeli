@@ -350,14 +350,6 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </Link>
-          <Link href="/admin/permissions" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🔐</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Permissions</p>
-              </CardContent>
-            </Card>
-          </Link>
           <Link href="/admin/shift-draft" className="block">
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
@@ -1226,6 +1218,18 @@ export default function AdminPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {!selectedUser && (
+            <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-400 text-sm">
+              <p className="font-bold uppercase tracking-wider mb-1">⚠️ About Roles</p>
+              <ul className="space-y-1 text-gray-700">
+                <li><strong>Pending:</strong> Awaiting approval. No access to camp pages until promoted.</li>
+                <li><strong>User:</strong> Full read/write access to camp pages (spots, kitchen, schedule, events, etc.). Does NOT see Build Week or Admin tabs.</li>
+                <li><strong>Builder:</strong> Everything a User can do, plus the Build Week tab (schedule, inventory, electrical load, layout sync, shade guide).</li>
+                <li><strong>Admin:</strong> Everything a Builder can do, plus the Admin dashboard, applicant review, and permission management.</li>
+              </ul>
+            </div>
           )}
         </TabPanel>
 
