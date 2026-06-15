@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<SystemSetting[]>([])
   const [shifts, setShifts] = useState<KitchenShift[]>([])
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
+  const [openTaskCount, setOpenTaskCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [fetchErrors, setFetchErrors] = useState<Record<string, string>>({})
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
@@ -55,12 +56,13 @@ export default function AdminPage() {
     const supabase = createClient()
     const errors: Record<string, string> = {}
     
-    const [campersRes, usersRes, settingsRes, shiftsRes, assignmentsRes] = await Promise.all([
+    const [campersRes, usersRes, settingsRes, shiftsRes, assignmentsRes, tasksRes] = await Promise.all([
       supabase.from('campers').select('*').order('created_at', { ascending: false }),
       supabase.from('user_profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('system_settings').select('*').order('key'),
       supabase.from('kitchen_shifts').select('*').order('date'),
       supabase.from('schedule_assignments').select('*'),
+      supabase.from('build_tasks').select('status'),
     ])
 
     if (campersRes.error) errors.campers = campersRes.error.message
@@ -68,6 +70,7 @@ export default function AdminPage() {
     if (settingsRes.error) errors.settings = settingsRes.error.message
     if (shiftsRes.error) errors.shifts = shiftsRes.error.message
     if (assignmentsRes.error) errors.assignments = assignmentsRes.error.message
+    if (tasksRes.error) errors.tasks = tasksRes.error.message
 
     const campersData = (campersRes.data || []) as Camper[]
     const usersData = (usersRes.data || []) as UserProfileRow[]
@@ -105,6 +108,7 @@ export default function AdminPage() {
     setSettings(allSettings)
     setShifts(shiftsRes.data || [])
     setAssignments(assignmentsRes.data || [])
+    setOpenTaskCount(((tasksRes.data || []) as { status: string }[]).filter(t => t.status !== 'done').length)
 
     // Load shift categories with any admin overrides applied
     const baseCategories = getAllDraftShiftCategories()
@@ -127,6 +131,10 @@ export default function AdminPage() {
      
     fetchData()
   }, [fetchData])
+
+  // Open shifts = scheduled shifts with no camper assigned to them
+  const assignedShiftIds = new Set(assignments.map(a => a.shift_id))
+  const openShiftCount = shifts.filter(s => !assignedShiftIds.has(s.id)).length
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = 
@@ -320,18 +328,22 @@ export default function AdminPage() {
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
-              <p className="text-3xl font-black">—</p>
+              {fetchErrors.tasks ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.tasks}>⚠</p>
+              ) : (
+                <p className="text-3xl font-black">{openTaskCount}</p>
+              )}
               <p className="text-xs uppercase tracking-wider text-gray-500">Open Tasks</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
-              {fetchErrors.assignments ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.assignments}>⚠</p>
+              {fetchErrors.assignments || fetchErrors.shifts ? (
+                <p className="text-2xl font-black text-red-500" title={fetchErrors.assignments || fetchErrors.shifts}>⚠</p>
               ) : (
-                <p className="text-3xl font-black">{assignments.length}</p>
+                <p className="text-3xl font-black">{openShiftCount}</p>
               )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Shift Assignments</p>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Open Shifts</p>
             </CardContent>
           </Card>
           <Link href="/admin/layout-builder" className="block">
