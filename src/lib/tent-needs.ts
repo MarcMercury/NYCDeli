@@ -15,6 +15,8 @@ export interface TentNeed {
   height: number
   /** True for RV / vehicle / sprinter shelters */
   isRV: boolean
+  /** True when any member of this tent group is a Builder or Admin */
+  isPrivileged: boolean
   /** Names of campers this tent serves */
   camperNames: string[]
   /** Number of physical entrance sides (1–4) — taken from the primary camper used for sizing */
@@ -62,6 +64,17 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   if (error || !data) return []
   const rows = data as unknown as CamperRow[]
 
+  // Campers linked to a Builder or Admin profile get a distinct tent color.
+  const { data: profileRows } = await supabase
+    .from('user_profiles')
+    .select('camper_id, role')
+    .in('role', ['builder', 'admin'])
+  const privilegedCamperIds = new Set<string>(
+    (profileRows ?? [])
+      .map(p => (p as { camper_id: string | null }).camper_id)
+      .filter((id): id is string => Boolean(id)),
+  )
+
   // Union-find over both partner columns so 3-person shares (A↔B, A↔C)
   // collapse into a single group (shared with src/lib/tent-mates.ts).
   const uf = buildTentShareGroups(rows)
@@ -82,6 +95,8 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   for (const members of groups.values()) {
     const names = members.map(m => m.full_name).filter(Boolean)
     if (names.length === 0) continue
+
+    const isPrivileged = members.some(m => privilegedCamperIds.has(m.id))
 
     const allRV = members.every(
       m => m.shelter_type === 'rv' || m.shelter_type === 'vehicle',
@@ -108,6 +123,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
         width: w > 0 ? w : DEFAULT_RV_W,
         height: l > 0 ? l : DEFAULT_RV_L,
         isRV: true,
+        isPrivileged,
         camperNames: names,
         entranceCount: primary?.tent_entrance_count ?? null,
         openingSide: primary?.tent_opening_side ?? null,
@@ -144,6 +160,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
       width: bestW,
       height: bestL,
       isRV: false,
+      isPrivileged,
       camperNames: names,
       entranceCount: primary?.tent_entrance_count ?? null,
       openingSide: primary?.tent_opening_side ?? null,

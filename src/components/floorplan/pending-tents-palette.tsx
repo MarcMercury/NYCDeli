@@ -25,6 +25,7 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
         entranceCount: tent.entranceCount,
         openingSide: tent.openingSide,
         tentMakeModel: tent.tentMakeModel,
+        isPrivileged: tent.isPrivileged,
       }),
     )
     e.dataTransfer.effectAllowed = 'copy'
@@ -73,6 +74,9 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
                     <div className="flex-1 min-w-0">
                       <div className="text-[10px] font-bold uppercase tracking-wider truncate">
                         {tent.label}
+                        {tent.isPrivileged && (
+                          <span className="ml-1 text-[8px] font-bold text-green-600" title="Builder / Admin">★</span>
+                        )}
                       </div>
                       <div className="text-[9px] text-gray-500 font-bold">
                         W {tent.width} × L {tent.height} ft

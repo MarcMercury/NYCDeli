@@ -217,11 +217,13 @@ export function FloorplanEditor() {
       entranceCount?: number | null
       openingSide?: 'length' | 'width' | 'both' | null
       tentMakeModel?: string | null
+      isPrivileged?: boolean
     },
   ) {
     if (!config) return
     const template = getTemplateForType('tent')
-    const color = template?.defaultColor ?? '#60a5fa'
+    // Builders / Admins get a lighter green tent; everyone else the default blue.
+    const color = meta?.isPrivileged ? '#86efac' : (template?.defaultColor ?? '#60a5fa')
     const props: FloorplanObjectRow['properties'] = {
       ...(template?.defaultProperties ?? {}),
       reservable: true,
@@ -285,6 +287,7 @@ export function FloorplanEditor() {
         width: widthFt,
         height: heightFt,
         isRV: false,
+        isPrivileged: meta?.isPrivileged ?? false,
         camperNames: [],
         entranceCount: meta?.entranceCount ?? null,
         openingSide: meta?.openingSide ?? null,

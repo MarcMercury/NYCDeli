@@ -42,6 +42,7 @@ interface GridCanvasProps {
       entranceCount?: number | null
       openingSide?: 'length' | 'width' | 'both' | null
       tentMakeModel?: string | null
+      isPrivileged?: boolean
     },
   ) => void
   showGrid: boolean
@@ -211,6 +212,7 @@ export function GridCanvas({
           entranceCount: data.entranceCount ?? null,
           openingSide: data.openingSide ?? null,
           tentMakeModel: data.tentMakeModel ?? null,
+          isPrivileged: data.isPrivileged ?? false,
         })
       }
     } catch (err) {
