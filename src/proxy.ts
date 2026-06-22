@@ -9,7 +9,7 @@ const adminRoutes = ['/admin']
 
 // Routes where pending users must be redirected (need profile query)
 const roleCheckRoutes = [
-  '/campers', '/events', '/ideas', '/kitchen', '/layout', '/layout-view',
+  '/campers', '/ideas', '/kitchen', '/layout', '/layout-view',
   '/map', '/profile', '/resources', '/schedule', '/shift-draft',
   '/build-week', '/camp-selection',
 ]

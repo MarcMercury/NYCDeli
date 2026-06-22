@@ -18,7 +18,6 @@ const baseNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
   { href: '/campers', label: 'Campers', icon: '🐀' },
   { href: '/profile', label: 'Profile', icon: '👤' },
-  { href: '/events', label: 'Events', icon: '🗓️' },
   { href: '/map', label: 'Camp Map', icon: '🏕️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
   { href: '/resources', label: 'Resources', icon: '📚' },

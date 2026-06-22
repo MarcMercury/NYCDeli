@@ -44,14 +44,6 @@ const modules = [
     statusColor: 'text-blue-400',
   },
   {
-    href: '/events',
-    icon: '🗓️',
-    title: 'Events Calendar',
-    description: 'Pre-burn gatherings, fundraisers, shopping trips, and socials — color-coded across 6 event categories.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
     href: '/kitchen',
     icon: '🍳',
     title: 'Kitchen Shifts',
