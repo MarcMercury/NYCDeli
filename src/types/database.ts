@@ -940,7 +940,6 @@ export interface FloorplanObjectProperties {
   fuel_type?: 'liquid' | 'propane'
   pc_number?: string
   door_direction?: 'north' | 'south' | 'east' | 'west'
-  opening_side?: 'north' | 'south' | 'east' | 'west'
   /** Tent-only: number of entrance sides on the physical tent (1–4) */
   entrance_count?: number
   /** Tent-only: which physical side(s) of the tent have the main opening — copied from the camper's `tent_opening_side` */

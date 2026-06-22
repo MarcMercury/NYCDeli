@@ -307,18 +307,6 @@ export function PropertiesPanel({
                   { value: 'both', label: 'Short and Long Sides' },
                 ]}
               />
-              <Select
-                label="Compass Facing (in camp)"
-                value={selectedObject.properties?.opening_side || ''}
-                onChange={e => updateProp('opening_side', e.target.value || undefined)}
-                options={[
-                  { value: '', label: 'Not set' },
-                  { value: 'north', label: '▲ North' },
-                  { value: 'south', label: '▼ South' },
-                  { value: 'east', label: '▶ East' },
-                  { value: 'west', label: '◀ West' },
-                ]}
-              />
             </div>
           </div>
         )}

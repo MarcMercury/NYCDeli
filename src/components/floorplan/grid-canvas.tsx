@@ -490,23 +490,6 @@ export function GridCanvas({
               </div>
             )}
 
-            {/* Tent opening side arrow indicator */}
-            {obj.object_type === 'tent' && obj.properties?.opening_side && (
-              <div
-                className={cn(
-                  'absolute flex items-center justify-center pointer-events-none text-black/70',
-                  obj.properties.opening_side === 'north' && 'top-0 left-1/2 -translate-x-1/2',
-                  obj.properties.opening_side === 'south' && 'bottom-0 left-1/2 -translate-x-1/2 rotate-180',
-                  obj.properties.opening_side === 'west' && 'left-0 top-1/2 -translate-y-1/2 -rotate-90',
-                  obj.properties.opening_side === 'east' && 'right-0 top-1/2 -translate-y-1/2 rotate-90',
-                )}
-              >
-                <svg width="12" height="8" viewBox="0 0 12 8" fill="currentColor">
-                  <polygon points="6,0 12,8 0,8" />
-                </svg>
-              </div>
-            )}
-
             {/* PC container door indicator */}
             {obj.object_type === 'pc_container' && obj.properties?.door_direction && (
               <div
