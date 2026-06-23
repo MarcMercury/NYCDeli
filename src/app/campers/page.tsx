@@ -110,9 +110,12 @@ export default function CampersPage() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-black uppercase tracking-wider">🐀 Camp Directory</h1>
-        <p className="text-gray-600 mt-1">
-          {directory.length} approved camper{directory.length !== 1 ? 's' : ''}
-        </p>
+        <div className="mt-3 inline-flex items-center gap-3 border-2 border-black bg-yellow-50 px-4 py-2">
+          <span className="text-3xl font-black tabular-nums">{directory.length}</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-gray-600">
+            Camper Count
+          </span>
+        </div>
       </div>
 
       <div className="mb-6">
