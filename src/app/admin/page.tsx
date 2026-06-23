@@ -676,40 +676,41 @@ export default function AdminPage() {
                             placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
                           />
                         </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Sharing Tent With</label>
-                          <Select
-                            placeholder="None"
-                            options={[
-                              { value: '', label: 'None' },
-                              ...campers
-                                .filter(c => c.id !== selectedCamper.id && c.id !== selectedCamper.sharing_tent_with_2)
-                                .map(c => ({
-                                  value: c.id,
-                                  label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
-                                }))
-                            ]}
-                            value={selectedCamper.sharing_tent_with || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, sharing_tent_with: e.target.value || null})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Sharing Tent With (2nd)</label>
-                          <Select
-                            placeholder="None"
-                            options={[
-                              { value: '', label: 'None' },
-                              ...campers
-                                .filter(c => c.id !== selectedCamper.id && c.id !== selectedCamper.sharing_tent_with)
-                                .map(c => ({
-                                  value: c.id,
-                                  label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
-                                }))
-                            ]}
-                            value={selectedCamper.sharing_tent_with_2 || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, sharing_tent_with_2: e.target.value || null})}
-                          />
-                        </div>
+                        {([
+                          { field: 'sharing_tent_with', label: 'Sharing Tent With' },
+                          { field: 'sharing_tent_with_2', label: 'Sharing Tent With (2nd)' },
+                          { field: 'sharing_tent_with_3', label: 'Sharing Tent With (3rd)' },
+                          { field: 'sharing_tent_with_4', label: 'Sharing Tent With (4th)' },
+                          { field: 'sharing_tent_with_5', label: 'Sharing Tent With (5th)' },
+                        ] as const).map(({ field, label }) => {
+                          const otherFields = [
+                            'sharing_tent_with',
+                            'sharing_tent_with_2',
+                            'sharing_tent_with_3',
+                            'sharing_tent_with_4',
+                            'sharing_tent_with_5',
+                          ].filter(f => f !== field) as (keyof typeof selectedCamper)[]
+                          const takenIds = new Set(otherFields.map(f => selectedCamper[f]).filter(Boolean) as string[])
+                          return (
+                            <div key={field}>
+                              <label className="text-xs font-bold uppercase">{label}</label>
+                              <Select
+                                placeholder="None"
+                                options={[
+                                  { value: '', label: 'None' },
+                                  ...campers
+                                    .filter(c => c.id !== selectedCamper.id && !takenIds.has(c.id))
+                                    .map(c => ({
+                                      value: c.id,
+                                      label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                                    }))
+                                ]}
+                                value={(selectedCamper[field] as string | null) || ''}
+                                onChange={(e) => setSelectedCamper({ ...selectedCamper, [field]: e.target.value || null })}
+                              />
+                            </div>
+                          )
+                        })}
                       </div>
                     </CardContent>
                   </Card>

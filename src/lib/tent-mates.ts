@@ -20,6 +20,9 @@ export interface TentMateRow {
   id: string
   sharing_tent_with: string | null
   sharing_tent_with_2: string | null
+  sharing_tent_with_3?: string | null
+  sharing_tent_with_4?: string | null
+  sharing_tent_with_5?: string | null
 }
 
 /** All camper IDs that share a tent with `camperId` (excludes `camperId` itself). */

@@ -43,14 +43,23 @@ export interface TentShareRow {
   id: string
   sharing_tent_with: string | null
   sharing_tent_with_2: string | null
+  sharing_tent_with_3?: string | null
+  sharing_tent_with_4?: string | null
+  sharing_tent_with_5?: string | null
 }
 
-/** Build a union-find that groups campers connected via either tent-share slot. */
+/** Build a union-find that groups campers connected via any tent-share slot. */
 export function buildTentShareGroups<T extends TentShareRow>(rows: readonly T[]): UnionFind {
   const uf = new UnionFind()
   for (const r of rows) uf.add(r.id)
   for (const r of rows) {
-    for (const partnerId of [r.sharing_tent_with, r.sharing_tent_with_2]) {
+    for (const partnerId of [
+      r.sharing_tent_with,
+      r.sharing_tent_with_2,
+      r.sharing_tent_with_3,
+      r.sharing_tent_with_4,
+      r.sharing_tent_with_5,
+    ]) {
       if (partnerId && uf.has(partnerId)) uf.union(r.id, partnerId)
     }
   }

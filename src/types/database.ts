@@ -82,6 +82,9 @@ export interface CamperRow {
   placement_locked: boolean
   sharing_tent_with: string | null
   sharing_tent_with_2: string | null
+  sharing_tent_with_3: string | null
+  sharing_tent_with_4: string | null
+  sharing_tent_with_5: string | null
   is_admin: boolean
   notes: string | null
 }
@@ -139,6 +142,9 @@ export interface CamperInsert {
   placement_locked?: boolean
   sharing_tent_with?: string | null
   sharing_tent_with_2?: string | null
+  sharing_tent_with_3?: string | null
+  sharing_tent_with_4?: string | null
+  sharing_tent_with_5?: string | null
   is_admin?: boolean
   notes?: string | null
 }
@@ -195,6 +201,9 @@ export interface CamperUpdate {
   placement_locked?: boolean
   sharing_tent_with?: string | null
   sharing_tent_with_2?: string | null
+  sharing_tent_with_3?: string | null
+  sharing_tent_with_4?: string | null
+  sharing_tent_with_5?: string | null
   is_admin?: boolean
   notes?: string | null
 }

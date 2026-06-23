@@ -60,6 +60,9 @@ export const shelterSchema = z.object({
   tent_opening_side: z.enum(tentOpeningSides).optional().nullable(),
   sharing_tent_with: z.string().uuid().optional().nullable(),
   sharing_tent_with_2: z.string().uuid().optional().nullable(),
+  sharing_tent_with_3: z.string().uuid().optional().nullable(),
+  sharing_tent_with_4: z.string().uuid().optional().nullable(),
+  sharing_tent_with_5: z.string().uuid().optional().nullable(),
 })
 
 // Infrastructure Section

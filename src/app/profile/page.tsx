@@ -279,6 +279,9 @@ export default function ProfilePage() {
         background_check_consent: editCamper.background_check_consent,
         sharing_tent_with: editCamper.sharing_tent_with || null,
         sharing_tent_with_2: editCamper.sharing_tent_with_2 || null,
+        sharing_tent_with_3: editCamper.sharing_tent_with_3 || null,
+        sharing_tent_with_4: editCamper.sharing_tent_with_4 || null,
+        sharing_tent_with_5: editCamper.sharing_tent_with_5 || null,
       }
 
       const { error } = await supabase
@@ -764,6 +767,45 @@ export default function ProfilePage() {
                     label="Sharing Tent With (3rd Person)"
                     value={editCamper.sharing_tent_with_2 || ''}
                     onChange={(e) => updateField('sharing_tent_with_2', e.target.value || null)}
+                    placeholder="None"
+                    options={[
+                      { value: '', label: 'None' },
+                      ...allCampersList.map(c => ({
+                        value: c.id,
+                        label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                      })),
+                    ]}
+                  />
+                  <Select
+                    label="Sharing Tent With (4th Person)"
+                    value={editCamper.sharing_tent_with_3 || ''}
+                    onChange={(e) => updateField('sharing_tent_with_3', e.target.value || null)}
+                    placeholder="None"
+                    options={[
+                      { value: '', label: 'None' },
+                      ...allCampersList.map(c => ({
+                        value: c.id,
+                        label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                      })),
+                    ]}
+                  />
+                  <Select
+                    label="Sharing Tent With (5th Person)"
+                    value={editCamper.sharing_tent_with_4 || ''}
+                    onChange={(e) => updateField('sharing_tent_with_4', e.target.value || null)}
+                    placeholder="None"
+                    options={[
+                      { value: '', label: 'None' },
+                      ...allCampersList.map(c => ({
+                        value: c.id,
+                        label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
+                      })),
+                    ]}
+                  />
+                  <Select
+                    label="Sharing Tent With (6th Person)"
+                    value={editCamper.sharing_tent_with_5 || ''}
+                    onChange={(e) => updateField('sharing_tent_with_5', e.target.value || null)}
                     placeholder="None"
                     options={[
                       { value: '', label: 'None' },

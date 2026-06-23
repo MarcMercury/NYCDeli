@@ -327,11 +327,11 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
       const supabase = createClient()
       const { data } = await supabase
         .from('campers')
-        .select('id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2')
+        .select('id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5')
         .order('full_name')
       if (!data || data.length === 0) return null
 
-      type Row = { id: string; full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null; sharing_tent_with_2: string | null }
+      type Row = { id: string; full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null; sharing_tent_with_2: string | null; sharing_tent_with_3: string | null; sharing_tent_with_4: string | null; sharing_tent_with_5: string | null }
       const rows = data as unknown as Row[]
 
       const camperList: CamperInfo[] = []

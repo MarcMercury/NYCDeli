@@ -35,6 +35,9 @@ interface CamperRow {
   shelter_length_ft: number | null
   sharing_tent_with: string | null
   sharing_tent_with_2: string | null
+  sharing_tent_with_3: string | null
+  sharing_tent_with_4: string | null
+  sharing_tent_with_5: string | null
   tent_entrance_count: number | null
   tent_opening_side: 'length' | 'width' | 'both' | null
   tent_make_model: string | null
@@ -57,7 +60,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   const { data, error } = await supabase
     .from('campers')
     .select(
-      'id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, tent_entrance_count, tent_opening_side, tent_make_model',
+      'id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5, tent_entrance_count, tent_opening_side, tent_make_model',
     )
     .order('full_name')
 
