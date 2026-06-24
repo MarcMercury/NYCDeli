@@ -259,7 +259,6 @@ export default function ProfilePage() {
         preferred_shift_types: editCamper.preferred_shift_types,
         strike_participation: editCamper.strike_participation,
         build_week_attending: editCamper.build_week_attending,
-        build_week_arrival_date: editCamper.build_week_attending ? editCamper.build_week_arrival_date : null,
         tools_bringing: editCamper.tools_bringing || [],
         vehicle_info: editCamper.vehicle_info || null,
         skills: editCamper.skills,
@@ -922,13 +921,9 @@ export default function ProfilePage() {
                   />
                   {editCamper.build_week_attending && (
                     <>
-                      <Input
-                        label="Build Week Arrival Date"
-                        type="date"
-                        value={editCamper.build_week_arrival_date || ''}
-                        onChange={(e) => updateField('build_week_arrival_date', e.target.value || null)}
-                        required
-                      />
+                      <p className="text-xs text-gray-500">
+                        Your arrival date is set above in <span className="font-bold">Arrival &amp; Departure</span>. For builders, that&apos;s your build-week arrival.
+                      </p>
                       <Input
                         label="Vehicle Info"
                         value={editCamper.vehicle_info || ''}

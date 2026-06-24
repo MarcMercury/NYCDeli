@@ -87,13 +87,9 @@ export const skillsSchema = z.object({
 // Build Week Section (refinement kept for standalone use; base object defined below for spreading)
 export const buildWeekSchema = z.object({
   build_week_attending: z.boolean(),
-  build_week_arrival_date: z.string().optional().nullable(),
   tools_bringing: z.array(z.string()).optional(),
   vehicle_info: z.string().max(200, "Keep vehicle info concise.").optional().nullable(),
-}).refine(
-  (data) => !data.build_week_attending || data.build_week_arrival_date,
-  { message: "If you're coming for build week, tell us when.", path: ['build_week_arrival_date'] }
-)
+})
 
 // Vehicle Intention
 export const vehicleOptions = ['no_vehicle', 'want_to_discuss'] as const
@@ -130,7 +126,6 @@ export const aboutYouSchema = z.object({
 // Build week base object (without refinement) for spreading into combined schemas
 const buildWeekBase = z.object({
   build_week_attending: z.boolean(),
-  build_week_arrival_date: z.string().optional().nullable(),
   tools_bringing: z.array(z.string()).optional(),
   vehicle_info: z.string().max(200, "Keep vehicle info concise.").optional().nullable(),
 })
@@ -154,9 +149,6 @@ export type IntakeFormData = z.infer<typeof intakeFormBase>
 export const intakeFormSchema = intakeFormBase.refine(
   (data) => data.password === data.confirmPassword,
   { message: "Passwords do not match.", path: ['confirmPassword'] }
-).refine(
-  (data) => !data.build_week_attending || data.build_week_arrival_date,
-  { message: "If you're coming for build week, tell us when.", path: ['build_week_arrival_date'] }
 ).refine(
   (data) => new Date(data.departure_date) >= new Date(data.arrival_date),
   { message: "You can't leave before you arrive. Physics exists.", path: ['departure_date'] }

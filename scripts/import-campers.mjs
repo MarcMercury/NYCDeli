@@ -294,7 +294,6 @@ function buildCamperRecord(headers, fields) {
     preferred_shift_types: ['any'],
     strike_participation: true,
     build_week_attending: false,
-    build_week_arrival_date: null,
     tools_bringing: [],
     vehicle_info: vehicleInfo,
     skills: [],

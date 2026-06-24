@@ -103,7 +103,7 @@ export async function fetchBuildWeekBuilders(): Promise<Camper[]> {
     .from('campers')
     .select('*')
     .eq('build_week_attending', true)
-    .order('build_week_arrival_date')
+    .order('arrival_date')
   if (error) throw error
   return (data as Camper[]) || []
 }

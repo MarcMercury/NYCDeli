@@ -64,7 +64,6 @@ export default function IntakePage() {
       kitchen_participation: true,
       strike_participation: true,
       build_week_attending: false,
-      build_week_arrival_date: '',
       tools_bringing: [],
       vehicle_info: '',
       skills: [],
@@ -113,7 +112,7 @@ export default function IntakePage() {
       ['power_required', 'power_type', 'special_requests'],
       ['kitchen_participation', 'strike_participation'],
       ['skills', 'custom_skills'],
-      ['build_week_attending', 'build_week_arrival_date', 'tools_bringing', 'vehicle_info'],
+      ['build_week_attending', 'tools_bringing', 'vehicle_info'],
       ['emergency_contact_name', 'emergency_contact_number', 'emergency_contact_relationship', 'medical_conditions', 'medications', 'allergies', 'dietary_restrictions'],
       ['burn_count', 'what_attracted_you', 'referral_source', 'character_references', 'first_burn_hopes', 'volunteer_commitment', 'sober_shifts', 'background_check_consent'],
     ]
@@ -188,7 +187,6 @@ export default function IntakePage() {
         playa_name: camperFields.playa_name || null,
         phone: camperFields.phone || null,
         special_requests: camperFields.special_requests || null,
-        build_week_arrival_date: camperFields.build_week_attending ? camperFields.build_week_arrival_date : null,
         tools_bringing: camperFields.tools_bringing || [],
         vehicle_info: camperFields.vehicle_info || null,
         custom_skills: camperFields.custom_skills || null,
@@ -746,20 +744,9 @@ export default function IntakePage() {
                   />
                   {buildWeekAttending && (
                     <>
-                      <Controller
-                        name="build_week_arrival_date"
-                        control={control}
-                        render={({ field }) => (
-                          <Input
-                            label="Build Week Arrival Date"
-                            type="date"
-                            required
-                            error={errors.build_week_arrival_date?.message}
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        )}
-                      />
+                      <p className="text-sm text-gray-500">
+                        Your build-week arrival is your <span className="font-bold">Arrival Date</span> from Step 2 &mdash; that single date is used everywhere.
+                      </p>
                       <Controller
                         name="vehicle_info"
                         control={control}

@@ -585,9 +585,12 @@ export default function BuildWeekPage() {
                         </span>
                         <span className="text-xs text-gray-500 truncate">{member.email}</span>
                         <span className="text-xs text-gray-500">
-                          {member.camper?.build_week_arrival_date
-                            ? new Date(member.camper.build_week_arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                          {member.camper?.arrival_date
+                            ? new Date(member.camper.arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                             : '—'}
+                          {member.camper?.arrival_method && (
+                            <span className="text-gray-400 capitalize"> · {member.camper.arrival_method}</span>
+                          )}
                         </span>
                         <span className="text-xs text-gray-500 truncate">
                           {member.camper?.tools_bringing && member.camper.tools_bringing.length > 0
@@ -613,8 +616,8 @@ export default function BuildWeekPage() {
                         </div>
                         <div className="text-xs text-gray-400 ml-1 space-y-0.5">
                           <p>{member.email}</p>
-                          {member.camper?.build_week_arrival_date && (
-                            <p>Arrives: {new Date(member.camper.build_week_arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                          {member.camper?.arrival_date && (
+                            <p>Arrives: {new Date(member.camper.arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}{member.camper?.arrival_method ? ` · ${member.camper.arrival_method}` : ''}</p>
                           )}
                           {member.camper?.tools_bringing && member.camper.tools_bringing.length > 0 && (
                             <p>Tools: {member.camper.tools_bringing.join(', ')}</p>

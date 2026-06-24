@@ -738,14 +738,9 @@ export default function AdminPage() {
                           </label>
                           {selectedCamper.build_week_attending && (
                             <div className="pl-6 space-y-2">
-                              <div>
-                                <label className="text-xs font-bold uppercase">Build Week Arrival</label>
-                                <Input
-                                  type="date"
-                                  value={selectedCamper.build_week_arrival_date || ''}
-                                  onChange={(e) => setSelectedCamper({...selectedCamper, build_week_arrival_date: e.target.value || null})}
-                                />
-                              </div>
+                              <p className="text-xs text-gray-500">
+                                Arrival date is set in the Arrival &amp; Departure fields above &mdash; that single date is the builder&apos;s build-week arrival.
+                              </p>
                               <div>
                                 <label className="text-xs font-bold uppercase">Vehicle Info</label>
                                 <Input

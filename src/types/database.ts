@@ -55,7 +55,6 @@ export interface CamperRow {
   preferred_shift_types: ShiftType[]
   strike_participation: boolean
   build_week_attending: boolean
-  build_week_arrival_date: string | null
   tools_bringing: string[]
   vehicle_info: string | null
   skills: SkillTag[]
@@ -115,7 +114,6 @@ export interface CamperInsert {
   preferred_shift_types?: ShiftType[]
   strike_participation?: boolean
   build_week_attending?: boolean
-  build_week_arrival_date?: string | null
   tools_bringing?: string[]
   vehicle_info?: string | null
   skills?: SkillTag[]
@@ -174,7 +172,6 @@ export interface CamperUpdate {
   preferred_shift_types?: ShiftType[]
   strike_participation?: boolean
   build_week_attending?: boolean
-  build_week_arrival_date?: string | null
   tools_bringing?: string[]
   vehicle_info?: string | null
   skills?: SkillTag[]
