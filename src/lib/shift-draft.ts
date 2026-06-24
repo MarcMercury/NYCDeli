@@ -570,3 +570,28 @@ export async function swapAssignments(assignmentA: string, assignmentB: string):
     p_assignment_b: assignmentB,
   })
 }
+
+/** Ad-hoc move: reassign a single assignment to a different offering (admin only).
+ *  Caller supplies a free slot_index for the target offering (max existing + 1). */
+export async function moveAssignment(
+  assignmentId: string,
+  targetOfferingId: string,
+  newSlotIndex: number
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('shift_draft_assignments')
+    .update({ offering_id: targetOfferingId, slot_index: newSlotIndex, source: 'manual' } as never)
+    .eq('id', assignmentId)
+  if (error) throw error
+}
+
+/** Remove a single assignment (admin only). */
+export async function removeAssignment(assignmentId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('shift_draft_assignments')
+    .delete()
+    .eq('id', assignmentId)
+  if (error) throw error
+}

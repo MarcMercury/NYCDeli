@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import Link from 'next/link'
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent,
-  Badge, Alert, Button, Input,
+  Badge, Alert, Button, Input, Tabs,
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -33,9 +33,18 @@ import {
   publishDraft,
   runAutoDraft,
   swapAssignments,
+  moveAssignment,
+  removeAssignment,
   type AutoDraftResult,
 } from '@/lib/shift-draft'
 import { OfferingsEditor } from './offerings-editor'
+
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+const sectionTabs = [
+  { id: 'setup', label: 'Setup & Draft' },
+  { id: 'calendar', label: 'Shift Calendar' },
+]
 
 export default function AdminShiftDraftPage() {
   const supabase = createClient()
@@ -74,6 +83,10 @@ export default function AdminShiftDraftPage() {
 
   // Assignment swapping
   const [swapSelected, setSwapSelected] = useState<string[]>([])
+
+  // Section tabs + calendar drag-and-drop
+  const [section, setSection] = useState<'setup' | 'calendar'>('setup')
+  const dragAssignment = useRef<string | null>(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -255,11 +268,11 @@ export default function AdminShiftDraftPage() {
   }
   const handlePublish = async () => {
     if (!activeDraft) return
-    if (!confirm('Archive this draft? Campers will see it as final.')) return
+    if (!confirm('Publish these shifts? Each camper’s assigned shifts, days, and responsibilities will appear on their My Schedule page.')) return
     setBusy('publish')
     try {
       await publishDraft(activeDraft.id)
-      setMsg({ type: 'success', text: 'Draft archived/published.' })
+      setMsg({ type: 'success', text: 'Shifts published to everyone’s My Schedule.' })
       await loadDraftDetails(activeDraft.id)
     } catch (e) {
       setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Publish failed' })
@@ -316,6 +329,57 @@ export default function AdminShiftDraftPage() {
     }
   }
 
+  // ===== Confirm order + execute + publish (guided flow) =====
+  const handleConfirmOrder = async () => {
+    if (!activeDraft) return
+    setBusy('confirm')
+    try {
+      await setDraftOrder(activeDraft.id, orderList)
+      if (activeDraft.status === 'open') {
+        await freezeDraftRankings(activeDraft.id)
+      }
+      setMsg({ type: 'success', text: 'Order confirmed and locked. You can now execute the draft.' })
+      await loadDraftDetails(activeDraft.id)
+    } catch (e) {
+      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Confirm failed' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // ===== Calendar ad-hoc moves =====
+  const handleMoveAssignment = async (assignmentId: string, targetOfferingId: string) => {
+    if (!activeDraft) return
+    const a = assignments.find(x => x.id === assignmentId)
+    if (!a || a.offering_id === targetOfferingId) return
+    const slots = assignments
+      .filter(x => x.offering_id === targetOfferingId)
+      .map(x => x.slot_index)
+    const nextSlot = (slots.length ? Math.max(...slots) : 0) + 1
+    setBusy('move')
+    try {
+      await moveAssignment(assignmentId, targetOfferingId, nextSlot)
+      await loadDraftDetails(activeDraft.id)
+    } catch (e) {
+      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Move failed' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleRemoveAssignment = async (assignmentId: string) => {
+    if (!activeDraft) return
+    setBusy('remove')
+    try {
+      await removeAssignment(assignmentId)
+      await loadDraftDetails(activeDraft.id)
+    } catch (e) {
+      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Remove failed' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
   // ===== Derived =====
   const status = activeDraft?.status ?? null
   const camperById = (id: string) => campers.find(c => c.id === id)
@@ -362,6 +426,61 @@ export default function AdminShiftDraftPage() {
     return g
   })()
 
+  // Assignments grouped by offering (for the shift calendar cells)
+  const assignmentsByOffering = (() => {
+    const m = new Map<string, ShiftDraftAssignmentRow[]>()
+    for (const a of assignments) {
+      if (!m.has(a.offering_id)) m.set(a.offering_id, [])
+      m.get(a.offering_id)!.push(a)
+    }
+    for (const list of m.values()) list.sort((x, y) => x.slot_index - y.slot_index)
+    return m
+  })()
+
+  // Day × shift grid (mirrors the camper ranking grid, but with names in cells)
+  type CalRow = {
+    key: string
+    pool: ShiftOfferingRow['pool']
+    category: string
+    role: string
+    time_label: string | null
+    cells: Map<string, ShiftOfferingRow>
+  }
+  const calendarGrid = (() => {
+    const poolRank: Record<string, number> = { deli: 0, special: 1, strike: 2 }
+    const daysPresent = DAY_ORDER.filter(d => offerings.some(o => (o.day_label ?? '') === d))
+    const sorted = [...offerings].sort((a, b) => {
+      if (poolRank[a.pool] !== poolRank[b.pool]) return poolRank[a.pool] - poolRank[b.pool]
+      return a.sort_order - b.sort_order
+    })
+    const rowMap = new Map<string, CalRow>()
+    const rowOrder: string[] = []
+    for (const o of sorted) {
+      const key = `${o.pool}|${o.category}|${o.role}|${o.time_label ?? ''}`
+      if (!rowMap.has(key)) {
+        rowMap.set(key, { key, pool: o.pool, category: o.category, role: o.role, time_label: o.time_label, cells: new Map() })
+        rowOrder.push(key)
+      }
+      rowMap.get(key)!.cells.set(o.day_label ?? '', o)
+    }
+    const sections: { category: string; pool: ShiftOfferingRow['pool']; rows: CalRow[] }[] = []
+    for (const k of rowOrder) {
+      const r = rowMap.get(k)!
+      let sec = sections[sections.length - 1]
+      if (!sec || sec.category !== r.category || sec.pool !== r.pool) {
+        sec = { category: r.category, pool: r.pool, rows: [] }
+        sections.push(sec)
+      }
+      sec.rows.push(r)
+    }
+    return { days: daysPresent, sections }
+  })()
+
+  const camperLabel = (id: string) => {
+    const c = camperById(id)
+    return c ? (c.playa_name || c.full_name) : id
+  }
+
   const filteredCampers = campers.filter(c => {
     const t = searchTerm.toLowerCase()
     if (!t) return true
@@ -402,6 +521,10 @@ export default function AdminShiftDraftPage() {
           </Alert>
         )}
 
+        <Tabs tabs={sectionTabs} activeTab={section} onChange={(id) => setSection(id as 'setup' | 'calendar')} />
+
+        {section === 'setup' && (
+        <div className="space-y-6">
         {/* Drafts list / new draft */}
         <Card>
           <CardHeader>
@@ -528,7 +651,7 @@ export default function AdminShiftDraftPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Camper Draft Order ({orderList.length})</CardTitle>
-                <CardDescription>Who picks first in each round. Drag to reorder.</CardDescription>
+                <CardDescription>Drag campers into rank order — #1 picks first. Then “Confirm Order &amp; Lock” to freeze it before executing the draft.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -573,7 +696,15 @@ export default function AdminShiftDraftPage() {
                     </div>
                   </div>
                 </div>
-                <Button onClick={handleSaveOrder} disabled={busy === 'order'}>Save Order</Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="secondary" onClick={handleSaveOrder} disabled={busy === 'order'}>Save Order</Button>
+                  <Button onClick={handleConfirmOrder} disabled={busy === 'confirm' || orderList.length === 0}>
+                    Confirm Order &amp; Lock
+                  </Button>
+                  {(status === 'frozen' || status === 'drafted') && (
+                    <Badge variant="warning">Locked — unfreeze below to edit</Badge>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -632,7 +763,7 @@ export default function AdminShiftDraftPage() {
               <CardHeader>
                 <CardTitle>Run the Draft</CardTitle>
                 <CardDescription>
-                  1. Freeze rankings · 2. Dry-run to preview · 3. Commit · 4. Manually adjust if needed · 5. Publish.
+                  1. Confirm &amp; lock the order above · 2. Preview (dry run) · 3. Execute Draft · 4. Adjust names in the Shift Calendar tab · 5. Publish Shifts.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -651,8 +782,8 @@ export default function AdminShiftDraftPage() {
                       <label className="text-xs">Seed (optional)
                         <Input value={seedInput} onChange={e => setSeedInput(e.currentTarget.value)} placeholder="leave blank for random" className="w-40" />
                       </label>
-                      <Button variant="secondary" onClick={() => handleAutoDraft(true)} disabled={busy === 'dry'}>Dry Run</Button>
-                      <Button onClick={() => handleAutoDraft(false)} disabled={busy === 'commit'}>Commit Auto-Draft</Button>
+                      <Button variant="secondary" onClick={() => handleAutoDraft(true)} disabled={busy === 'dry'}>Preview (Dry Run)</Button>
+                      <Button onClick={() => handleAutoDraft(false)} disabled={busy === 'commit'}>Execute Draft</Button>
                     </div>
                     {preview && (
                       <div className="text-xs">
@@ -663,7 +794,9 @@ export default function AdminShiftDraftPage() {
                 )}
 
                 {status === 'drafted' && (
-                  <Button variant="secondary" onClick={handlePublish} disabled={busy === 'publish'}>Archive (Publish Final)</Button>
+                  <Button variant="secondary" onClick={() => setSection('calendar')}>
+                    Review in Shift Calendar →
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -742,6 +875,128 @@ export default function AdminShiftDraftPage() {
               </Card>
             )}
           </>
+        )}
+        </div>
+        )}
+
+        {section === 'calendar' && (
+          <div className="space-y-6">
+            {!activeDraft && <Alert variant="info">Create a draft first in “Setup &amp; Draft”.</Alert>}
+            {activeDraft && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Full Shift Calendar — {activeDraft.name}</CardTitle>
+                    <CardDescription>
+                      Every drafted shift with assigned campers. Drag a name into another cell to move
+                      them; hover a name and click × to unassign. When the schedule looks right, publish
+                      it to everyone’s My Schedule.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button onClick={handlePublish} disabled={busy === 'publish' || assignments.length === 0}>
+                        Publish Shifts → My Schedule
+                      </Button>
+                      <span className="text-xs text-gray-600">
+                        {assignments.length} assignment{assignments.length === 1 ? '' : 's'}
+                        {status === 'archived' && ' · already published'}
+                      </span>
+                    </div>
+                    {assignments.length === 0 && (
+                      <Alert variant="info">
+                        No assignments yet — run “Execute Draft” in Setup &amp; Draft first.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {offerings.length > 0 && assignments.length > 0 && (
+                  <Card>
+                    <CardContent className="py-4">
+                      <div className="overflow-x-auto">
+                        <table className="text-xs border-collapse">
+                          <thead>
+                            <tr>
+                              <th className="sticky left-0 z-10 bg-black text-white px-2 py-2 text-left font-black uppercase tracking-wider min-w-[170px]">
+                                Shift
+                              </th>
+                              {calendarGrid.days.map(day => (
+                                <th key={day} className="bg-black text-white px-2 py-2 font-black uppercase tracking-wider min-w-[120px] text-center">
+                                  {day}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {calendarGrid.sections.map(sec => (
+                              <Fragment key={`${sec.pool}-${sec.category}`}>
+                                <tr>
+                                  <td
+                                    colSpan={calendarGrid.days.length + 1}
+                                    className="bg-gray-100 border-y border-gray-300 px-2 py-1 font-black uppercase text-[10px] tracking-wider text-gray-700"
+                                  >
+                                    {sec.category}
+                                    {sec.pool !== 'deli' && (
+                                      <Badge className="ml-2 text-[9px] capitalize">{sec.pool}</Badge>
+                                    )}
+                                  </td>
+                                </tr>
+                                {sec.rows.map(row => (
+                                  <tr key={row.key} className="border-b border-gray-200 align-top">
+                                    <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-2 py-1 text-left align-top">
+                                      <div className="font-bold leading-tight">{row.role}</div>
+                                      {row.time_label && <div className="text-[10px] text-gray-500">{row.time_label}</div>}
+                                    </td>
+                                    {calendarGrid.days.map(day => {
+                                      const o = row.cells.get(day)
+                                      if (!o) return <td key={day} className="border-l border-gray-100 bg-gray-50/60" />
+                                      const asgs = assignmentsByOffering.get(o.id) ?? []
+                                      const over = asgs.length > o.capacity
+                                      return (
+                                        <td
+                                          key={day}
+                                          onDragOver={e => e.preventDefault()}
+                                          onDrop={() => { const id = dragAssignment.current; dragAssignment.current = null; if (id) handleMoveAssignment(id, o.id) }}
+                                          className="border-l border-gray-100 p-1 align-top min-w-[120px]"
+                                        >
+                                          <div className={cn("text-[9px] uppercase mb-0.5", over ? "text-red-600 font-bold" : "text-gray-400")}>
+                                            {asgs.length}/{o.capacity}
+                                          </div>
+                                          <div className="space-y-0.5">
+                                            {asgs.map(a => (
+                                              <div
+                                                key={a.id}
+                                                draggable
+                                                onDragStart={() => { dragAssignment.current = a.id }}
+                                                className="group flex items-center gap-1 bg-yellow-50 border border-yellow-300 rounded px-1 py-0.5 cursor-move"
+                                              >
+                                                <span className="flex-1 truncate text-[11px]">{camperLabel(a.camper_id)}</span>
+                                                <button
+                                                  onClick={() => handleRemoveAssignment(a.id)}
+                                                  className="opacity-0 group-hover:opacity-100 text-red-600 text-xs leading-none"
+                                                  title="Unassign"
+                                                >×</button>
+                                              </div>
+                                            ))}
+                                            {asgs.length === 0 && <div className="text-[10px] text-gray-300 italic">—</div>}
+                                          </div>
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                ))}
+                              </Fragment>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>
