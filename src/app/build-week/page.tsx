@@ -561,7 +561,7 @@ export default function BuildWeekPage() {
                   <span>Role</span>
                   <span>Email</span>
                   <span>Arrival</span>
-                  <span>Skills / Tools</span>
+                  <span>Arrival Method</span>
                 </div>
 
                 <div className="divide-y divide-gray-100">
@@ -588,14 +588,9 @@ export default function BuildWeekPage() {
                           {member.camper?.arrival_date
                             ? new Date(member.camper.arrival_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                             : '—'}
-                          {member.camper?.arrival_method && (
-                            <span className="text-gray-400 capitalize"> · {member.camper.arrival_method}</span>
-                          )}
                         </span>
-                        <span className="text-xs text-gray-500 truncate">
-                          {member.camper?.tools_bringing && member.camper.tools_bringing.length > 0
-                            ? member.camper.tools_bringing.join(', ')
-                            : '—'}
+                        <span className="text-xs text-gray-500 capitalize truncate">
+                          {member.camper?.arrival_method || '—'}
                         </span>
                       </div>
 
