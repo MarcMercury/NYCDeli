@@ -30,6 +30,8 @@ const tabs: Tab[] = [
   { id: 'full-schedule', label: 'Full Schedule' },
 ]
 
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
 interface ShiftPosition {
   role: string
   description?: string
@@ -420,21 +422,61 @@ export default function KitchenPage() {
   const draftIsFrozen = draft?.status === 'frozen'
   const draftIsDrafted = draft?.status === 'drafted'
 
-  const offeringsByPool = (() => {
-    const groups: Record<'deli'|'special'|'strike', ShiftOfferingRow[]> = { deli: [], special: [], strike: [] }
-    for (const o of offerings) groups[o.pool].push(o)
-    return groups
+  // ======== Ranking Grid (day × shift matrix) ========
+  // Rows = distinct shift (pool/category/role/time), grouped by type/role.
+  // Columns = days of the week. Each cell maps to a single offering.
+  type GridRow = {
+    key: string
+    pool: ShiftOfferingRow['pool']
+    category: string
+    role: string
+    time_label: string | null
+    counts_double: boolean
+    requires_exp: boolean
+    note: string | null
+    cells: Map<string, ShiftOfferingRow>
+  }
+  const rankingGrid = (() => {
+    const poolRank: Record<string, number> = { deli: 0, special: 1, strike: 2 }
+    const daysPresent = DAY_ORDER.filter(d => offerings.some(o => (o.day_label ?? '') === d))
+    const sorted = [...offerings].sort((a, b) => {
+      if (poolRank[a.pool] !== poolRank[b.pool]) return poolRank[a.pool] - poolRank[b.pool]
+      return a.sort_order - b.sort_order
+    })
+    const rowMap = new Map<string, GridRow>()
+    const order: string[] = []
+    for (const o of sorted) {
+      const key = `${o.pool}|${o.category}|${o.role}|${o.time_label ?? ''}`
+      if (!rowMap.has(key)) {
+        rowMap.set(key, {
+          key, pool: o.pool, category: o.category, role: o.role, time_label: o.time_label,
+          counts_double: o.counts_double, requires_exp: o.requires_exp, note: o.note, cells: new Map(),
+        })
+        order.push(key)
+      }
+      rowMap.get(key)!.cells.set(o.day_label ?? '', o)
+    }
+    const sections: { category: string; pool: ShiftOfferingRow['pool']; rows: GridRow[] }[] = []
+    for (const k of order) {
+      const r = rowMap.get(k)!
+      let sec = sections[sections.length - 1]
+      if (!sec || sec.category !== r.category || sec.pool !== r.pool) {
+        sec = { category: r.category, pool: r.pool, rows: [] }
+        sections.push(sec)
+      }
+      sec.rows.push(r)
+    }
+    return { days: daysPresent, sections, totalCells: offerings.length }
   })()
 
-  const offeringByDay = (() => {
-    const map = new Map<string, ShiftOfferingRow[]>()
-    for (const o of offeringsByPool.deli) {
-      const k = o.day_label ?? '—'
-      if (!map.has(k)) map.set(k, [])
-      map.get(k)!.push(o)
+  const usedRanks = new Set(myRankings.map(r => r.rank))
+  const availableRanks = (currentRank: number | null): number[] => {
+    const opts: number[] = []
+    for (let i = 1; i <= rankingGrid.totalCells; i++) {
+      if (!usedRanks.has(i) || i === currentRank) opts.push(i)
     }
-    return map
-  })()
+    return opts
+  }
 
   // Optimistic update helper for admin position edits (roles tab)
   const updateDisplayPosition = (catIdx: number, posIdx: number, field: 'role' | 'time' | 'description', value: string) => {
@@ -974,95 +1016,126 @@ export default function KitchenPage() {
             )}
 
             {draft && offerings.length > 0 && (
-              <>
-                {(['deli', 'special', 'strike'] as const).map(pool => {
-                  const list = offeringsByPool[pool]
-                  if (list.length === 0) return null
-                  const groups: { label: string; items: ShiftOfferingRow[] }[] =
-                    pool === 'deli'
-                      ? Array.from(offeringByDay.entries()).map(([k, v]) => ({ label: k, items: v }))
-                      : [{ label: pool === 'special' ? 'Special / Deep Playa' : 'Strike', items: list }]
+              <Card>
+                <CardHeader>
+                  <CardTitle>Rank Your Shifts</CardTitle>
+                  <CardDescription>
+                    Pick a rank for every shift/day you&apos;d like — 1 is your top choice. Each number can
+                    only be used once across the whole grid, so a number disappears from the other
+                    drop-downs once you use it. Leave a cell blank if you don&apos;t want it.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!currentUser.camperId && (
+                    <Alert variant="warning">
+                      Your login isn&apos;t linked to a camper profile yet, so rankings can&apos;t be saved.
+                      Reach out to an admin to get linked.
+                    </Alert>
+                  )}
 
-                  return (
-                    <Card key={pool}>
-                      <CardHeader>
-                        <CardTitle className="capitalize">{pool} Pool</CardTitle>
-                        <CardDescription>
-                          {pool === 'deli' && 'Daily kitchen + camp shifts (Mon–Sat).'}
-                          {pool === 'special' && 'Deep Playa Friday food service.'}
-                          {pool === 'strike' && 'Sunday teardown — Sunday departures only.'}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        {groups.map(group => (
-                          <div key={group.label}>
-                            <h4 className="font-bold uppercase text-xs tracking-wider text-gray-700 mb-2">{group.label}</h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs border-collapse">
-                                <thead>
-                                  <tr className="border-b-2 border-black">
-                                    <th className="text-left py-1 pr-2 font-black uppercase w-16">Rank</th>
-                                    <th className="text-left py-1 pr-2 font-black uppercase">Role</th>
-                                    <th className="text-left py-1 pr-2 font-black uppercase">Time</th>
-                                    <th className="text-left py-1 pr-2 font-black uppercase">Cap</th>
-                                    <th className="text-left py-1 pr-2 font-black uppercase">Notes</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {group.items.map(o => {
-                                    const rank = rankingByOffering.get(o.id) ?? ''
-                                    const assigned = assignedOfferingIds.has(o.id)
-                                    return (
-                                      <tr
-                                        key={o.id}
+                  <div className="flex items-center justify-between text-xs">
+                    <p className="text-gray-600">
+                      <span className="font-black">{myRankings.length}</span> of{' '}
+                      <span className="font-black">{rankingGrid.totalCells}</span> shifts ranked.
+                    </p>
+                    <p className="text-gray-500">
+                      <Badge variant="warning" className="text-[9px] mr-1">2×</Badge> counts as two shifts ·{' '}
+                      <Badge variant="default" className="text-[9px] mx-1">EXP</Badge> experience helpful
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="text-xs border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="sticky left-0 z-10 bg-black text-white px-2 py-2 text-left font-black uppercase tracking-wider min-w-[180px]">
+                            Shift
+                          </th>
+                          {rankingGrid.days.map(day => (
+                            <th key={day} className="bg-black text-white px-2 py-2 font-black uppercase tracking-wider min-w-[64px] text-center">
+                              {day}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rankingGrid.sections.map(section => (
+                          <React.Fragment key={`${section.pool}-${section.category}`}>
+                            <tr>
+                              <td
+                                colSpan={rankingGrid.days.length + 1}
+                                className="bg-gray-100 border-y border-gray-300 px-2 py-1 font-black uppercase text-[10px] tracking-wider text-gray-700"
+                              >
+                                {section.category}
+                                {section.pool !== 'deli' && (
+                                  <Badge variant="default" className="ml-2 text-[9px] capitalize">{section.pool}</Badge>
+                                )}
+                              </td>
+                            </tr>
+                            {section.rows.map(row => (
+                              <tr key={row.key} className="border-b border-gray-200">
+                                <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-2 py-1 text-left align-top">
+                                  <div className="font-bold leading-tight">
+                                    {row.role}
+                                    {row.counts_double && <Badge variant="warning" className="ml-1 text-[9px]">2×</Badge>}
+                                    {row.requires_exp && (
+                                      <Badge
+                                        variant="default"
+                                        className="ml-1 text-[9px]"
+                                        title="Experience helpful — a hint, not a requirement. Anyone can rank this."
+                                      >
+                                        EXP
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {row.time_label && (
+                                    <div className="text-[10px] text-gray-500">{row.time_label}</div>
+                                  )}
+                                </td>
+                                {rankingGrid.days.map(day => {
+                                  const o = row.cells.get(day)
+                                  if (!o) {
+                                    return <td key={day} className="border-l border-gray-100 bg-gray-50/60" />
+                                  }
+                                  const currentRank = rankingByOffering.get(o.id) ?? null
+                                  const assigned = assignedOfferingIds.has(o.id)
+                                  return (
+                                    <td
+                                      key={day}
+                                      className={cn(
+                                        "border-l border-gray-100 p-0.5 text-center",
+                                        assigned && "bg-green-50",
+                                      )}
+                                    >
+                                      <select
+                                        value={currentRank ?? ''}
+                                        disabled={!draftIsOpen || !currentUser.camperId || savingOffering === o.id}
+                                        onChange={(e) => handleSetRanking(o.id, e.target.value)}
+                                        title={o.description ?? undefined}
                                         className={cn(
-                                          "border-b border-gray-200",
-                                          assigned && "bg-green-50",
+                                          "w-full text-xs rounded border px-1 py-1 cursor-pointer disabled:cursor-default disabled:opacity-60",
+                                          currentRank
+                                            ? "border-blue-500 bg-blue-50 font-black text-blue-700"
+                                            : "border-gray-200 text-gray-400",
                                         )}
                                       >
-                                        <td className="py-1 pr-2">
-                                          <Input
-                                            type="number"
-                                            min={1}
-                                            defaultValue={rank === '' ? '' : String(rank)}
-                                            disabled={!draftIsOpen || !currentUser.camperId || savingOffering === o.id}
-                                            onBlur={(e) => handleSetRanking(o.id, e.currentTarget.value)}
-                                            className="w-14 text-xs"
-                                            placeholder="—"
-                                          />
-                                        </td>
-                                        <td className="py-1 pr-2">
-                                          <span className="font-bold">{o.role}</span>
-                                          {o.counts_double && <Badge variant="warning" className="ml-2 text-[9px]">2×</Badge>}
-                                          {o.requires_exp && (
-                                            <Badge
-                                              variant="default"
-                                              className="ml-1 text-[9px]"
-                                              title="Experience helpful — a hint, not a requirement. Anyone can rank this."
-                                            >
-                                              EXP
-                                            </Badge>
-                                          )}
-                                        </td>
-                                        <td className="py-1 pr-2 text-gray-600">{o.time_label ?? '—'}</td>
-                                        <td className="py-1 pr-2">{o.capacity}</td>
-                                        <td className="py-1 pr-2 text-gray-500">
-                                          {o.description}
-                                          {o.note && <div className="italic text-[10px]">{o.note}</div>}
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
+                                        <option value="">—</option>
+                                        {availableRanks(currentRank).map(n => (
+                                          <option key={n} value={n}>{n}</option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            ))}
+                          </React.Fragment>
                         ))}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </TabPanel>
