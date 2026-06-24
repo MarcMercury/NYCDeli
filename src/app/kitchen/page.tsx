@@ -20,6 +20,8 @@ import {
   upsertCamperRanking,
   clearCamperRanking,
   applyShiftCategoryOverrides,
+  createDraft,
+  seedDefaultOfferings,
 } from '@/lib/shift-draft'
 
 type Tab = { id: string; label: string; icon?: React.ReactNode }
@@ -272,6 +274,7 @@ export default function KitchenPage() {
   const [currentUser, setCurrentUser] = useState<{ id: string; camperId: string | null }>({ id: '', camperId: null })
   const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [savingOffering, setSavingOffering] = useState<string | null>(null)
+  const [openingRanking, setOpeningRanking] = useState(false)
   // Admin editing state
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminEditing, setAdminEditing] = useState(false)
@@ -513,6 +516,25 @@ export default function KitchenPage() {
       setDraftMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed' })
     } finally {
       setSavingOffering(null)
+    }
+  }
+
+  // Admin: create a draft and seed all shifts so the ranking grid populates.
+  const handleOpenRanking = async () => {
+    if (!isAdmin) return
+    setOpeningRanking(true)
+    setDraftMessage(null)
+    try {
+      const { data: { user } } = await createClient().auth.getUser()
+      if (!user) throw new Error('Not signed in')
+      const newDraft = await createDraft({ name: 'Kitchen Shift Ranking', created_by: user.id })
+      await seedDefaultOfferings(newDraft.id)
+      await fetchData()
+      setDraftMessage({ type: 'success', text: 'Ranking is now open — all shifts are populated below.' })
+    } catch (err) {
+      setDraftMessage({ type: 'error', text: err instanceof Error ? err.message : 'Could not open ranking' })
+    } finally {
+      setOpeningRanking(false)
     }
   }
 
@@ -941,7 +963,19 @@ export default function KitchenPage() {
           <div className="space-y-6">
             {!draft && (
               <Alert variant="info">
-                No active shift draft yet. An admin will create one and seed the offerings; check back soon.
+                {isAdmin ? (
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <span>
+                      No active shift ranking yet. Click to open ranking — this creates a draft and
+                      populates every shift from the Roles &amp; Descriptions tab for all campers.
+                    </span>
+                    <Button onClick={handleOpenRanking} disabled={openingRanking}>
+                      {openingRanking ? 'Opening…' : 'Open Camper Ranking'}
+                    </Button>
+                  </div>
+                ) : (
+                  'No active shift ranking yet. An admin will open it soon; check back later.'
+                )}
               </Alert>
             )}
 
