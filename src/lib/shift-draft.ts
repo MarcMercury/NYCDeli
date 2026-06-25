@@ -415,6 +415,17 @@ export async function clearCamperRanking(draftId: string, offeringId: string, ca
   })
 }
 
+/** Wipe every ranking a camper has made for a draft, so they can start over. */
+export async function clearAllCamperRankings(draftId: string, camperId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('shift_draft_rankings')
+    .delete()
+    .eq('draft_id', draftId)
+    .eq('camper_id', camperId)
+  if (error) throw new Error(error.message)
+}
+
 export async function compactCamperRankings(draftId: string, camperId?: string): Promise<number> {
   const data = await rpc<number>('compact_camper_rankings', {
     p_draft_id: draftId,

@@ -19,6 +19,7 @@ import {
   fetchAssignments,
   upsertCamperRanking,
   clearCamperRanking,
+  clearAllCamperRankings,
   applyShiftCategoryOverrides,
   createDraft,
   seedDefaultOfferings,
@@ -514,6 +515,23 @@ export default function KitchenPage() {
       setMyRankings(rks)
     } catch (err) {
       setDraftMessage({ type: 'error', text: err instanceof Error ? err.message : 'Save failed' })
+    } finally {
+      setSavingOffering(null)
+    }
+  }
+
+  const handleClearAllRankings = async () => {
+    if (!draft || !currentUser.camperId || !draftIsOpen) return
+    if (myRankings.length === 0) return
+    if (!confirm('Clear all your shift rankings? This wipes the grid so you can start over.')) return
+    setSavingOffering('__clear_all__')
+    try {
+      await clearAllCamperRankings(draft.id, currentUser.camperId)
+      const rks = await fetchMyRankings(draft.id, currentUser.camperId)
+      setMyRankings(rks)
+      setDraftMessage({ type: 'success', text: 'Rankings cleared — start fresh whenever you like.' })
+    } catch (err) {
+      setDraftMessage({ type: 'error', text: err instanceof Error ? err.message : 'Could not clear rankings' })
     } finally {
       setSavingOffering(null)
     }
@@ -1067,15 +1085,25 @@ export default function KitchenPage() {
                     </Alert>
                   )}
 
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between text-xs gap-3">
                     <p className="text-gray-600">
                       <span className="font-black">{myRankings.length}</span> of{' '}
                       <span className="font-black">{rankingGrid.totalCells}</span> shifts ranked.
                     </p>
-                    <p className="text-gray-500">
-                      <Badge variant="warning" className="text-[9px] mr-1">2×</Badge> counts as two shifts ·{' '}
-                      <Badge variant="default" className="text-[9px] mx-1">EXP</Badge> experience helpful
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-gray-500 hidden sm:block">
+                        <Badge variant="warning" className="text-[9px] mr-1">2×</Badge> counts as two shifts ·{' '}
+                        <Badge variant="default" className="text-[9px] mx-1">EXP</Badge> experience helpful
+                      </p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleClearAllRankings}
+                        disabled={!draftIsOpen || !currentUser.camperId || myRankings.length === 0 || savingOffering === '__clear_all__'}
+                      >
+                        {savingOffering === '__clear_all__' ? 'Clearing…' : 'Clear All'}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto">
