@@ -7,7 +7,7 @@
  * the 30×50 shade structures placed on the Camp Map (Layout Builder). The
  * shade sail/fabric is intentionally NOT drawn — this is the build skeleton
  * only: vertical poles, top perimeter rails, ratchet straps, and the Maker
- * Pipe connectors (corner + tee) and base flanges.
+ * Pipe connectors (2/3/4/5-way, sized by how many pipes meet) and base flanges.
  *
  * Source of truth is the active floorplan. Only `shade_structure` objects whose
  * footprint is 30×50 (either orientation) are included — every other shade
@@ -42,14 +42,16 @@ function is30x50(o: FloorplanObjectRow): boolean {
 
 // ───────────────────────────── Geometry model ─────────────────────────────
 /**
- * angled  — diagonal ratchet strap from the pole top to an outward ground
- *           anchor (perimeter tie-down).
- * vertical — strap straight down, wrapped around the pole to an anchor at its
- *           base (used on interior poles where two sections meet end-to-end).
- * none    — no strap on this pole (skipped perimeter pole in the every-other
- *           pattern; it is still tied in by its neighbours + rails).
+ * A strap segment runs from the TOP of a pole down to a ground target.
+ *  • ground = true  → the strap ties into a ground anchor (needs a lag bolt).
+ *  • ground = false → the strap ties to the base plate of the next pole
+ *                     (pyramid leg between two verticals — no extra anchor).
  */
-type StrapType = 'angled' | 'vertical' | 'none'
+interface StrapSeg {
+  toX: number
+  toY: number
+  ground: boolean
+}
 
 interface PostNode {
   /** world feet */
@@ -58,7 +60,10 @@ interface PostNode {
   corner: boolean
   shared: boolean
   owned: boolean
-  strapType: StrapType
+  /** pipes meeting at the top connector incl. the vertical: 2..5 way */
+  connectorWay: number
+  /** straps anchoring this pole (1 normally, 4 at a wall junction = pyramid) */
+  straps: StrapSeg[]
   /** world-space unit vector pointing out from the wall (for angled straps) */
   outX: number
   outY: number
@@ -86,12 +91,13 @@ interface SchemaModel {
     structures: number
     polesVertical: number
     railSegments: number
-    cornerConnectors: number
-    teeConnectors: number
+    way2: number
+    way3: number
+    way4: number
+    way5: number
     baseFlanges: number
-    ratchetStraps: number
-    angledStraps: number
-    verticalStraps: number
+    straps: number
+    groundAnchors: number
   }
 }
 
@@ -132,6 +138,15 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
     set.add(deg)
   }
 
+  // Adjacent poles (the other end of each rail) per pole — used to aim the
+  // pyramid straps at neighbouring pole base plates.
+  const neighborsByKey = new Map<string, Map<string, { x: number; y: number }>>()
+  const addNeighbor = (k: string, nx: number, ny: number) => {
+    let m = neighborsByKey.get(k)
+    if (!m) { m = new Map(); neighborsByKey.set(k, m) }
+    m.set(`${Math.round(nx / 0.5)}_${Math.round(ny / 0.5)}`, { x: nx, y: ny })
+  }
+
   // ── Pass 1: build rails + per-structure post records (with edge order) ──
   type PostTmp = {
     lx: number; ly: number; wx: number; wy: number
@@ -165,6 +180,8 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
         rails.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y })
         addDir(keyOf(a.x, a.y), a.x, a.y, b.x, b.y)
         addDir(keyOf(b.x, b.y), b.x, b.y, a.x, a.y)
+        addNeighbor(keyOf(a.x, a.y), b.x, b.y)
+        addNeighbor(keyOf(b.x, b.y), a.x, a.y)
       }
     }
     addEdge(xs.map(x => localToWorld(o, x, 0)))               // top edge
@@ -228,48 +245,76 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
     })
   })
 
-  // ── Pass 2: classify each owned pole's strap from the global junction map ──
+  // ── Pass 2: classify each owned pole's connector + straps ──
   const counts = {
     structures: structs.length,
     polesVertical: 0,
     railSegments: 0,
-    cornerConnectors: 0,
-    teeConnectors: 0,
+    way2: 0,
+    way3: 0,
+    way4: 0,
+    way5: 0,
     baseFlanges: 0,
-    ratchetStraps: 0,
-    angledStraps: 0,
-    verticalStraps: 0,
+    straps: 0,
+    groundAnchors: 0,
   }
+
+  const STRAP_REACH_FT = POLE_HEIGHT_FT * 0.7
 
   const structures: StructureModel[] = structsTmp.map(st => {
     const posts: PostNode[] = st.recs.map(p => {
-      const deg = dirByKey.get(keyOf(p.wx, p.wy))?.size ?? 0
+      const key = keyOf(p.wx, p.wy)
+      const hDeg = dirByKey.get(key)?.size ?? 0 // distinct horizontal rail directions
+      const connectorWay = hDeg + 1 // + the vertical pole
+      const isJunction = hDeg >= 3 // inner wall meets perimeter (or interior cross)
 
-      let strapType: StrapType
-      if (!p.owned) {
-        strapType = 'none' // a non-owner never renders the shared pole's strap
-      } else if (p.corner || deg >= 3) {
-        // Corners and 3-way+ junctions (where inner sections meet) always get
-        // an angled tie-down.
-        strapType = 'angled'
-      } else if (p.shared) {
-        // Interior pole (middle of a shared edge): strap straight down, wrapped.
-        strapType = 'vertical'
-      } else {
-        // Plain outer-perimeter pole: angled strap on every other pole.
-        strapType = p.inlineOrder != null && p.inlineOrder % 2 === 0 ? 'angled' : 'none'
-      }
-
+      const straps: StrapSeg[] = []
       if (p.owned) {
+        if (isJunction) {
+          // PYRAMID: a strap toward every neighbouring pole base, plus a strap
+          // straight to the ground on any open (exterior) side. 4 legs total.
+          const neighbors = [...(neighborsByKey.get(key)?.values() ?? [])]
+          let sx = 0, sy = 0
+          neighbors.forEach(n => {
+            straps.push({ toX: n.x, toY: n.y, ground: false })
+            const dx = n.x - p.wx, dy = n.y - p.wy
+            const m = Math.hypot(dx, dy) || 1
+            sx += dx / m; sy += dy / m
+          })
+          // Open sides: the missing cardinal direction(s) → strap into the ground.
+          if (neighbors.length < 4) {
+            let ex = -sx, ey = -sy
+            const m = Math.hypot(ex, ey)
+            if (m > 0.01) {
+              ex /= m; ey /= m
+              straps.push({ toX: p.wx + ex * STRAP_REACH_FT, toY: p.wy + ey * STRAP_REACH_FT, ground: true })
+            }
+          }
+        } else if (p.corner) {
+          // Corner: single 45° angled tie-down out to the ground.
+          straps.push({ toX: p.wx + p.outX * STRAP_REACH_FT, toY: p.wy + p.outY * STRAP_REACH_FT, ground: true })
+        } else if (p.shared) {
+          // Interior inline pole (middle of a shared edge): straight down, wrapped.
+          straps.push({ toX: p.wx, toY: p.wy, ground: true })
+        } else if (p.inlineOrder != null && p.inlineOrder % 2 === 0) {
+          // Plain outer-perimeter pole: angled tie-down on every other pole.
+          straps.push({ toX: p.wx + p.outX * STRAP_REACH_FT, toY: p.wy + p.outY * STRAP_REACH_FT, ground: true })
+        }
+
         counts.polesVertical += 1
         counts.baseFlanges += 1
-        if (p.corner) counts.cornerConnectors += 1
-        else counts.teeConnectors += 1
-        if (strapType === 'angled') { counts.angledStraps += 1; counts.ratchetStraps += 1 }
-        else if (strapType === 'vertical') { counts.verticalStraps += 1; counts.ratchetStraps += 1 }
+        if (connectorWay <= 2) counts.way2 += 1
+        else if (connectorWay === 3) counts.way3 += 1
+        else if (connectorWay === 4) counts.way4 += 1
+        else counts.way5 += 1
+        counts.straps += straps.length
+        counts.groundAnchors += straps.filter(s => s.ground).length
       }
 
-      return { wx: p.wx, wy: p.wy, corner: p.corner, shared: p.shared, owned: p.owned, strapType, outX: p.outX, outY: p.outY }
+      return {
+        wx: p.wx, wy: p.wy, corner: p.corner, shared: p.shared, owned: p.owned,
+        connectorWay, straps, outX: p.outX, outY: p.outY,
+      }
     })
 
     counts.railSegments += st.rails.length
@@ -284,6 +329,14 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
     bounds: { minX, minY, maxX, maxY },
     counts,
   }
+}
+
+// Connector colour by "way" (number of pipes meeting incl. the vertical).
+function wayColor(way: number): string {
+  if (way <= 2) return '#64748b' // slate — 2-way
+  if (way === 3) return '#2563eb' // blue — 3-way (corner / inline)
+  if (way === 4) return '#16a34a' // green — 4-way (wall junction)
+  return '#9333ea' // purple — 5-way (interior cross)
 }
 
 // ───────────────────────────── 2D Plan (SVG) ─────────────────────────────
@@ -349,35 +402,45 @@ function SchemaPlan2D({ model }: { model: SchemaModel }) {
               {/* straps + poles */}
               {s.posts.map((p, i) => {
                 if (!p.owned) return null
-                const ox = p.outX
-                const oy = p.outY
-                const strapLen = 8 // ft outward
                 return (
                   <g key={i}>
-                    {p.strapType === 'angled' && (
-                      <line
-                        x1={px(p.wx)} y1={py(p.wy)}
-                        x2={px(p.wx + ox * strapLen)} y2={py(p.wy + oy * strapLen)}
-                        stroke="#ea580c"
-                        strokeWidth={1.5}
-                        strokeDasharray="4 2"
-                      />
-                    )}
-                    {p.strapType === 'vertical' && (
-                      // straight-down wrapped strap reads as a ring around the pole in plan
-                      <circle
-                        cx={px(p.wx)} cy={py(p.wy)}
-                        r={9}
-                        fill="none"
-                        stroke="#ea580c"
-                        strokeWidth={1.5}
-                        strokeDasharray="3 2"
-                      />
-                    )}
+                    {/* straps (pyramid legs / angled / vertical) */}
+                    {p.straps.map((st, j) => {
+                      const isVertical = Math.hypot(st.toX - p.wx, st.toY - p.wy) < 0.5
+                      if (isVertical) {
+                        // straight-down wrapped strap reads as a ring in plan
+                        return (
+                          <circle
+                            key={j}
+                            cx={px(p.wx)} cy={py(p.wy)}
+                            r={9}
+                            fill="none"
+                            stroke="#ea580c"
+                            strokeWidth={1.5}
+                            strokeDasharray="3 2"
+                          />
+                        )
+                      }
+                      return (
+                        <g key={j}>
+                          <line
+                            x1={px(p.wx)} y1={py(p.wy)}
+                            x2={px(st.toX)} y2={py(st.toY)}
+                            stroke="#ea580c"
+                            strokeWidth={1.5}
+                            strokeDasharray={st.ground ? '4 2' : undefined}
+                          />
+                          {st.ground && (
+                            <circle cx={px(st.toX)} cy={py(st.toY)} r={2} fill="#111827" />
+                          )}
+                        </g>
+                      )
+                    })}
+                    {/* pole, coloured by connector way */}
                     <circle
                       cx={px(p.wx)} cy={py(p.wy)}
-                      r={p.corner ? 6 : 5}
-                      fill={p.corner ? '#2563eb' : '#16a34a'}
+                      r={p.connectorWay >= 4 ? 6 : 5}
+                      fill={wayColor(p.connectorWay)}
                       stroke={p.shared ? '#d97706' : '#ffffff'}
                       strokeWidth={p.shared ? 3 : 1.5}
                     />
@@ -439,12 +502,14 @@ function Pole({ x, z, shared }: { x: number; z: number; shared: boolean }) {
   )
 }
 
-function Connector({ x, z, corner }: { x: number; z: number; corner: boolean }) {
+function Connector({ x, z, way }: { x: number; z: number; way: number }) {
   const hM = POLE_HEIGHT_FT * FT_TO_M
+  // bigger node for higher-way junctions so they read clearly in the guide
+  const r = way >= 5 ? 0.12 : way === 4 ? 0.105 : 0.085
   return (
     <mesh position={[x, hM, z]} castShadow>
-      <sphereGeometry args={[0.085, 14, 14]} />
-      <meshStandardMaterial color={corner ? '#2563eb' : '#16a34a'} metalness={0.4} roughness={0.4} />
+      <sphereGeometry args={[r, 14, 14]} />
+      <meshStandardMaterial color={wayColor(way)} metalness={0.4} roughness={0.4} />
     </mesh>
   )
 }
@@ -465,17 +530,15 @@ function Rail({ a, b }: { a: [number, number]; b: [number, number] }) {
   )
 }
 
-function AngledStrap({ x, z, ox, oz }: { x: number; z: number; ox: number; oz: number }) {
-  // ratchet strap: from pole top (x, hM, z) to a ground anchor outward
+function StrapLeg3D({ x, z, tx, tz, ground }: { x: number; z: number; tx: number; tz: number; ground: boolean }) {
+  // ratchet strap from the pole top down to a ground target — either a ground
+  // anchor (exterior) or the base plate of a neighbouring pole (pyramid leg).
   const hM = POLE_HEIGHT_FT * FT_TO_M
-  const reach = POLE_HEIGHT_FT * 0.7 * FT_TO_M
-  const ax = x + ox * reach
-  const az = z + oz * reach
   const top = new THREE.Vector3(x, hM, z)
-  const anchor = new THREE.Vector3(ax, 0, az)
-  const dir = new THREE.Vector3().subVectors(anchor, top)
+  const target = new THREE.Vector3(tx, 0, tz)
+  const dir = new THREE.Vector3().subVectors(target, top)
   const len = dir.length()
-  const mid = new THREE.Vector3().addVectors(top, anchor).multiplyScalar(0.5)
+  const mid = new THREE.Vector3().addVectors(top, target).multiplyScalar(0.5)
   const quat = new THREE.Quaternion().setFromUnitVectors(
     new THREE.Vector3(0, 1, 0),
     dir.clone().normalize()
@@ -486,11 +549,12 @@ function AngledStrap({ x, z, ox, oz }: { x: number; z: number; ox: number; oz: n
         <cylinderGeometry args={[0.015, 0.015, len, 6]} />
         <meshStandardMaterial color="#ea580c" metalness={0.1} roughness={0.8} />
       </mesh>
-      {/* anchor stake */}
-      <mesh position={[ax, 0.05, az]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.1, 6]} />
-        <meshStandardMaterial color="#111827" />
-      </mesh>
+      {ground && (
+        <mesh position={[tx, 0.05, tz]}>
+          <cylinderGeometry args={[0.03, 0.03, 0.1, 6]} />
+          <meshStandardMaterial color="#111827" />
+        </mesh>
+      )}
     </group>
   )
 }
@@ -567,14 +631,16 @@ function Schema3DScene({ model }: { model: SchemaModel }) {
             {s.posts.map((p, i) => {
               if (!p.owned) return null
               const [x, z] = toM(p.wx, p.wy)
-              const ox = p.outX
-              const oz = p.outY
               return (
                 <group key={`post-${i}`}>
                   <Pole x={x} z={z} shared={p.shared} />
-                  <Connector x={x} z={z} corner={p.corner} />
-                  {p.strapType === 'angled' && <AngledStrap x={x} z={z} ox={ox} oz={oz} />}
-                  {p.strapType === 'vertical' && <VerticalStrap x={x} z={z} />}
+                  <Connector x={x} z={z} way={p.connectorWay} />
+                  {p.straps.map((st, j) => {
+                    const isVertical = Math.hypot(st.toX - p.wx, st.toY - p.wy) < 0.5
+                    if (isVertical) return <VerticalStrap key={j} x={x} z={z} />
+                    const [tx, tz] = toM(st.toX, st.toY)
+                    return <StrapLeg3D key={j} x={x} z={z} tx={tx} tz={tz} ground={st.ground} />
+                  })}
                 </group>
               )
             })}
@@ -631,8 +697,10 @@ function Schema3D({ model }: { model: SchemaModel }) {
  */
 const SCHEMA_PRODUCTS = {
   emt:    { name: '1" × 10\' EMT Conduit',                    sku: 'EMT-1-10' },
-  corner: { name: 'Maker Pipe 90° Corner Connector — 1"',    sku: 'MP-90' },
-  tee:    { name: 'Maker Pipe T Connector — 1"',             sku: 'MP-T' },
+  way2:   { name: 'Maker Pipe 2-Way Connector — 1"',         sku: 'MP-2W' },
+  way3:   { name: 'Maker Pipe 3-Way Connector — 1"',         sku: 'MP-3W' },
+  way4:   { name: 'Maker Pipe 4-Way Connector — 1"',         sku: 'MP-4W' },
+  way5:   { name: 'Maker Pipe 5-Way Connector — 1"',         sku: 'MP-5W' },
   flange: { name: 'Maker Pipe Flange Connector — 1"',        sku: 'MP-FLANGE' },
   strap:  { name: '1" × 15\' Ratchet Tie-Down (500 lb WLL)', sku: 'RATCH-1-15' },
   anchor: { name: '1/2" × 18" Hex Lag Bolt Ground Anchor',   sku: 'LAG-12-18' },
@@ -642,7 +710,6 @@ type NeedItem = { name: string; sku: string; label?: string; qty: number }
 type NeedGroup = { group: string; items: NeedItem[] }
 
 function buildNeeds(c: SchemaModel['counts']): NeedGroup[] {
-  const straps = c.angledStraps + c.verticalStraps
   const groups: NeedGroup[] = [
     {
       group: 'Frame · EMT',
@@ -654,16 +721,18 @@ function buildNeeds(c: SchemaModel['counts']): NeedGroup[] {
     {
       group: 'Connectors',
       items: [
-        { ...SCHEMA_PRODUCTS.corner, qty: c.cornerConnectors },
-        { ...SCHEMA_PRODUCTS.tee, qty: c.teeConnectors },
+        { ...SCHEMA_PRODUCTS.way2, label: 'wall end', qty: c.way2 },
+        { ...SCHEMA_PRODUCTS.way3, label: 'corner / inline', qty: c.way3 },
+        { ...SCHEMA_PRODUCTS.way4, label: 'wall junction', qty: c.way4 },
+        { ...SCHEMA_PRODUCTS.way5, label: 'interior cross', qty: c.way5 },
         { ...SCHEMA_PRODUCTS.flange, label: 'pole base', qty: c.baseFlanges },
       ],
     },
     {
       group: 'Straps & Anchoring',
       items: [
-        { ...SCHEMA_PRODUCTS.strap, label: `${c.angledStraps} angled · ${c.verticalStraps} vertical`, qty: straps },
-        { ...SCHEMA_PRODUCTS.anchor, label: '1 per strap', qty: straps },
+        { ...SCHEMA_PRODUCTS.strap, label: 'incl. 4-leg pyramids at junctions', qty: c.straps },
+        { ...SCHEMA_PRODUCTS.anchor, label: 'ground tie-downs only', qty: c.groundAnchors },
       ],
     },
   ]
@@ -675,7 +744,7 @@ function buildNeeds(c: SchemaModel['counts']): NeedGroup[] {
 function NeedsList({ model }: { model: SchemaModel }) {
   const groups = buildNeeds(model.counts)
   const emtTotal = model.counts.polesVertical + model.counts.railSegments
-  const straps = model.counts.angledStraps + model.counts.verticalStraps
+  const straps = model.counts.straps
   return (
     <div className="border-2 border-black bg-white">
       <div className="flex items-center justify-between border-b-2 border-black px-3 py-1.5">
@@ -715,9 +784,11 @@ function Legend() {
   const items: Array<{ color: string; label: string }> = [
     { color: '#6b7280', label: 'Pole (1″ EMT, 10ft)' },
     { color: '#4b5563', label: 'Top rail (10ft EMT)' },
-    { color: '#2563eb', label: 'Corner connector (90°)' },
-    { color: '#16a34a', label: 'Tee connector' },
-    { color: '#ea580c', label: 'Ratchet strap (angled = perimeter, ring = vertical/interior)' },
+    { color: '#64748b', label: '2-way connector' },
+    { color: '#2563eb', label: '3-way connector (corner / inline)' },
+    { color: '#16a34a', label: '4-way connector (wall junction)' },
+    { color: '#9333ea', label: '5-way connector (interior cross)' },
+    { color: '#ea580c', label: 'Ratchet strap / pyramid leg / anchor' },
     { color: '#d97706', label: 'Shared pole (two structures)' },
   ]
   return (
@@ -832,11 +903,14 @@ export default function ShadeSchemaTab() {
         <div className="border-2 border-black bg-white px-4 py-3">
           <Legend />
           <p className="mt-2 text-[11px] text-gray-500">
-            Poles sit on the perimeter at every corner plus every {SPACING_FT}ft. Corners use 90° connectors; intermediate
-            edge poles use tee connectors. Each pole gets a base flange. <strong>Strap rule:</strong> interior poles (where
-            two sections meet end-to-end) get a strap straight down, wrapped around the pole; perimeter poles get an angled
-            tie-down on every other pole, always including the corners and any 3-way junctions. Shared poles between
-            adjacent structures are counted once.
+            Poles sit on the perimeter at every corner plus every {SPACING_FT}ft, each on a base flange.{' '}
+            <strong>Connectors</strong> are sized by how many pipes meet: dead-ends are 2-way, corners and inline edge
+            poles are 3-way, wall junctions (where an inner wall meets the perimeter) are 4-way, and interior crosses are
+            5-way. <strong>Strap rule:</strong> wall junctions get a 4-leg <em>pyramid</em> — straps running to each
+            neighbouring pole base plus one ground anchor on the open side; interior poles (where two sections meet
+            end-to-end) get a strap straight down wrapped around the pole; remaining perimeter poles get an angled
+            ground tie-down on every other pole, always including the corners. Only ground-facing straps need a lag-bolt
+            anchor. Shared poles between adjacent structures are counted once.
           </p>
         </div>
       )}
