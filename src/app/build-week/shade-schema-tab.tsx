@@ -302,21 +302,25 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
       const straps: StrapSeg[] = []
       if (p.owned) {
         if (isJunction) {
-          // PYRAMID: a strap toward every neighbouring pole base, plus a strap
-          // straight to the ground on any open (exterior) side. 4 legs total.
           const neighbors = [...(neighborsByKey.get(key)?.values() ?? [])]
-          let sx = 0, sy = 0
-          neighbors.forEach(n => {
-            straps.push({ toX: n.x, toY: n.y, ground: false })
-            const dx = n.x - p.wx, dy = n.y - p.wy
-            const m = Math.hypot(dx, dy) || 1
-            sx += dx / m; sy += dy / m
-          })
-          // Open sides: the missing cardinal direction → strap into the ground,
-          // but ONLY when that direction faces true exterior. Interior junctions
-          // (where structures meet inside the camp) get no ground tie-down — the
-          // pyramid legs to neighbouring pole bases are enough.
-          if (neighbors.length < 4) {
+          if (neighbors.length >= 4) {
+            // Interior 5-way cross (four walls meet): a single straight-down
+            // strap wrapped around the pole — no angled pyramid legs.
+            straps.push({ toX: p.wx, toY: p.wy, ground: true })
+          } else {
+            // T-junction PYRAMID: a strap toward every neighbouring pole base,
+            // plus a strap straight to the ground on any open (exterior) side.
+            let sx = 0, sy = 0
+            neighbors.forEach(n => {
+              straps.push({ toX: n.x, toY: n.y, ground: false })
+              const dx = n.x - p.wx, dy = n.y - p.wy
+              const m = Math.hypot(dx, dy) || 1
+              sx += dx / m; sy += dy / m
+            })
+            // Open sides: the missing cardinal direction → strap into the ground,
+            // but ONLY when that direction faces true exterior. Interior junctions
+            // (where structures meet inside the camp) get no ground tie-down — the
+            // pyramid legs to neighbouring pole bases are enough.
             let ex = -sx, ey = -sy
             const m = Math.hypot(ex, ey)
             if (m > 0.01) {
