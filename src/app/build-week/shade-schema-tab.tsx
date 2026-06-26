@@ -119,6 +119,25 @@ function edgeStops(len: number): number[] {
   return arr
 }
 
+/**
+ * True when a world point sits clearly inside the given structure's footprint
+ * (used to detect when a ground-strap leg would aim into the camp interior
+ * rather than out to open exterior ground). `inset` keeps perimeter poles from
+ * counting as "inside" their own structure.
+ */
+function pointInStructure(o: FloorplanObjectRow, wx: number, wy: number, inset: number): boolean {
+  const cx = o.x + o.width_ft / 2
+  const cy = o.y + o.height_ft / 2
+  const rad = ((o.rotation ?? 0) * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const dxw = wx - cx
+  const dyw = wy - cy
+  const lx = dxw * cos + dyw * sin + o.width_ft / 2
+  const ly = -dxw * sin + dyw * cos + o.height_ft / 2
+  return lx > inset && lx < o.width_ft - inset && ly > inset && ly < o.height_ft - inset
+}
+
 function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
   const structs = objects.filter(o => o.object_type === 'shade_structure' && is30x50(o))
   // Sharing flags (collapses poles shared by two adjacent 30×50 structures).
@@ -281,24 +300,39 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
             const m = Math.hypot(dx, dy) || 1
             sx += dx / m; sy += dy / m
           })
-          // Open sides: the missing cardinal direction(s) → strap into the ground.
+          // Open sides: the missing cardinal direction → strap into the ground,
+          // but ONLY when that direction faces true exterior. Interior junctions
+          // (where structures meet inside the camp) get no ground tie-down — the
+          // pyramid legs to neighbouring pole bases are enough.
           if (neighbors.length < 4) {
             let ex = -sx, ey = -sy
             const m = Math.hypot(ex, ey)
             if (m > 0.01) {
               ex /= m; ey /= m
-              straps.push({ toX: p.wx + ex * STRAP_REACH_FT, toY: p.wy + ey * STRAP_REACH_FT, ground: true })
+              const tX = p.wx + ex * STRAP_REACH_FT
+              const tY = p.wy + ey * STRAP_REACH_FT
+              const interior = structs.some(o => pointInStructure(o, tX, tY, 1))
+              if (!interior) straps.push({ toX: tX, toY: tY, ground: true })
             }
           }
         } else if (p.corner) {
-          // Corner: single 45° angled tie-down out to the ground.
-          straps.push({ toX: p.wx + p.outX * STRAP_REACH_FT, toY: p.wy + p.outY * STRAP_REACH_FT, ground: true })
+          // Corner: single 45° angled tie-down out to the ground — perimeter only.
+          const tX = p.wx + p.outX * STRAP_REACH_FT
+          const tY = p.wy + p.outY * STRAP_REACH_FT
+          if (!structs.some(o => pointInStructure(o, tX, tY, 1))) {
+            straps.push({ toX: tX, toY: tY, ground: true })
+          }
         } else if (p.shared) {
           // Interior inline pole (middle of a shared edge): straight down, wrapped.
           straps.push({ toX: p.wx, toY: p.wy, ground: true })
         } else if (p.inlineOrder != null && p.inlineOrder % 2 === 0) {
-          // Plain outer-perimeter pole: angled tie-down on every other pole.
-          straps.push({ toX: p.wx + p.outX * STRAP_REACH_FT, toY: p.wy + p.outY * STRAP_REACH_FT, ground: true })
+          // Plain outer-perimeter pole: angled tie-down on every other pole —
+          // perimeter only (skip if it would aim into the camp interior).
+          const tX = p.wx + p.outX * STRAP_REACH_FT
+          const tY = p.wy + p.outY * STRAP_REACH_FT
+          if (!structs.some(o => pointInStructure(o, tX, tY, 1))) {
+            straps.push({ toX: tX, toY: tY, ground: true })
+          }
         }
 
         counts.polesVertical += 1
