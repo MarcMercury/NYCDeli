@@ -41,6 +41,16 @@ function is30x50(o: FloorplanObjectRow): boolean {
 }
 
 // ───────────────────────────── Geometry model ─────────────────────────────
+/**
+ * angled  — diagonal ratchet strap from the pole top to an outward ground
+ *           anchor (perimeter tie-down).
+ * vertical — strap straight down, wrapped around the pole to an anchor at its
+ *           base (used on interior poles where two sections meet end-to-end).
+ * none    — no strap on this pole (skipped perimeter pole in the every-other
+ *           pattern; it is still tied in by its neighbours + rails).
+ */
+type StrapType = 'angled' | 'vertical' | 'none'
+
 interface PostNode {
   /** world feet */
   wx: number
@@ -48,6 +58,10 @@ interface PostNode {
   corner: boolean
   shared: boolean
   owned: boolean
+  strapType: StrapType
+  /** world-space unit vector pointing out from the wall (for angled straps) */
+  outX: number
+  outY: number
 }
 
 interface RailSeg {
@@ -76,6 +90,8 @@ interface SchemaModel {
     teeConnectors: number
     baseFlanges: number
     ratchetStraps: number
+    angledStraps: number
+    verticalStraps: number
   }
 }
 
@@ -102,8 +118,117 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
   // Sharing flags (collapses poles shared by two adjacent 30×50 structures).
   const postsByObj = computeShadePosts(structs, SPACING_FT)
 
-  const structures: StructureModel[] = []
+  const keyOf = (x: number, y: number) => `${Math.round(x / 0.5)}_${Math.round(y / 0.5)}`
+
+  // Direction set per physical pole — used to classify junctions. Each rail
+  // contributes its bearing (rounded) at both endpoints; the number of distinct
+  // bearings = the junction degree (2 = corner/inline, 3 = tee, 4 = cross).
+  const ROUND_DEG = 15
+  const dirByKey = new Map<string, Set<number>>()
+  const addDir = (k: string, ax: number, ay: number, bx: number, by: number) => {
+    const deg = (((Math.round((Math.atan2(by - ay, bx - ax) * 180) / Math.PI / ROUND_DEG) * ROUND_DEG) % 360) + 360) % 360
+    let set = dirByKey.get(k)
+    if (!set) { set = new Set(); dirByKey.set(k, set) }
+    set.add(deg)
+  }
+
+  // ── Pass 1: build rails + per-structure post records (with edge order) ──
+  type PostTmp = {
+    lx: number; ly: number; wx: number; wy: number
+    corner: boolean; shared: boolean; owned: boolean
+    inlineOrder: number | null
+    outX: number; outY: number
+  }
+  type StructTmp = {
+    id: string; label: string; ownerCenter: { x: number; y: number }
+    cornersWorld: Array<{ x: number; y: number }>
+    rails: RailSeg[]; recs: PostTmp[]
+  }
+
+  const structsTmp: StructTmp[] = []
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+  structs.forEach((o, idx) => {
+    const sharedLookup = new Map<string, { shared: boolean; owned: boolean }>()
+    ;(postsByObj.get(o.id) ?? []).forEach(p => {
+      sharedLookup.set(`${p.xLocal.toFixed(2)}_${p.yLocal.toFixed(2)}`, { shared: p.shared, owned: p.owned })
+    })
+
+    const xs = edgeStops(o.width_ft)
+    const ys = edgeStops(o.height_ft)
+
+    // Rails (perimeter) + direction accumulation.
+    const rails: RailSeg[] = []
+    const addEdge = (pts: Array<{ x: number; y: number }>) => {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1]
+        rails.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y })
+        addDir(keyOf(a.x, a.y), a.x, a.y, b.x, b.y)
+        addDir(keyOf(b.x, b.y), b.x, b.y, a.x, a.y)
+      }
+    }
+    addEdge(xs.map(x => localToWorld(o, x, 0)))               // top edge
+    addEdge(xs.map(x => localToWorld(o, x, o.height_ft)))     // bottom edge
+    addEdge(ys.map(y => localToWorld(o, 0, y)))               // left edge
+    addEdge(ys.map(y => localToWorld(o, o.width_ft, y)))      // right edge
+
+    // Posts with per-edge inline ordering (corners get inlineOrder = null).
+    const recMap = new Map<string, PostTmp>()
+    const addPost = (lx: number, ly: number, inlineOrder: number | null) => {
+      const lk = `${lx.toFixed(2)}_${ly.toFixed(2)}`
+      const existing = recMap.get(lk)
+      if (existing) {
+        if (inlineOrder != null && existing.inlineOrder == null) existing.inlineOrder = inlineOrder
+        return
+      }
+      const isCorner =
+        (lx <= 0.001 || lx >= o.width_ft - 0.001) &&
+        (ly <= 0.001 || ly >= o.height_ft - 0.001)
+      const w = localToWorld(o, lx, ly)
+      const sm = sharedLookup.get(lk) ?? { shared: false, owned: true }
+
+      // Outward direction = sum of the wall normals of the edge(s) this pole
+      // sits on, in the structure's LOCAL frame, then rotated to world.
+      //  • tee / inline edge pole → one normal → strap straight out (90° to wall)
+      //  • corner → two normals → 45° bisector of the two horizontal pipes
+      let nx = 0, ny = 0
+      if (lx <= 0.001) nx -= 1
+      if (lx >= o.width_ft - 0.001) nx += 1
+      if (ly <= 0.001) ny -= 1
+      if (ly >= o.height_ft - 0.001) ny += 1
+      const nMag = Math.hypot(nx, ny) || 1
+      nx /= nMag; ny /= nMag
+      const rad = ((o.rotation ?? 0) * Math.PI) / 180
+      const cos = Math.cos(rad), sin = Math.sin(rad)
+      const outX = nx * cos - ny * sin
+      const outY = nx * sin + ny * cos
+
+      minX = Math.min(minX, w.x); maxX = Math.max(maxX, w.x)
+      minY = Math.min(minY, w.y); maxY = Math.max(maxY, w.y)
+      recMap.set(lk, { lx, ly, wx: w.x, wy: w.y, corner: isCorner, shared: sm.shared, owned: sm.owned, inlineOrder, outX, outY })
+    }
+    const inlineIdx = (i: number, len: number) => (i > 0 && i < len - 1 ? i - 1 : null)
+    xs.forEach((x, i) => addPost(x, 0, inlineIdx(i, xs.length)))
+    xs.forEach((x, i) => addPost(x, o.height_ft, inlineIdx(i, xs.length)))
+    ys.forEach((y, j) => addPost(0, y, inlineIdx(j, ys.length)))
+    ys.forEach((y, j) => addPost(o.width_ft, y, inlineIdx(j, ys.length)))
+
+    structsTmp.push({
+      id: o.id,
+      label: o.label?.trim() || `Structure ${idx + 1}`,
+      ownerCenter: { x: o.x + o.width_ft / 2, y: o.y + o.height_ft / 2 },
+      cornersWorld: [
+        localToWorld(o, 0, 0),
+        localToWorld(o, o.width_ft, 0),
+        localToWorld(o, o.width_ft, o.height_ft),
+        localToWorld(o, 0, o.height_ft),
+      ],
+      rails,
+      recs: [...recMap.values()],
+    })
+  })
+
+  // ── Pass 2: classify each owned pole's strap from the global junction map ──
   const counts = {
     structures: structs.length,
     polesVertical: 0,
@@ -112,59 +237,44 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
     teeConnectors: 0,
     baseFlanges: 0,
     ratchetStraps: 0,
+    angledStraps: 0,
+    verticalStraps: 0,
   }
 
-  structs.forEach((o, idx) => {
-    const localPosts = postsByObj.get(o.id) ?? []
-    const posts: PostNode[] = localPosts.map(p => {
-      const isCorner =
-        (p.xLocal <= 0.001 || p.xLocal >= o.width_ft - 0.001) &&
-        (p.yLocal <= 0.001 || p.yLocal >= o.height_ft - 0.001)
-      const w = localToWorld(o, p.xLocal, p.yLocal)
-      minX = Math.min(minX, w.x); maxX = Math.max(maxX, w.x)
-      minY = Math.min(minY, w.y); maxY = Math.max(maxY, w.y)
-      return { wx: w.x, wy: w.y, corner: isCorner, shared: p.shared, owned: p.owned }
-    })
+  const structures: StructureModel[] = structsTmp.map(st => {
+    const posts: PostNode[] = st.recs.map(p => {
+      const deg = dirByKey.get(keyOf(p.wx, p.wy))?.size ?? 0
 
-    // Perimeter rails: connect consecutive posts along each of the 4 edges.
-    const xs = edgeStops(o.width_ft)
-    const ys = edgeStops(o.height_ft)
-    const rails: RailSeg[] = []
-    const addEdge = (pts: Array<{ x: number; y: number }>) => {
-      for (let i = 0; i < pts.length - 1; i++) {
-        rails.push({ ax: pts[i].x, ay: pts[i].y, bx: pts[i + 1].x, by: pts[i + 1].y })
+      let strapType: StrapType
+      if (!p.owned) {
+        strapType = 'none' // a non-owner never renders the shared pole's strap
+      } else if (p.corner || deg >= 3) {
+        // Corners and 3-way+ junctions (where inner sections meet) always get
+        // an angled tie-down.
+        strapType = 'angled'
+      } else if (p.shared) {
+        // Interior pole (middle of a shared edge): strap straight down, wrapped.
+        strapType = 'vertical'
+      } else {
+        // Plain outer-perimeter pole: angled strap on every other pole.
+        strapType = p.inlineOrder != null && p.inlineOrder % 2 === 0 ? 'angled' : 'none'
       }
-    }
-    addEdge(xs.map(x => localToWorld(o, x, 0)))               // top edge
-    addEdge(xs.map(x => localToWorld(o, x, o.height_ft)))      // bottom edge
-    addEdge(ys.map(y => localToWorld(o, 0, y)))                // left edge
-    addEdge(ys.map(y => localToWorld(o, o.width_ft, y)))       // right edge
 
-    const cornersWorld = [
-      localToWorld(o, 0, 0),
-      localToWorld(o, o.width_ft, 0),
-      localToWorld(o, o.width_ft, o.height_ft),
-      localToWorld(o, 0, o.height_ft),
-    ]
+      if (p.owned) {
+        counts.polesVertical += 1
+        counts.baseFlanges += 1
+        if (p.corner) counts.cornerConnectors += 1
+        else counts.teeConnectors += 1
+        if (strapType === 'angled') { counts.angledStraps += 1; counts.ratchetStraps += 1 }
+        else if (strapType === 'vertical') { counts.verticalStraps += 1; counts.ratchetStraps += 1 }
+      }
 
-    // Counts — only count physical (owned) poles once across shared structures.
-    posts.forEach(p => {
-      if (!p.owned) return
-      counts.polesVertical += 1
-      counts.baseFlanges += 1
-      counts.ratchetStraps += 1
-      if (p.corner) counts.cornerConnectors += 1
-      else counts.teeConnectors += 1
+      return { wx: p.wx, wy: p.wy, corner: p.corner, shared: p.shared, owned: p.owned, strapType, outX: p.outX, outY: p.outY }
     })
-    counts.railSegments += rails.length
 
-    structures.push({
-      id: o.id,
-      label: o.label?.trim() || `Structure ${idx + 1}`,
-      cornersWorld,
-      posts,
-      rails,
-    })
+    counts.railSegments += st.rails.length
+
+    return { id: st.id, label: st.label, cornersWorld: st.cornersWorld, posts, rails: st.rails }
   })
 
   if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 50; maxY = 50 }
@@ -236,24 +346,34 @@ function SchemaPlan2D({ model }: { model: SchemaModel }) {
                   strokeLinecap="round"
                 />
               ))}
-              {/* straps (outward ticks) + poles */}
+              {/* straps + poles */}
               {s.posts.map((p, i) => {
                 if (!p.owned) return null
-                // outward direction from structure center
-                let ox = p.wx - sc.x
-                let oy = p.wy - sc.y
-                const mag = Math.hypot(ox, oy) || 1
-                ox /= mag; oy /= mag
+                const ox = p.outX
+                const oy = p.outY
                 const strapLen = 8 // ft outward
                 return (
                   <g key={i}>
-                    <line
-                      x1={px(p.wx)} y1={py(p.wy)}
-                      x2={px(p.wx + ox * strapLen)} y2={py(p.wy + oy * strapLen)}
-                      stroke="#ea580c"
-                      strokeWidth={1.5}
-                      strokeDasharray="4 2"
-                    />
+                    {p.strapType === 'angled' && (
+                      <line
+                        x1={px(p.wx)} y1={py(p.wy)}
+                        x2={px(p.wx + ox * strapLen)} y2={py(p.wy + oy * strapLen)}
+                        stroke="#ea580c"
+                        strokeWidth={1.5}
+                        strokeDasharray="4 2"
+                      />
+                    )}
+                    {p.strapType === 'vertical' && (
+                      // straight-down wrapped strap reads as a ring around the pole in plan
+                      <circle
+                        cx={px(p.wx)} cy={py(p.wy)}
+                        r={9}
+                        fill="none"
+                        stroke="#ea580c"
+                        strokeWidth={1.5}
+                        strokeDasharray="3 2"
+                      />
+                    )}
                     <circle
                       cx={px(p.wx)} cy={py(p.wy)}
                       r={p.corner ? 6 : 5}
@@ -345,7 +465,7 @@ function Rail({ a, b }: { a: [number, number]; b: [number, number] }) {
   )
 }
 
-function Strap({ x, z, ox, oz }: { x: number; z: number; ox: number; oz: number }) {
+function AngledStrap({ x, z, ox, oz }: { x: number; z: number; ox: number; oz: number }) {
   // ratchet strap: from pole top (x, hM, z) to a ground anchor outward
   const hM = POLE_HEIGHT_FT * FT_TO_M
   const reach = POLE_HEIGHT_FT * 0.7 * FT_TO_M
@@ -368,6 +488,34 @@ function Strap({ x, z, ox, oz }: { x: number; z: number; ox: number; oz: number 
       </mesh>
       {/* anchor stake */}
       <mesh position={[ax, 0.05, az]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.1, 6]} />
+        <meshStandardMaterial color="#111827" />
+      </mesh>
+    </group>
+  )
+}
+
+function VerticalStrap({ x, z }: { x: number; z: number }) {
+  // strap straight down, wrapped around the pole, to an anchor at its base.
+  const hM = POLE_HEIGHT_FT * FT_TO_M
+  const r = 0.045
+  const off = r + 0.02
+  return (
+    <group position={[x, 0, z]}>
+      {/* vertical strap run hugging the pole */}
+      <mesh position={[off, hM / 2, 0]}>
+        <cylinderGeometry args={[0.012, 0.012, hM, 6]} />
+        <meshStandardMaterial color="#ea580c" metalness={0.1} roughness={0.8} />
+      </mesh>
+      {/* wrap bands around the pole near top, middle, bottom */}
+      {[0.85, 0.5, 0.15].map((f, i) => (
+        <mesh key={i} position={[0, hM * f, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[off, 0.01, 6, 16]} />
+          <meshStandardMaterial color="#ea580c" metalness={0.1} roughness={0.8} />
+        </mesh>
+      ))}
+      {/* ground anchor stake at the base */}
+      <mesh position={[off, 0.05, 0]}>
         <cylinderGeometry args={[0.03, 0.03, 0.1, 6]} />
         <meshStandardMaterial color="#111827" />
       </mesh>
@@ -419,15 +567,14 @@ function Schema3DScene({ model }: { model: SchemaModel }) {
             {s.posts.map((p, i) => {
               if (!p.owned) return null
               const [x, z] = toM(p.wx, p.wy)
-              let ox = p.wx - sc.x
-              let oz = p.wy - sc.y
-              const mag = Math.hypot(ox, oz) || 1
-              ox /= mag; oz /= mag
+              const ox = p.outX
+              const oz = p.outY
               return (
                 <group key={`post-${i}`}>
                   <Pole x={x} z={z} shared={p.shared} />
                   <Connector x={x} z={z} corner={p.corner} />
-                  <Strap x={x} z={z} ox={ox} oz={oz} />
+                  {p.strapType === 'angled' && <AngledStrap x={x} z={z} ox={ox} oz={oz} />}
+                  {p.strapType === 'vertical' && <VerticalStrap x={x} z={z} />}
                 </group>
               )
             })}
@@ -476,6 +623,93 @@ function Schema3D({ model }: { model: SchemaModel }) {
   )
 }
 
+// ───────────────────────────── Inventory Needs ─────────────────────────────
+/**
+ * Item names/SKUs are taken from the Shade Calculator catalog, but the
+ * quantities come from THIS schema model (the placed 30×50 structures), not the
+ * calculator's own math.
+ */
+const SCHEMA_PRODUCTS = {
+  emt:    { name: '1" × 10\' EMT Conduit',                    sku: 'EMT-1-10' },
+  corner: { name: 'Maker Pipe 90° Corner Connector — 1"',    sku: 'MP-90' },
+  tee:    { name: 'Maker Pipe T Connector — 1"',             sku: 'MP-T' },
+  flange: { name: 'Maker Pipe Flange Connector — 1"',        sku: 'MP-FLANGE' },
+  strap:  { name: '1" × 15\' Ratchet Tie-Down (500 lb WLL)', sku: 'RATCH-1-15' },
+  anchor: { name: '1/2" × 18" Hex Lag Bolt Ground Anchor',   sku: 'LAG-12-18' },
+} as const
+
+type NeedItem = { name: string; sku: string; label?: string; qty: number }
+type NeedGroup = { group: string; items: NeedItem[] }
+
+function buildNeeds(c: SchemaModel['counts']): NeedGroup[] {
+  const straps = c.angledStraps + c.verticalStraps
+  const groups: NeedGroup[] = [
+    {
+      group: 'Frame · EMT',
+      items: [
+        { ...SCHEMA_PRODUCTS.emt, label: 'verticals', qty: c.polesVertical },
+        { ...SCHEMA_PRODUCTS.emt, label: 'top rails', qty: c.railSegments },
+      ],
+    },
+    {
+      group: 'Connectors',
+      items: [
+        { ...SCHEMA_PRODUCTS.corner, qty: c.cornerConnectors },
+        { ...SCHEMA_PRODUCTS.tee, qty: c.teeConnectors },
+        { ...SCHEMA_PRODUCTS.flange, label: 'pole base', qty: c.baseFlanges },
+      ],
+    },
+    {
+      group: 'Straps & Anchoring',
+      items: [
+        { ...SCHEMA_PRODUCTS.strap, label: `${c.angledStraps} angled · ${c.verticalStraps} vertical`, qty: straps },
+        { ...SCHEMA_PRODUCTS.anchor, label: '1 per strap', qty: straps },
+      ],
+    },
+  ]
+  return groups
+    .map(g => ({ ...g, items: g.items.filter(i => i.qty > 0) }))
+    .filter(g => g.items.length > 0)
+}
+
+function NeedsList({ model }: { model: SchemaModel }) {
+  const groups = buildNeeds(model.counts)
+  const emtTotal = model.counts.polesVertical + model.counts.railSegments
+  const straps = model.counts.angledStraps + model.counts.verticalStraps
+  return (
+    <div className="border-2 border-black bg-white">
+      <div className="flex items-center justify-between border-b-2 border-black px-3 py-1.5">
+        <span className="text-xs font-bold uppercase tracking-wider">Inventory Needs</span>
+        <span className="text-[11px] text-gray-500">
+          {model.counts.structures} structure{model.counts.structures !== 1 ? 's' : ''} · {emtTotal} EMT sticks · {straps} straps
+        </span>
+      </div>
+      <div>
+        {groups.map(g => (
+          <div key={g.group}>
+            <div className="bg-gray-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
+              {g.group}
+            </div>
+            {g.items.map((it, i) => (
+              <div
+                key={`${it.sku}-${i}`}
+                className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-1 text-[11px] last:border-b-0"
+              >
+                <span className="truncate text-gray-800">
+                  {it.name}
+                  {it.label ? <span className="text-gray-400"> · {it.label}</span> : null}
+                  <span className="text-gray-300"> · {it.sku}</span>
+                </span>
+                <span className="shrink-0 font-bold tabular-nums">{it.qty}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ───────────────────────────── Legend ─────────────────────────────
 function Legend() {
   const items: Array<{ color: string; label: string }> = [
@@ -483,7 +717,7 @@ function Legend() {
     { color: '#4b5563', label: 'Top rail (10ft EMT)' },
     { color: '#2563eb', label: 'Corner connector (90°)' },
     { color: '#16a34a', label: 'Tee connector' },
-    { color: '#ea580c', label: 'Ratchet strap / anchor' },
+    { color: '#ea580c', label: 'Ratchet strap (angled = perimeter, ring = vertical/interior)' },
     { color: '#d97706', label: 'Shared pole (two structures)' },
   ]
   return (
@@ -571,25 +805,8 @@ export default function ShadeSchemaTab() {
         </div>
       </div>
 
-      {/* ── Counts strip ── */}
-      {hasStructures && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          {[
-            { label: 'Structures', value: model.counts.structures },
-            { label: 'Poles', value: model.counts.polesVertical },
-            { label: 'Top Rails', value: model.counts.railSegments },
-            { label: 'Corner Conn.', value: model.counts.cornerConnectors },
-            { label: 'Tee Conn.', value: model.counts.teeConnectors },
-            { label: 'Base Flanges', value: model.counts.baseFlanges },
-            { label: 'Ratchet Straps', value: model.counts.ratchetStraps },
-          ].map(c => (
-            <div key={c.label} className="border-2 border-black bg-white px-3 py-2 text-center">
-              <div className="text-xl font-extrabold leading-none">{c.value}</div>
-              <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">{c.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* ── Inventory needs (compact list) ── */}
+      {hasStructures && <NeedsList model={model} />}
 
       {/* ── Render area ── */}
       {loading ? (
@@ -616,8 +833,10 @@ export default function ShadeSchemaTab() {
           <Legend />
           <p className="mt-2 text-[11px] text-gray-500">
             Poles sit on the perimeter at every corner plus every {SPACING_FT}ft. Corners use 90° connectors; intermediate
-            edge poles use tee connectors. Each pole gets a base flange and one ratchet strap to a ground anchor. Shared
-            poles between adjacent structures are counted once.
+            edge poles use tee connectors. Each pole gets a base flange. <strong>Strap rule:</strong> interior poles (where
+            two sections meet end-to-end) get a strap straight down, wrapped around the pole; perimeter poles get an angled
+            tie-down on every other pole, always including the corners and any 3-way junctions. Shared poles between
+            adjacent structures are counted once.
           </p>
         </div>
       )}
