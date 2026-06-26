@@ -172,6 +172,7 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
     corner: boolean; shared: boolean; owned: boolean
     inlineOrder: number | null
     outX: number; outY: number
+    normalsWorld: Array<{ x: number; y: number }>
   }
   type StructTmp = {
     id: string; label: string; ownerCenter: { x: number; y: number }
@@ -239,9 +240,20 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
       const outX = nx * cos - ny * sin
       const outY = nx * sin + ny * cos
 
+      // The individual outward wall normals (one per edge this pole sits on),
+      // rotated to world. Corners get two — used to place a strap along each
+      // exterior wall direction rather than a single diagonal.
+      const normalsWorld: Array<{ x: number; y: number }> = []
+      const pushNormal = (lnx: number, lny: number) =>
+        normalsWorld.push({ x: lnx * cos - lny * sin, y: lnx * sin + lny * cos })
+      if (lx <= 0.001) pushNormal(-1, 0)
+      if (lx >= o.width_ft - 0.001) pushNormal(1, 0)
+      if (ly <= 0.001) pushNormal(0, -1)
+      if (ly >= o.height_ft - 0.001) pushNormal(0, 1)
+
       minX = Math.min(minX, w.x); maxX = Math.max(maxX, w.x)
       minY = Math.min(minY, w.y); maxY = Math.max(maxY, w.y)
-      recMap.set(lk, { lx, ly, wx: w.x, wy: w.y, corner: isCorner, shared: sm.shared, owned: sm.owned, inlineOrder, outX, outY })
+      recMap.set(lk, { lx, ly, wx: w.x, wy: w.y, corner: isCorner, shared: sm.shared, owned: sm.owned, inlineOrder, outX, outY, normalsWorld })
     }
     const inlineIdx = (i: number, len: number) => (i > 0 && i < len - 1 ? i - 1 : null)
     xs.forEach((x, i) => addPost(x, 0, inlineIdx(i, xs.length)))
@@ -316,12 +328,16 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
             }
           }
         } else if (p.corner) {
-          // Corner: single 45° angled tie-down out to the ground — perimeter only.
-          const tX = p.wx + p.outX * STRAP_REACH_FT
-          const tY = p.wy + p.outY * STRAP_REACH_FT
-          if (!structs.some(o => pointInStructure(o, tX, tY, 1))) {
-            straps.push({ toX: tX, toY: tY, ground: true })
-          }
+          // Exterior corner: one angled tie-down along EACH of the two outward
+          // wall directions (2 straps), skipping any that would aim into the
+          // open interior of a structure.
+          p.normalsWorld.forEach(n => {
+            const tX = p.wx + n.x * STRAP_REACH_FT
+            const tY = p.wy + n.y * STRAP_REACH_FT
+            if (!structs.some(o => pointInStructure(o, tX, tY, 1))) {
+              straps.push({ toX: tX, toY: tY, ground: true })
+            }
+          })
         } else if (p.shared) {
           // Interior inline pole (middle of a shared edge): straight down, wrapped.
           straps.push({ toX: p.wx, toY: p.wy, ground: true })
