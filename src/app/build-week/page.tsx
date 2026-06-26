@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils'
 import ElectricalLoadTab from './electrical-load-tab'
 import LayoutSyncTab from './layout-sync-tab'
 import MeetingAgendasTab from './meeting-agendas-tab'
-import ShadeCalcTab from './shade-calc-tab'
 import ShadeSchemaTab from './shade-schema-tab'
 import {
   fetchBuildStagesWithGoals,
@@ -65,7 +64,6 @@ const tabs: Tab[] = [
   { id: 'schedule', label: 'Schedule' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'electrical', label: 'Electrical Load' },
-  { id: 'shade-calc', label: 'Shade Calc' },
   { id: 'shade', label: 'Shade Guide' },
   { id: 'shade-schema', label: 'Shade Schema' },
 ]
@@ -118,7 +116,7 @@ export default function BuildWeekPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const validTabs = ['roster', 'agendas', 'schedule', 'inventory', 'electrical', 'shade-calc', 'shade', 'shade-schema']
+  const validTabs = ['roster', 'agendas', 'schedule', 'inventory', 'electrical', 'shade', 'shade-schema']
   const initialTab = (() => {
     const t = searchParams?.get('tab')
     return t && validTabs.includes(t) ? t : 'roster'
@@ -1050,11 +1048,6 @@ export default function BuildWeekPage() {
                 })}
             </div>
           )}
-        </TabPanel>
-
-        {/* ═══════════  SHADE CALC  ═══════════ */}
-        <TabPanel tabId="shade-calc" activeTab={activeTab}>
-          <ShadeCalcTab />
         </TabPanel>
 
         {/* ═══════════  SHADE GUIDE  ═══════════ */}
