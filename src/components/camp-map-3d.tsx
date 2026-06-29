@@ -168,6 +168,40 @@ function RV3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: numb
         <circleGeometry args={[cabH * 0.08, 12]} />
         <meshStandardMaterial color="#ffffcc" emissive="#ffffaa" emissiveIntensity={0.3} />
       </mesh>
+      {/* Rooftop AC unit */}
+      <mesh castShadow position={[-widthM / 2 + bodyLen * 0.32, bodyH + 0.07, 0]}>
+        <boxGeometry args={[bodyLen * 0.2, 0.12, depthM * 0.5]} />
+        <meshStandardMaterial color="#e8e8e8" roughness={0.6} metalness={0.2} />
+      </mesh>
+      {/* Roof vent */}
+      <mesh castShadow position={[-widthM / 2 + bodyLen * 0.62, bodyH + 0.05, 0]}>
+        <boxGeometry args={[bodyLen * 0.1, 0.07, depthM * 0.18]} />
+        <meshStandardMaterial color="#f5f5f5" roughness={0.5} />
+      </mesh>
+      {/* Pull-out awning on the entry side */}
+      <mesh castShadow position={[-widthM / 2 + bodyLen * 0.55, bodyH * 0.82, depthM / 2 + depthM * 0.22]} rotation={[Math.PI / 2.5, 0, 0]}>
+        <planeGeometry args={[bodyLen * 0.6, depthM * 0.42]} />
+        <meshStandardMaterial color="#e2ddd0" roughness={0.85} side={THREE.DoubleSide} />
+      </mesh>
+      {[-bodyLen * 0.26, bodyLen * 0.26].map((sx, i) => (
+        <mesh key={`awn-${i}`} position={[-widthM / 2 + bodyLen * 0.55 + sx, bodyH * 0.4, depthM / 2 + depthM * 0.2]}>
+          <cylinderGeometry args={[0.012, 0.012, bodyH * 0.8, 6]} />
+          <meshStandardMaterial color="#bbbbbb" metalness={0.5} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Rear ladder */}
+      {[-depthM * 0.12, depthM * 0.12].map((sz, i) => (
+        <mesh key={`lad-${i}`} position={[-widthM / 2 - 0.01, bodyH * 0.52, sz]}>
+          <cylinderGeometry args={[0.01, 0.01, bodyH * 0.9, 6]} />
+          <meshStandardMaterial color="#888888" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+      {[0.25, 0.5, 0.75].map((f, i) => (
+        <mesh key={`rung-${i}`} position={[-widthM / 2 - 0.01, bodyH * f, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.008, 0.008, depthM * 0.24, 6]} />
+          <meshStandardMaterial color="#888888" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -310,69 +344,303 @@ function Container3D({ widthM, depthM, heightM, color }: { widthM: number; depth
   )
 }
 
-// ─── Tent (A-frame ridge style) ─────────────────────────────
-function Tent3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
-  const threeColor = hexToThreeColor(color)
-  const ridgeH = heightM * 0.5
+// ─── Tent brand classification ──────────────────────────────
+// Maps a camper's free-text make/model (or a pasted product URL) to a
+// distinctive tent silhouette. Keeps geometry light — one style per look.
+type TentStyle = 'shiftpod' | 'nobake' | 'canvas' | 'cabin' | 'dome'
 
-  // Build a triangular prism roof + short walls
-  const wallH = heightM * 0.4
+function classifyTentStyle(makeModel: string | null | undefined): TentStyle {
+  const s = (makeModel || '').toLowerCase()
+  if (/shift\s*pod/.test(s)) return 'shiftpod'
+  if (/no\s*bake|nobaketent/.test(s)) return 'nobake'
+  if (/kodiak|flex.?bow|canvas|wall\s*tent/.test(s)) return 'canvas'
+  if (/cabin|skylodge|kingdom|instant|stand\s*up|standup|lodge/.test(s)) return 'cabin'
+  if (/dome|sundome|pop.?up/.test(s)) return 'dome'
+  // Unknown / blank → classic camping dome (door + window, reads as a tent)
+  return 'dome'
+}
+
+// ─── Shared tent geometry helpers ───────────────────────────
+// 4-sided hip roof spanning an exact w×d footprint up to a central apex.
+function useHipRoofGeometry(w: number, d: number, h: number) {
   const geo = useMemo(() => {
-    const hw = widthM / 2
-    const hd = depthM / 2
-    const verts = new Float32Array([
-      // Front triangle
-      -hw, wallH, -hd,   hw, wallH, -hd,   0, wallH + ridgeH, -hd,
-      // Back triangle
-      -hw, wallH, hd,    hw, wallH, hd,     0, wallH + ridgeH, hd,
-      // Left slope
-      -hw, wallH, -hd,   -hw, wallH, hd,    0, wallH + ridgeH, hd,   0, wallH + ridgeH, -hd,
-      // Right slope
-      hw, wallH, -hd,    hw, wallH, hd,     0, wallH + ridgeH, hd,   0, wallH + ridgeH, -hd,
-    ])
-    const indices = new Uint16Array([
-      0, 1, 2,
-      3, 5, 4,
-      6, 7, 8, 6, 8, 9,
-      10, 12, 11, 10, 13, 12,
+    const hw = w / 2, hd = d / 2
+    const v = new Float32Array([
+      -hw, 0, -hd,  hw, 0, -hd,  0, h, 0,
+       hw, 0, -hd,  hw, 0,  hd,  0, h, 0,
+       hw, 0,  hd, -hw, 0,  hd,  0, h, 0,
+      -hw, 0,  hd, -hw, 0, -hd,  0, h, 0,
     ])
     const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(verts, 3))
-    g.setIndex(new THREE.BufferAttribute(indices, 1))
+    g.setAttribute('position', new THREE.BufferAttribute(v, 3))
     g.computeVertexNormals()
     return g
-  }, [widthM, depthM, wallH, ridgeH])
+  }, [w, d, h])
+  useEffect(() => () => { geo.dispose() }, [geo])
+  return geo
+}
 
+// Gable / ridge roof: two slopes facing ±x with closed gable ends on ±z.
+function useRidgeRoofGeometry(w: number, d: number, h: number) {
+  const geo = useMemo(() => {
+    const hw = w / 2, hd = d / 2
+    const v = new Float32Array([
+      // left slope
+      -hw, 0, -hd,  -hw, 0, hd,  0, h, hd,
+      -hw, 0, -hd,   0, h, hd,   0, h, -hd,
+      // right slope
+       hw, 0, -hd,   0, h, hd,   hw, 0, hd,
+       hw, 0, -hd,   0, h, -hd,  0, h, hd,
+      // front gable
+      -hw, 0, hd,    hw, 0, hd,  0, h, hd,
+      // back gable
+       hw, 0, -hd,  -hw, 0, -hd, 0, h, -hd,
+    ])
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(v, 3))
+    g.computeVertexNormals()
+    return g
+  }, [w, d, h])
+  useEffect(() => () => { geo.dispose() }, [geo])
+  return geo
+}
+
+// ─── Reusable tent door (zip-arch panel on a tent face) ──────
+function TentDoor({ width, height, faceDepth, back = false, arch = true }: { width: number; height: number; faceDepth: number; back?: boolean; arch?: boolean }) {
+  const z = back ? -faceDepth : faceDepth
   return (
-    <group>
-      {/* Short side walls */}
-      <mesh castShadow receiveShadow position={[0, wallH / 2, 0]}>
-        <boxGeometry args={[widthM, wallH, depthM]} />
-        <meshStandardMaterial color={threeColor} roughness={0.85} metalness={0} transparent opacity={0.8} />
+    <group position={[0, 0, z]} rotation={[0, back ? Math.PI : 0, 0]}>
+      <mesh position={[0, height / 2, 0.006]}>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial color="#26282b" roughness={0.85} metalness={0.05} side={THREE.DoubleSide} />
       </mesh>
-      {/* A-frame roof canvas */}
-      <mesh castShadow receiveShadow geometry={geo}>
-        <meshStandardMaterial color={threeColor.clone().multiplyScalar(0.85)} roughness={0.9} metalness={0} side={THREE.DoubleSide} />
-      </mesh>
-      {/* Ridge pole visible on top */}
-      <mesh position={[0, wallH + ridgeH, 0]}>
-        <cylinderGeometry args={[0.01, 0.01, depthM, 6]} />
-        <meshStandardMaterial color="#666666" metalness={0.7} roughness={0.3} />
-      </mesh>
-      {/* Corner stakes */}
-      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
-        <mesh key={i} position={[sx * widthM * 0.52, 0.05, sz * depthM * 0.52]}>
-          <cylinderGeometry args={[0.008, 0.003, 0.1, 4]} />
-          <meshStandardMaterial color="#888888" metalness={0.6} roughness={0.4} />
+      {arch && (
+        <mesh position={[0, height, 0.006]}>
+          <circleGeometry args={[width / 2, 14, 0, Math.PI]} />
+          <meshStandardMaterial color="#26282b" roughness={0.85} side={THREE.DoubleSide} />
         </mesh>
-      ))}
-      {/* Ground sheet */}
-      <mesh receiveShadow position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[widthM * 1.05, depthM * 1.05]} />
-        <meshStandardMaterial color={threeColor.clone().multiplyScalar(0.6)} roughness={1} />
+      )}
+      {/* Zipper seam */}
+      <mesh position={[0, height / 2, 0.009]}>
+        <boxGeometry args={[0.012, height * 0.96, 0.004]} />
+        <meshStandardMaterial color="#d8b53a" metalness={0.6} roughness={0.35} />
       </mesh>
     </group>
   )
+}
+
+// ─── Reusable tent window (mesh-screen panel) ───────────────
+function TentWindow({ position, width, height, rotY = 0 }: { position: [number, number, number]; width: number; height: number; rotY?: number }) {
+  return (
+    <group position={position} rotation={[0, rotY, 0]}>
+      <mesh>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial color="#16242c" transparent opacity={0.5} roughness={0.25} metalness={0.2} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 0, 0.003]}>
+        <boxGeometry args={[width, 0.008, 0.004]} />
+        <meshStandardMaterial color="#9aa0a6" metalness={0.3} roughness={0.6} />
+      </mesh>
+    </group>
+  )
+}
+
+// ─── Shiftpod (faceted insulated silver dome) ───────────────
+function ShiftpodTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
+  const tc = hexToThreeColor(color)
+  // Iconic reflective silver shell — blend hue toward silver but keep enough
+  // of the assigned color so builder/camper coding still reads.
+  const shell = tc.clone().lerp(new THREE.Color('#d3d7db'), 0.62)
+  const r = Math.min(widthM, depthM) / 2 || 0.5
+  const baseH = heightM * 0.3
+  const domeH = heightM * 0.7
+  const doorW = Math.min(widthM, depthM) * 0.3
+  const doorH = heightM * 0.45
+  return (
+    <group>
+      {/* Octagonal insulated base ring */}
+      <mesh castShadow receiveShadow position={[0, baseH / 2, 0]} scale={[widthM / (2 * r), 1, depthM / (2 * r)]}>
+        <cylinderGeometry args={[r, r, baseH, 8]} />
+        <meshStandardMaterial color={shell} roughness={0.5} metalness={0.5} flatShading />
+      </mesh>
+      {/* Faceted dome roof */}
+      <mesh castShadow receiveShadow position={[0, baseH, 0]} scale={[widthM / (2 * r), 1, depthM / (2 * r)]}>
+        <coneGeometry args={[r, domeH, 8]} />
+        <meshStandardMaterial color={shell.clone().multiplyScalar(1.05)} roughness={0.45} metalness={0.55} flatShading />
+      </mesh>
+      {/* Top vent cap */}
+      <mesh position={[0, baseH + domeH * 0.82, 0]}>
+        <cylinderGeometry args={[r * 0.16, r * 0.16, heightM * 0.07, 8]} />
+        <meshStandardMaterial color="#3a3d40" roughness={0.6} metalness={0.4} />
+      </mesh>
+      <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} arch />
+      {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} back arch />}
+      {/* Round side window */}
+      <mesh position={[widthM * 0.32, baseH * 0.85, depthM / 2 + 0.005]}>
+        <circleGeometry args={[Math.min(widthM, depthM) * 0.07, 14]} />
+        <meshStandardMaterial color="#16242c" transparent opacity={0.5} roughness={0.2} metalness={0.3} />
+      </mesh>
+      <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.45)} />
+    </group>
+  )
+}
+
+// ─── No Bake Tent (reflective insulated white dome) ─────────
+function NoBakeTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
+  const tc = hexToThreeColor(color)
+  const shell = tc.clone().lerp(new THREE.Color('#eef1f3'), 0.7)
+  const r = 0.5
+  const doorW = Math.min(widthM, depthM) * 0.32
+  const doorH = heightM * 0.55
+  return (
+    <group>
+      <mesh castShadow receiveShadow scale={[widthM, heightM, depthM]}>
+        <sphereGeometry args={[r, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={shell} roughness={0.35} metalness={0.45} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Roof vent */}
+      <mesh position={[0, heightM * 0.95, 0]}>
+        <cylinderGeometry args={[Math.min(widthM, depthM) * 0.08, Math.min(widthM, depthM) * 0.08, heightM * 0.06, 10]} />
+        <meshStandardMaterial color="#9aa0a6" metalness={0.5} roughness={0.5} />
+      </mesh>
+      <TentDoor width={doorW} height={doorH} faceDepth={depthM * r + 0.004} arch />
+      {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM * r + 0.004} back arch />}
+      <TentWindow position={[widthM * r + 0.005, heightM * 0.4, 0]} width={depthM * 0.26} height={heightM * 0.24} rotY={Math.PI / 2} />
+      <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.5)} />
+    </group>
+  )
+}
+
+// ─── Canvas wall tent (Kodiak Flex-Bow style) ───────────────
+function CanvasTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
+  const tc = hexToThreeColor(color)
+  const canvas = tc.clone().lerp(new THREE.Color('#cdbb90'), 0.55)
+  const wallH = heightM * 0.5
+  const ridgeH = heightM * 0.5
+  const roofGeo = useRidgeRoofGeometry(widthM, depthM, ridgeH)
+  const doorW = Math.min(widthM, depthM) * 0.3
+  const doorH = wallH * 0.9
+  return (
+    <group>
+      {/* Canvas walls */}
+      <mesh castShadow receiveShadow position={[0, wallH / 2, 0]}>
+        <boxGeometry args={[widthM, wallH, depthM]} />
+        <meshStandardMaterial color={canvas} roughness={0.95} metalness={0} />
+      </mesh>
+      {/* Peaked canvas roof */}
+      <mesh castShadow receiveShadow geometry={roofGeo} position={[0, wallH, 0]}>
+        <meshStandardMaterial color={canvas.clone().multiplyScalar(0.9)} roughness={0.95} side={THREE.DoubleSide} flatShading />
+      </mesh>
+      {/* Awning over the front door */}
+      <mesh castShadow position={[0, wallH * 0.92, depthM / 2 + depthM * 0.16]} rotation={[Math.PI / 2.6, 0, 0]}>
+        <planeGeometry args={[doorW * 1.7, depthM * 0.38]} />
+        <meshStandardMaterial color={canvas.clone().multiplyScalar(1.05)} roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      {[-doorW * 0.8, doorW * 0.8].map((sx, i) => (
+        <mesh key={i} castShadow position={[sx, wallH * 0.45, depthM / 2 + depthM * 0.3]}>
+          <cylinderGeometry args={[0.02, 0.02, wallH * 0.9, 6]} />
+          <meshStandardMaterial color="#8a6a3a" roughness={0.7} />
+        </mesh>
+      ))}
+      <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} arch={false} />
+      {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} back arch={false} />}
+      <TentWindow position={[widthM / 2 + 0.005, wallH * 0.62, 0]} width={depthM * 0.24} height={wallH * 0.34} rotY={Math.PI / 2} />
+      <GroundSheet widthM={widthM} depthM={depthM} color={canvas.clone().multiplyScalar(0.5)} />
+    </group>
+  )
+}
+
+// ─── Cabin / instant tent (Coleman, REI Kingdom) ────────────
+function CabinTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
+  const tc = hexToThreeColor(color)
+  const wallH = heightM * 0.62
+  const roofH = heightM * 0.38
+  const roofGeo = useHipRoofGeometry(widthM, depthM, roofH)
+  const doorW = Math.min(widthM, depthM) * 0.32
+  const doorH = wallH * 0.82
+  const winW = depthM * 0.26
+  const winH = wallH * 0.4
+  return (
+    <group>
+      {/* Vertical fabric walls */}
+      <mesh castShadow receiveShadow position={[0, wallH / 2, 0]}>
+        <boxGeometry args={[widthM, wallH, depthM]} />
+        <meshStandardMaterial color={tc} roughness={0.85} metalness={0} />
+      </mesh>
+      {/* Hip roof */}
+      <mesh castShadow receiveShadow geometry={roofGeo} position={[0, wallH, 0]}>
+        <meshStandardMaterial color={tc.clone().multiplyScalar(0.82)} roughness={0.9} metalness={0} flatShading side={THREE.DoubleSide} />
+      </mesh>
+      <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} arch={false} />
+      {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} back arch={false} />}
+      <TentWindow position={[widthM / 2 + 0.005, wallH * 0.58, 0]} width={winW} height={winH} rotY={Math.PI / 2} />
+      <TentWindow position={[-widthM / 2 - 0.005, wallH * 0.58, 0]} width={winW} height={winH} rotY={-Math.PI / 2} />
+      <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.5)} />
+    </group>
+  )
+}
+
+// ─── Classic dome tent (default for unknown make/model) ─────
+function DomeTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
+  const tc = hexToThreeColor(color)
+  const r = 0.5
+  const doorW = Math.min(widthM, depthM) * 0.34
+  const doorH = heightM * 0.6
+  return (
+    <group>
+      {/* Dome canopy (top hemisphere scaled to the footprint) */}
+      <mesh castShadow receiveShadow scale={[widthM, heightM, depthM]}>
+        <sphereGeometry args={[r, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={tc} roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Crossing support poles */}
+      {[0, Math.PI / 2].map((rot, i) => (
+        <mesh key={i} rotation={[0, rot, 0]}>
+          <torusGeometry args={[Math.min(widthM, depthM) / 2, 0.012, 6, 20, Math.PI]} />
+          <meshStandardMaterial color="#5b6066" metalness={0.5} roughness={0.5} />
+        </mesh>
+      ))}
+      <TentDoor width={doorW} height={doorH} faceDepth={depthM * r + 0.004} arch />
+      {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM * r + 0.004} back arch />}
+      <TentWindow position={[widthM * r + 0.005, heightM * 0.4, 0]} width={depthM * 0.3} height={heightM * 0.28} rotY={Math.PI / 2} />
+      <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.55)} />
+    </group>
+  )
+}
+
+// Shared ground sheet under every tent.
+function GroundSheet({ widthM, depthM, color }: { widthM: number; depthM: number; color: THREE.Color }) {
+  return (
+    <mesh receiveShadow position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[widthM * 1.04, depthM * 1.04]} />
+      <meshStandardMaterial color={color} roughness={1} />
+    </mesh>
+  )
+}
+
+interface TentStyleProps {
+  widthM: number
+  depthM: number
+  heightM: number
+  color: string
+  backDoor: boolean
+}
+
+// ─── Tent (brand-aware dispatcher) ──────────────────────────
+function Tent3D({ obj, widthM, depthM, heightM, color }: { obj: FloorplanObjectRow; widthM: number; depthM: number; heightM: number; color: string }) {
+  const style = classifyTentStyle(obj.properties?.tent_make_model)
+  const entranceCount = obj.properties?.entrance_count ?? 1
+  const backDoor = entranceCount >= 2 || obj.properties?.entrance_side === 'both'
+  const props: TentStyleProps = { widthM, depthM, heightM, color, backDoor }
+
+  switch (style) {
+    case 'shiftpod': return <ShiftpodTent {...props} />
+    case 'nobake':   return <NoBakeTent {...props} />
+    case 'canvas':   return <CanvasTent {...props} />
+    case 'cabin':    return <CabinTent {...props} />
+    case 'dome':
+    default:         return <DomeTent {...props} />
+  }
 }
 
 // ─── Generator ──────────────────────────────────────────────
@@ -1191,7 +1459,7 @@ function ProceduralObject({
     case 'pc_container':
       return <Container3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'tent':
-      return <Tent3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
+      return <Tent3D obj={obj} widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'generator':
       return <Generator3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'porta_potty':
