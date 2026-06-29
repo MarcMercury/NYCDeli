@@ -172,7 +172,6 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
     corner: boolean; shared: boolean; owned: boolean
     inlineOrder: number | null
     outX: number; outY: number
-    normalsWorld: Array<{ x: number; y: number }>
   }
   type StructTmp = {
     id: string; label: string; ownerCenter: { x: number; y: number }
@@ -240,20 +239,9 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
       const outX = nx * cos - ny * sin
       const outY = nx * sin + ny * cos
 
-      // The individual outward wall normals (one per edge this pole sits on),
-      // rotated to world. Corners get two — used to place a strap along each
-      // exterior wall direction rather than a single diagonal.
-      const normalsWorld: Array<{ x: number; y: number }> = []
-      const pushNormal = (lnx: number, lny: number) =>
-        normalsWorld.push({ x: lnx * cos - lny * sin, y: lnx * sin + lny * cos })
-      if (lx <= 0.001) pushNormal(-1, 0)
-      if (lx >= o.width_ft - 0.001) pushNormal(1, 0)
-      if (ly <= 0.001) pushNormal(0, -1)
-      if (ly >= o.height_ft - 0.001) pushNormal(0, 1)
-
       minX = Math.min(minX, w.x); maxX = Math.max(maxX, w.x)
       minY = Math.min(minY, w.y); maxY = Math.max(maxY, w.y)
-      recMap.set(lk, { lx, ly, wx: w.x, wy: w.y, corner: isCorner, shared: sm.shared, owned: sm.owned, inlineOrder, outX, outY, normalsWorld })
+      recMap.set(lk, { lx, ly, wx: w.x, wy: w.y, corner: isCorner, shared: sm.shared, owned: sm.owned, inlineOrder, outX, outY })
     }
     const inlineIdx = (i: number, len: number) => (i > 0 && i < len - 1 ? i - 1 : null)
     xs.forEach((x, i) => addPost(x, 0, inlineIdx(i, xs.length)))
@@ -332,16 +320,21 @@ function buildSchema(objects: FloorplanObjectRow[]): SchemaModel {
             }
           }
         } else if (p.corner) {
-          // Exterior corner: one angled tie-down along EACH of the two outward
-          // wall directions (2 straps), skipping any that would aim into the
-          // open interior of a structure.
-          p.normalsWorld.forEach(n => {
-            const tX = p.wx + n.x * STRAP_REACH_FT
-            const tY = p.wy + n.y * STRAP_REACH_FT
-            if (!structs.some(o => pointInStructure(o, tX, tY, 1))) {
-              straps.push({ toX: tX, toY: tY, ground: true })
-            }
+          // Exterior corner PYRAMID (3 straps): one strap straight off the point
+          // of the corner along the 45° bisector to a ground anchor, plus two
+          // straps angled down to the base plate of the nearest pole along each
+          // wall. Mirrors the T-junction pyramid but with the exterior leg
+          // running straight out from the corner point.
+          const neighbors = [...(neighborsByKey.get(key)?.values() ?? [])]
+          neighbors.forEach(n => {
+            straps.push({ toX: n.x, toY: n.y, ground: false })
           })
+          // Exterior leg straight off the corner point (outward 45° bisector).
+          const tX = p.wx + p.outX * STRAP_REACH_FT
+          const tY = p.wy + p.outY * STRAP_REACH_FT
+          if (!structs.some(o => pointInStructure(o, tX, tY, 1))) {
+            straps.push({ toX: tX, toY: tY, ground: true })
+          }
         } else if (p.shared) {
           // Interior inline pole (middle of a shared edge): straight down, wrapped.
           straps.push({ toX: p.wx, toY: p.wy, ground: true })
@@ -961,9 +954,11 @@ export default function ShadeSchemaTab() {
             <strong>Connectors</strong> are sized by how many pipes meet: dead-ends are 2-way, corners and inline edge
             poles are 3-way, wall junctions (where an inner wall meets the perimeter) are 4-way, and interior crosses are
             5-way. <strong>Strap rule:</strong> wall junctions get a 4-leg <em>pyramid</em> — straps running to each
-            neighbouring pole base plus one ground anchor on the open side; interior poles (where two sections meet
+            neighbouring pole base plus one ground anchor on the open side; exterior corners get a 3-leg
+            <em>pyramid</em> — one strap straight off the corner point to a ground anchor plus two angled down to the
+            nearest pole base along each wall; interior poles (where two sections meet
             end-to-end) get a strap straight down wrapped around the pole; remaining perimeter poles get an angled
-            ground tie-down on every other pole, always including the corners. Only ground-facing straps need a lag-bolt
+            ground tie-down on every other pole. Only ground-facing straps need a lag-bolt
             anchor. Shared poles between adjacent structures are counted once.
           </p>
         </div>
