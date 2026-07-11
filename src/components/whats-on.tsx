@@ -138,16 +138,25 @@ export default function WhatsOn() {
   useEffect(() => { load() }, [load])
 
   // Flatten every event into individual timed occurrences.
+  // The Burning Man API frequently returns the same event more than once (and
+  // occasionally repeats an occurrence), which would otherwise render duplicate
+  // cards and — worse — produce duplicate React keys that break list
+  // reconciliation (making the filters appear unresponsive). Dedupe on a
+  // composite of the event uid + occurrence start time so every card is unique.
   const allOccurrences = useMemo<Occurrence[]>(() => {
     const out: Occurrence[] = []
+    const seen = new Set<string>()
     for (const ev of events) {
       const set = ev.occurrence_set ?? []
-      set.forEach((occ, i) => {
-        if (!occ.start_time) return
+      for (const occ of set) {
+        if (!occ.start_time) continue
+        const key = `${ev.uid}-${occ.start_time}`
+        if (seen.has(key)) continue
+        seen.add(key)
         const start = parsePlayaIso(occ.start_time)
         const end = parsePlayaIso(occ.end_time || occ.start_time)
-        out.push({ key: `${ev.uid}-${i}`, event: ev, date: start.date, start, end })
-      })
+        out.push({ key, event: ev, date: start.date, start, end })
+      }
     }
     return out
   }, [events])
