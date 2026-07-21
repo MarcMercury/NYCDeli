@@ -19,6 +19,8 @@ interface UserWithCamper extends UserProfileRow {
   camper: Camper | null
 }
 
+type UserSortKey = 'name' | 'role' | 'status' | 'shelter' | 'sharing' | 'arrival' | 'lastLogin'
+
 const tabs: Tab[] = [
   { id: 'campers', label: 'Campers & Users' },
   { id: 'kitchen-shifts', label: 'Kitchen Shifts' },
@@ -40,6 +42,7 @@ export default function AdminPage() {
   const [selectedCamper, setSelectedCamper] = useState<Camper | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [userFilter, setUserFilter] = useState<'all' | 'linked' | 'unlinked' | 'admin' | 'builder' | 'pending'>('all')
+  const [userSort, setUserSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' })
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // Kitchen shift editor state
   const [shiftCategories, setShiftCategories] = useState<DraftShiftCategory[]>([])
@@ -153,6 +156,44 @@ export default function AdminPage() {
       default: return true
     }
   })
+
+  const userSortValue = (u: UserWithCamper): string => {
+    switch (userSort.key) {
+      case 'name': return (u.camper?.playa_name || u.camper?.full_name || u.email).toLowerCase()
+      case 'role': return u.role
+      case 'status': return u.camper ? 'linked' : 'no profile'
+      case 'shelter': return (u.camper?.shelter_type || '').toLowerCase()
+      case 'sharing': {
+        if (!u.camper) return ''
+        return resolveTentMateIds(u.camper.id, campers)
+          .map(id => campers.find(c => c.id === id))
+          .filter((c): c is Camper => !!c)
+          .map(m => (m.playa_name || m.full_name || '').toLowerCase())
+          .join(', ')
+      }
+      case 'arrival': return u.camper?.arrival_date || ''
+      case 'lastLogin': return u.last_sign_in_at || ''
+      default: return ''
+    }
+  }
+
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const av = userSortValue(a)
+    const bv = userSortValue(b)
+    // Push empty values to the bottom regardless of direction
+    if (av === '' && bv !== '') return 1
+    if (bv === '' && av !== '') return -1
+    const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' })
+    return userSort.dir === 'asc' ? cmp : -cmp
+  })
+
+  const toggleUserSort = (key: UserSortKey) => {
+    setUserSort(prev =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' }
+    )
+  }
 
   const updateCamper = async (camperId: string, updates: CamperUpdate) => {
     const result = await updateCamperAction(camperId, updates)
@@ -1069,18 +1110,33 @@ export default function AdminPage() {
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white border-b-2 border-black">
                       <tr>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider">Name / Email</th>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Role</th>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Status</th>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden md:table-cell">Shelter</th>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Sharing Tent With</th>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Arrival</th>
-                        <th className="text-left p-3 font-bold uppercase tracking-wider hidden lg:table-cell">Last Login</th>
+                        {([
+                          { key: 'name', label: 'Name / Email', className: '' },
+                          { key: 'role', label: 'Role', className: 'hidden md:table-cell' },
+                          { key: 'status', label: 'Status', className: 'hidden md:table-cell' },
+                          { key: 'shelter', label: 'Shelter', className: 'hidden md:table-cell' },
+                          { key: 'sharing', label: 'Sharing Tent With', className: 'hidden lg:table-cell' },
+                          { key: 'arrival', label: 'Arrival', className: 'hidden lg:table-cell' },
+                          { key: 'lastLogin', label: 'Last Login', className: 'hidden lg:table-cell' },
+                        ] as const).map(col => (
+                          <th key={col.key} className={cn('text-left p-3 font-bold uppercase tracking-wider', col.className)}>
+                            <button
+                              type="button"
+                              onClick={() => toggleUserSort(col.key)}
+                              className="flex items-center gap-1 uppercase tracking-wider hover:text-black text-inherit"
+                            >
+                              {col.label}
+                              <span className={cn('text-[10px]', userSort.key === col.key ? 'opacity-100' : 'opacity-30')}>
+                                {userSort.key === col.key ? (userSort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                              </span>
+                            </button>
+                          </th>
+                        ))}
                         <th className="text-left p-3 font-bold uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.map(user => (
+                      {sortedUsers.map(user => (
                         <tr
                           key={user.id}
                           className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
