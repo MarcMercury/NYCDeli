@@ -274,17 +274,6 @@ Thank you everyone for paying camp fees promptly. This lets Brian pay vendors ea
 • Camp shade over all tents, kitchen, eating, and activity areas`,
   },
   {
-    title: 'SparklePony Express — Camp Art Car',
-    category: 'camp-info',
-    tags: ['art car', 'sparklepony', 'mutant vehicle', 'lucifer', 'paul dedood'],
-    content: `NYC Deli hosts an art car! The **SparklePony Express** is a sparkly unicorn built atop a jumbo electric golf cart, seating 4-5 passengers. She belongs to NYC Deli camper Lucifer (Paul DeDood).
-
-• Lucifer decides anything to do with the SparklePony
-• He has been known to offer rides and even playa tours to Deli campers who are helpful and ask nicely!
-
-Over 500 Mutant Vehicles (art/sound cars) attend Burning Man each year.`,
-  },
-  {
     title: 'Bike Rentals — Dust Rentals',
     category: 'camp-info',
     tags: ['bike', 'bicycle', 'rental', 'dust rentals', 'transportation', 'e-bike', 'mechanic'],
