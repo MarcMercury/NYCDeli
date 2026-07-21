@@ -316,6 +316,47 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   { category: 'Emergency & Safety', item: 'Personal ashtray (Altoid tin)', priority: 'nice', notes: 'If you smoke — full-size Altoid tin works well' },
 
   // ═══════════════════════════════════════════
+  // FUN & GAMES
+  // ═══════════════════════════════════════════
+  { category: 'Fun & Games', item: 'Kites', priority: 'nice', notes: 'The playa wind is perfect for flying' },
+  { category: 'Fun & Games', item: 'LED light sabers / glow toys', priority: 'nice', notes: 'Great for night play and staying visible' },
+  { category: 'Fun & Games', item: 'Glow sticks', priority: 'nice', notes: 'Fun to hand out and easy night markers' },
+  { category: 'Fun & Games', item: 'Water guns / squirt toys', priority: 'nice', notes: 'A cool spray is a welcome gift in the heat' },
+  { category: 'Fun & Games', item: 'Playing cards / travel games', priority: 'nice', notes: 'For downtime in the shade' },
+  { category: 'Fun & Games', item: 'Art supplies (markers, pens, paper)', priority: 'nice' },
+
+  // ═══════════════════════════════════════════
+  // CAPTAIN'S LOG ADDITIONS
+  // Merged from the veteran "Captain's Log" packing sheet
+  // ═══════════════════════════════════════════
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Quilt & top sheet', priority: 'nice', notes: 'Optional — use instead of a sleeping bag' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Bathrobe / yukata', priority: 'nice', notes: 'Handy for walking to and from the shower' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Tarp poles', priority: 'nice', notes: 'For raising shade structures and tarps' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Ratchet straps', priority: 'nice', notes: 'For securing shade cloth, loads, and gear' },
+  { category: 'Clothing - Cold Weather', item: 'Rain poncho', priority: 'nice', notes: 'Rain lockdowns happen — a poncho keeps you moving' },
+  { category: 'Tools & Hardware', item: 'Sharpies / permanent markers', priority: 'must', notes: 'Label bins, gear, and contact info on everything' },
+  { category: 'Tools & Hardware', item: 'Shovel', priority: 'nice', notes: 'Leveling, digging out stakes, and mud recovery' },
+  { category: 'Tools & Hardware', item: 'Baling wire', priority: 'nice', notes: 'Endlessly useful for quick repairs and rigging' },
+  { category: 'Tools & Hardware', item: 'Gear repair kit (grommet kit, 5-min epoxy, nylon repair tape)', priority: 'nice', notes: 'Fix tents, tarps, and packs on the spot' },
+  { category: 'Tools & Hardware', item: 'Step ladder', priority: 'nice', notes: 'For shade-structure assembly and hanging lights' },
+  { category: 'Tools & Hardware', item: 'Staple gun', priority: 'nice' },
+  { category: 'Tools & Hardware', item: 'Spring clamps', priority: 'nice', notes: 'Great for holding shade cloth in place' },
+  { category: 'Kitchen & Cooking', item: 'Camp stove + fuel', priority: 'must', notes: 'Windproof canister stove (e.g. MSR WindBurner) — bring extra fuel' },
+  { category: 'Kitchen & Cooking', item: 'Aluminum foil', priority: 'nice', notes: 'Cooking, covering food, and reflecting heat' },
+  { category: 'Kitchen & Cooking', item: 'Reusable dish wipes (Handi Wipes)', priority: 'nice', notes: 'Far better than rolls of paper towel' },
+  { category: 'Personal Care & Bathing', item: 'USB / battery shower pump', priority: 'nice', notes: 'Rechargeable pump turns any jug into a real shower' },
+  { category: 'Personal Care & Bathing', item: 'Citric acid powder', priority: 'nice', notes: 'Neutralizes alkaline playa dust — alternative to vinegar' },
+  { category: 'Vehicle & Travel', item: 'Traction boards', priority: 'nice', notes: 'For getting unstuck in mud or soft sand' },
+  { category: 'Vehicle & Travel', item: 'Recovery / tow strap', priority: 'nice' },
+  { category: 'Electronics & Power', item: 'Portable generator (2000W inverter)', priority: 'optional', notes: 'For camps running lights, fans, or a swamp cooler' },
+  { category: 'Electronics & Power', item: 'Label printer (P-touch)', priority: 'optional', notes: 'Quickly print contact-info labels for gear' },
+  { category: 'Electronics & Power', item: 'Tripod', priority: 'optional', notes: 'For long-exposure night photography' },
+  { category: 'Food & Meals', item: 'Bagels', priority: 'nice', notes: 'Keep better than sliced bread' },
+  { category: 'Food & Meals', item: 'Tortillas', priority: 'nice', notes: 'Durable, versatile, and pack flat' },
+  { category: 'Food & Meals', item: 'Instant noodles / cup soup', priority: 'nice', notes: 'Fast warm meal for cold playa nights' },
+  { category: 'Food & Meals', item: 'Pouched tuna / protein pouches', priority: 'nice', notes: 'Shelf-stable protein, no cooler space needed' },
+
+  // ═══════════════════════════════════════════
   // BUILD WEEK
   // ═══════════════════════════════════════════
   { category: 'Build Week', item: 'Closed Toed Work Shoes', priority: 'must' },
@@ -339,6 +380,7 @@ export const PACKING_CATEGORIES = [
   'Clothing - Cold Weather',
   'Footwear & Accessories',
   'Tools & Hardware',
+  'Fun & Games',
   'Gifting & Community',
   'Emergency & Safety',
   'Build Week',
