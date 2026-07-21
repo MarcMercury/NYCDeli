@@ -357,6 +357,48 @@ export const BASE_PACKING_LIST: BasePackingItem[] = [
   { category: 'Food & Meals', item: 'Pouched tuna / protein pouches', priority: 'nice', notes: 'Shelf-stable protein, no cooler space needed' },
 
   // ═══════════════════════════════════════════
+  // M&J LIST ADDITIONS
+  // Reconciled from the M&J packing sheet — items not already covered above
+  // ═══════════════════════════════════════════
+  { category: 'Tickets & Documentation', item: 'Burner Express bus tickets', priority: 'nice', notes: 'If riding the Burner Express instead of driving — buy in advance' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Extra sheets to cover tent', priority: 'nice', notes: 'Drape over the tent to block sun and dust during the day' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Air mattress', priority: 'nice', notes: 'Add padding on top — air gets cold with the temp swings' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Clothes hangers', priority: 'nice', notes: 'For the clothing rack or wardrobe organizer' },
+  { category: 'Shelter, Sleep & Camp Setup', item: 'Tent clips / clamps', priority: 'nice', notes: 'Secure shade cloth, liners, and decorations to the tent' },
+  { category: 'Bike & Transportation', item: 'Bike totem / tall flag', priority: 'nice', notes: 'A tall marker makes your bike easy to spot in a sea of bikes' },
+  { category: 'Bike & Transportation', item: 'Gel bike seat / seat cover', priority: 'nice', notes: 'Long rides on a hard seat get rough fast' },
+  { category: 'Bike & Transportation', item: 'Bike basket lock', priority: 'nice', notes: 'Keeps your basket and its contents from walking off' },
+  { category: 'Footwear & Accessories', item: 'Plastic shoe covers', priority: 'nice', notes: 'Slip over shoes during mud — keeps playa muck off your feet' },
+  { category: 'Electronics & Power', item: 'Dust/waterproof phone case or pouch', priority: 'must', notes: 'Playa dust destroys phones — seal it up' },
+  { category: 'Water, Hydration & Drinks', item: 'Water jug with spout (for tent)', priority: 'nice', notes: 'Keep drinking/rinse water handy inside your tent' },
+  { category: 'Water, Hydration & Drinks', item: 'Refillable collapsible water bottle', priority: 'nice', notes: 'Packs flat when empty' },
+  { category: 'Personal Care & Bathing', item: 'Eye cream', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Female urination device (pStyle/GoGirl)', priority: 'nice', notes: 'Makes port-o-potties and playa peeing far easier' },
+  { category: 'Personal Care & Bathing', item: 'Feminine hygiene wipes', priority: 'nice' },
+  { category: 'Personal Care & Bathing', item: 'Vicks inhaler / smelling sticks', priority: 'nice', notes: 'Clears the sinuses after a dusty day' },
+  { category: 'Personal Care & Bathing', item: 'Wet wipes (for gear & surfaces)', priority: 'nice', notes: 'Keep separate from body wipes — for wiping down stuff, not skin' },
+
+  // ═══════════════════════════════════════════
+  // EXIT SUITCASE (POST-BURN)
+  // A clean bag/suitcase kept sealed and dust-free for AFTER the burn —
+  // fresh clothes and toiletries to feel human again once you leave the playa.
+  // ═══════════════════════════════════════════
+  { category: 'Exit Suitcase (Post-Burn)', item: 'ID / license & health insurance card', priority: 'must', notes: 'Keep a set with your exit bag for the trip home' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Credit card / cash', priority: 'must' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Phone + portable charger', priority: 'must' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Burner Express / travel tickets', priority: 'must', notes: 'If flying or bussing home' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Clean clothes in a ziplock for flight/drive home', priority: 'must', notes: 'Sealed so they stay dust-free until you leave' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'New underwear and socks', priority: 'must', notes: 'A fresh pair for the trip home feels amazing' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'OTC meds (allergy, cold & sinus, antacids)', priority: 'nice' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Eye cream', priority: 'nice' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Nasal spray', priority: 'nice', notes: 'Helps clear dust on the way out' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Face / makeup wipes', priority: 'nice' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Feminine hygiene wipes', priority: 'nice' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Toiletries (toothpaste, brush, comb, razor, shaving cream, moisturizer)', priority: 'nice' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Lip balm', priority: 'nice' },
+  { category: 'Exit Suitcase (Post-Burn)', item: 'Wet wipes (for stuff, not bodies)', priority: 'nice' },
+
+  // ═══════════════════════════════════════════
   // BUILD WEEK
   // ═══════════════════════════════════════════
   { category: 'Build Week', item: 'Closed Toed Work Shoes', priority: 'must' },
@@ -383,5 +425,6 @@ export const PACKING_CATEGORIES = [
   'Fun & Games',
   'Gifting & Community',
   'Emergency & Safety',
+  'Exit Suitcase (Post-Burn)',
   'Build Week',
 ] as const
