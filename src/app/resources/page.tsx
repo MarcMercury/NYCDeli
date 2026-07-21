@@ -1094,6 +1094,147 @@ Giant wooden crates (e.g. 5'×8'×4') you can pack gear into, then assemble and 
 • Separate shade structure over your tent makes a huge difference
 • More enclosed = less dust inside (but hotter during the day without cooling)`,
   },
+  /* ---- Captain's Log — Shelter Guide (Capt. Ron / Orphanage camps) ---- */
+  {
+    title: "Captain's Log: How Big a Tent Do You Need?",
+    category: 'packing',
+    tags: ['tent', 'shelter', 'tent size', 'captains log', 'captain ron', 'dome', 'sleeping'],
+    content: `Wisdom from Captain Ron's "Captain's Log" — a long-running series of playa survival articles. Here's the cliff's-notes version on sizing your tent.
+
+**The rule of thumb (see the pattern):**
+• A **2-person tent** is really only big enough for **1 person** and all their stuff
+• A **4-person tent** is really only big enough for **2 people** and all their gear
+• Always size UP — costumes and gear take more room than you think
+
+**Match the tent to your bed:**
+• Sleeping on a **foam pad or air mattress?** A **LOW-profile dome-style** tent sheds wind better.
+• Using a **camp cot or full-height inflatable bed?** Go with a **TALLER dome or wall-style** tent you can stand up in.
+
+**It's car camping** — there's no reason to spend big money on an ultralight backpacking tent. Prioritize dust resistance and wind stability over weight.`,
+  },
+  {
+    title: "Captain's Log: Tent Styles Compared",
+    category: 'packing',
+    tags: ['tent', 'shelter', 'dome tent', 'wall tent', 'kodiak', 'springbar', 'shiftpod', 'nobake', 'gazelle', 'blackout', 'captains log'],
+    content: `A breakdown of tent styles that survive (or don't survive) the wind-ravaged playa, from Captain Ron's Shelter log.
+
+**Dome style** — $30–$400
+• Self-standing domes work best in playa wind
+• Stake out ALL guylines to maximize structural support
+• Pitch so the "backside" faces the prevailing wind (usually from the SW)
+• Look for zippered window covers
+• Cheaper solid-wall models beat mesh-wall models for dust — see the dust section below
+
+**Instant-Up style** — $50–$200
+• Fast, convenient setup with plenty of interior space
+• Most feature fully zippered covers over the mesh
+• Pole and hub joints are MORE susceptible to wind damage
+• CRITICAL: stake out all guylines at a 45° angle
+
+**Pop-up Blackout tent** — ~$300
+• Super-fast setup and teardown
+• White exterior reflects heat; blackout interior lets you sleep in late
+• Dome shape sheds wind well; stake out all guylines
+• e.g. Quechua 2-Second Easy Fresh & Black Pop-Up
+
+**Wall style (canvas)** — ~$450–$900
+• Springbar & Kodiak canvas wall tents are bombproof and playa-tested
+• Plenty of room to STAND UP inside; highly dust-resistant
+• "Tension wall" design — easy one-person setup, no guylines to stake
+• Expensive, but lasts a lifetime (the Captain has 8 burns on one 10×10)
+• WARNING: BIG, heavy, and bulky when packed (~62 lbs for a 10×10; poles alone are 50")
+
+**"No Bake" tent** — [nobaketent.com](https://shops.nobaketent.com/)
+• Shade and shelter in one package; ideal for fly-in burners with limited transport space
+• Reflects heat, blackout interior stays dark all day, plenty of room to stand and spread out
+
+**Pop-Out tent (Gazelle)** — $400–$1k — [gazelletents.com](https://gazelletents.com/collections/hub-tents)
+• Sets up in ~90 seconds; super stable when you guy out the sidewall hubs
+• Spacious, tall enough to stand in, with oversized mesh pockets
+• A fraction of the cost of a Shift Pod, but ~60" packed length means you'll need a vehicle to transport`,
+  },
+  {
+    title: "Captain's Log: Beating Playa Dust in Your Tent",
+    category: 'packing',
+    tags: ['dust', 'tent', 'mesh', 'dust shield', 'solid walls', 'sheets', 'captains log', 'diy'],
+    content: `Dust is constant on the playa — it gets on EVERYTHING and EVERYWHERE. From Captain Ron's Shelter log, here's how to keep it out of your sleeping area.
+
+**The #1 rule: solid walls beat mesh**
+• Buy tents with SOLID walls, not mesh
+• A rain fly over mesh does NOT work — winds blow dust up through the sides and cover everything
+
+**Already own a mesh tent? Make a DIY dust shield:**
+1. Dig up an old mismatched set of sheets (linen closet, mom's house, or a Goodwill run)
+2. Duct-tape the sheet to the OUTSIDE of the tent, then use a Sharpie to draw a dotted line outlining the mesh sections
+3. Remove the sheet and cut ~1" outside the dotted line — now you have a removable dust shield
+4. Use SAFETY PINS every 6–10" along the edges to attach the sheets to the mesh
+5. Unpin to pack the tent; re-pin once you're on playa
+
+**Important:** Do NOT use duct tape to seal mesh directly — when it gets hot it turns into a sticky mess. You'd be surprised how much a sheet shield cuts down on dust in your sleeping area.`,
+  },
+  {
+    title: "Captain's Log: Staking & Anchoring (No Rebar!)",
+    category: 'packing',
+    tags: ['stakes', 'staking', 'rebar', 'lag screws', 'anchoring', 'wind', 'fender washers', 'survey whiskers', 'moop', 'captains log', 'safety'],
+    content: `The tent stakes that came with your tent will NOT hold on the playa. Here's how to anchor properly, per Captain Ron's Shelter log.
+
+**Know the ground**
+• The top layer is wind- and water-packed alkali dirt
+• 6–12" below the surface is a denser, clay-like lake bed
+• Surface conditions vary year to year and sector to sector
+
+**Small & low-profile tents (2-person, low 4-person):**
+• 10"-long nail-style stakes with a molded nylon head work well (e.g. Coleman 10" Steel Nail Tent Pegs)
+• Or use 10" × ⅜" spike nails with ⅜" × 1.5" fender washers to loop guylines under
+• Drive them STRAIGHT down with a claw hammer — NOT at an angle — FLUSH to the ground to avoid stubbed toes
+
+**Larger family tents, Springbar/Kodiak:**
+• Require a more robust stake (e.g. Monk Industries playa stakes)
+• Drive straight down and flush with a claw or engineer hammer
+
+**Why NOT rebar:**
+• Rebar is overkill for tents and the #1 source of soft-tissue foot lacerations treated at Burning Man medical
+• Even capped with a tennis ball or bottle, people still stub toes
+• It's a pain to pound in (needs a sledge), bends easily, and is miserable to pull out
+• Skip the "candy-cane rebar" and "playa staples" advice — it's outdated
+
+**Large structures (carports, domes, community shade):**
+• Use **LAG SCREWS**, not lag bolts (screws have a pointy end that penetrates the ground)
+• **3/8" × 14" lag screws** are the playa standard (3/8" fits all standard tarp grommets); 9/16" head size
+• 5× the holding power of rebar; fast and easy to install/remove with an impact driver or hammer drill
+• Shorter 8–10" lag screws with fender washers are great for big tents
+• Always carry a mechanical backup (e.g. a 3/8" speeder handle)
+• Fender washers (1.5" × ⅜") or 2–3 links of chain let you flush-mount the screw
+• Paired with ratchet cargo straps, structures have survived 70 mph windstorms
+
+**Leave No Trace:** Lag screws and tent stakes have become the #1 type of MOOP on playa — people are tired at teardown. Mark every stake and screw with a **survey whisker** so they pop up from the ground and are easy to find and remove.`,
+  },
+  {
+    title: "Captain's Log: Big Shelters — Hexayurt, RV & Box Truck",
+    category: 'packing',
+    tags: ['hexayurt', 'rv', 'box truck', 'shelter', 'housing', 'generator', 'fly-in', 'captains log'],
+    content: `Thinking beyond a tent? Captain Ron's Shelter log breaks down the bigger options — and their real costs.
+
+**Hexayurt** — ~$400
+• Rigid "yurt"-style structure built from 1"-thick Tuff-R insulation panels
+• Nice and cool inside, lightweight, and playa-proven
+• Downside: bulky and difficult to transport, and needs lots of hands to assemble
+• [hexayurt.com](http://hexayurt.com/)
+
+**RVs** — the reality check
+• EXPENSIVE: roughly $4,000–$12,000 for the week, before gas
+• Expensive per person: if it "sleeps 8," expect it to comfortably sleep about 4
+• Cleaning deposits run ~$500–$1,000 — budget 3–4 hours of post-burn cleaning
+• Onboard tanks fill fast; showers/toilets get unpleasant by mid-week and pump trucks are hard to flag down
+• Rentals near the event (Reno, Sacramento, SF) sell out early — book well ahead
+• Bonus: a wall of RVs makes a great wind break for the camp (but keep that generator noise neighborly!)
+
+**Box Truck** — great for fly-in burners
+• Ideal if you're flying in from afar — eliminates the need for a rental car AND gives you shelter to sleep and lounge in
+• Kills two birds with one stone; do your homework first on the eplaya box-truck camping threads
+
+*Attribution: adapted from "The Captain's Log — SHELTER" by Capt. Ron of the Orphanage camps, a gift to the citizens of Black Rock City. Language lightly edited for camp.*`,
+  },
   {
     title: 'Home Setup & Organization',
     category: 'packing',
