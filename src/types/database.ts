@@ -1641,7 +1641,7 @@ export interface ShiftDraftOrderWithCamper extends ShiftDraftOrderRow {
 // Packing List Items
 // ==========================================
 
-export type PackingItemStatus = 'need' | 'ordered' | 'have' | 'packed'
+export type PackingItemStatus = 'need' | 'ordered' | 'have' | 'packed' | 'camp_provided' | 'na'
 
 export interface PackingListItemRow {
   id: string

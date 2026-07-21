@@ -22,12 +22,18 @@ type PriorityFilter = 'all' | 'must' | 'nice' | 'optional'
 type StatusFilter = 'all' | PackingItemStatus
 
 const STATUS_FLOW: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed']
+// All statuses, including the two that sit outside the normal progression
+const ALL_STATUSES: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed', 'camp_provided', 'na']
+// Statuses that count as "handled" (no more action needed) for progress/completion
+const RESOLVED_STATUSES: PackingItemStatus[] = ['packed', 'camp_provided', 'na']
 
 const STATUS_CONFIG = {
   need: { label: 'Need', icon: '⬜', color: 'bg-gray-100 text-gray-700 border-gray-300', barColor: 'bg-gray-300' },
   ordered: { label: 'Ordered', icon: '📦', color: 'bg-amber-100 text-amber-800 border-amber-300', barColor: 'bg-amber-400' },
   have: { label: 'Have', icon: '✅', color: 'bg-blue-100 text-blue-800 border-blue-300', barColor: 'bg-blue-400' },
   packed: { label: 'Packed', icon: '🎒', color: 'bg-green-100 text-green-800 border-green-300', barColor: 'bg-green-500' },
+  camp_provided: { label: 'Camp Provided', icon: '⛺', color: 'bg-purple-100 text-purple-800 border-purple-300', barColor: 'bg-purple-400' },
+  na: { label: 'N/A', icon: '🚫', color: 'bg-gray-100 text-gray-400 border-gray-200', barColor: 'bg-gray-300' },
 } as const
 
 const PRIORITY_COLORS = {
@@ -69,6 +75,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   const [editCategory, setEditCategory] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editPriority, setEditPriority] = useState<'must' | 'nice' | 'optional'>('must')
+  const [editStatus, setEditStatus] = useState<PackingItemStatus>('need')
 
   const fetchItems = useCallback(async () => {
     const result = await getPackingListAction(camper.id)
@@ -163,6 +170,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     setEditCategory(item.category)
     setEditNotes(item.notes || '')
     setEditPriority(item.priority || 'must')
+    setEditStatus(item.status || 'need')
   }
 
   const saveEdit = async () => {
@@ -172,6 +180,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
       category: editCategory.trim() || 'Uncategorized',
       notes: editNotes.trim() || null,
       priority: editPriority,
+      status: editStatus,
     })
     if (result.success && result.item) {
       setItems(prev => prev.map(i => i.id === editingId ? result.item! : i))
@@ -246,8 +255,13 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
     ordered: items.filter(i => i.status === 'ordered').length,
     have: items.filter(i => i.status === 'have').length,
     packed: items.filter(i => i.status === 'packed').length,
+    camp_provided: items.filter(i => i.status === 'camp_provided').length,
+    na: items.filter(i => i.status === 'na').length,
   }), [items])
   const totalItems = items.length
+  // Items that still require action tracking (exclude N/A) and count of resolved items
+  const trackableItems = totalItems - statusCounts.na
+  const resolvedCount = statusCounts.packed + statusCounts.camp_provided
 
   if (loading) {
     return (
@@ -285,9 +299,9 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
 
         {totalItems > 0 && (
           <CardContent className="pt-0 pb-3">
-            {/* Status summary - 4 tappable stat boxes */}
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {STATUS_FLOW.map(s => {
+            {/* Status summary - tappable stat boxes */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {ALL_STATUSES.map(s => {
                 const cfg = STATUS_CONFIG[s]
                 const count = statusCounts[s]
                 const isActive = statusFilter === s
@@ -309,8 +323,8 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
 
             {/* Stacked progress bar */}
             <div className="w-full bg-gray-200 rounded-full h-3 border border-black overflow-hidden flex">
-              {STATUS_FLOW.filter(s => s !== 'need').map(s => {
-                const pct = totalItems > 0 ? (statusCounts[s] / totalItems) * 100 : 0
+              {(['ordered', 'have', 'packed', 'camp_provided'] as PackingItemStatus[]).map(s => {
+                const pct = trackableItems > 0 ? (statusCounts[s] / trackableItems) * 100 : 0
                 return pct > 0 ? (
                   <div
                     key={s}
@@ -323,10 +337,10 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-[10px] text-gray-400">
-                {statusCounts.packed} of {totalItems} packed
+                {resolvedCount} of {trackableItems} ready{statusCounts.na > 0 ? ` · ${statusCounts.na} N/A` : ''}
               </span>
               <span className="text-[10px] font-bold text-gray-500">
-                {totalItems > 0 ? Math.round((statusCounts.packed / totalItems) * 100) : 0}%
+                {trackableItems > 0 ? Math.round((resolvedCount / trackableItems) * 100) : 0}%
               </span>
             </div>
           </CardContent>
@@ -442,9 +456,9 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
       {/* Category cards */}
       {sortedCategories.map(category => {
         const categoryItems = grouped[category]
-        const catPacked = categoryItems.filter(i => i.status === 'packed').length
+        const catDone = categoryItems.filter(i => RESOLVED_STATUSES.includes(i.status)).length
         const isCollapsed = collapsedCats.has(category)
-        const allDone = catPacked === categoryItems.length
+        const allDone = catDone === categoryItems.length
 
         return (
           <Card key={category} className={allDone ? 'opacity-70' : ''}>
@@ -469,8 +483,8 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                     <span>📦{categoryItems.filter(i => i.status === 'ordered').length}</span>
                   )}
                 </div>
-                <Badge variant={allDone ? 'success' : catPacked > 0 ? 'warning' : 'default'}>
-                  {catPacked}/{categoryItems.length}
+                <Badge variant={allDone ? 'success' : catDone > 0 ? 'warning' : 'default'}>
+                  {catDone}/{categoryItems.length}
                 </Badge>
               </div>
             </button>
@@ -490,6 +504,12 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                               options={[{ value: 'must', label: 'Essential' }, { value: 'nice', label: 'Recommended' }, { value: 'optional', label: 'Optional' }]}
                               className="sm:w-32"
                             />
+                            <Select
+                              value={editStatus}
+                              onChange={(e) => setEditStatus(e.target.value as PackingItemStatus)}
+                              options={ALL_STATUSES.map(s => ({ value: s, label: STATUS_CONFIG[s].label }))}
+                              className="sm:w-40"
+                            />
                           </div>
                           <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" />
                           <div className="flex gap-2">
@@ -502,8 +522,8 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                           {/* Status button - tap to cycle */}
                           <button
                             onClick={() => cycleStatus(item)}
-                            className={`flex-shrink-0 w-[70px] px-1.5 py-1 text-[11px] font-bold rounded-md border transition-all hover:scale-105 active:scale-95 ${STATUS_CONFIG[item.status].color}`}
-                            title={`Click to change status (current: ${STATUS_CONFIG[item.status].label})`}
+                            className={`flex-shrink-0 min-w-[70px] px-1.5 py-1 text-[11px] font-bold rounded-md border transition-all hover:scale-105 active:scale-95 ${STATUS_CONFIG[item.status].color}`}
+                            title={`Click to advance status (current: ${STATUS_CONFIG[item.status].label}). Use edit to set Camp Provided or N/A.`}
                           >
                             {STATUS_CONFIG[item.status].icon} {STATUS_CONFIG[item.status].label}
                           </button>
@@ -511,7 +531,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                           {/* Item name + priority + notes */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className={`text-sm ${item.status === 'packed' ? 'line-through text-gray-400' : ''}`}>
+                              <span className={`text-sm ${RESOLVED_STATUSES.includes(item.status) ? 'line-through text-gray-400' : ''}`}>
                                 {item.item}
                               </span>
                               <span className={`text-[9px] font-bold px-1 py-0.5 rounded border ${PRIORITY_COLORS[item.priority]}`}>

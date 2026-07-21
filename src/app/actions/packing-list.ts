@@ -214,7 +214,7 @@ export async function updateStatusAction(
 ): Promise<PackingListActionResult> {
   await requireApproved()
 
-  const validStatuses: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed']
+  const validStatuses: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed', 'camp_provided', 'na']
   if (!validStatuses.includes(status)) {
     return { success: false, error: 'Invalid status' }
   }
