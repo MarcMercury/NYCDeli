@@ -21,8 +21,7 @@ interface PackingListTabProps {
 type PriorityFilter = 'all' | 'must' | 'nice' | 'optional'
 type StatusFilter = 'all' | PackingItemStatus
 
-const STATUS_FLOW: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed']
-// All statuses, including the two that sit outside the normal progression
+// Tap-to-cycle order for the status button (includes all selectable statuses)
 const ALL_STATUSES: PackingItemStatus[] = ['need', 'ordered', 'have', 'packed', 'camp_provided', 'na']
 // Statuses that count as "handled" (no more action needed) for progress/completion
 const RESOLVED_STATUSES: PackingItemStatus[] = ['packed', 'camp_provided', 'na']
@@ -133,8 +132,8 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
   }
 
   const cycleStatus = async (item: PackingListItemRow) => {
-    const currentIdx = STATUS_FLOW.indexOf(item.status)
-    const nextStatus = STATUS_FLOW[(currentIdx + 1) % STATUS_FLOW.length]
+    const currentIdx = ALL_STATUSES.indexOf(item.status)
+    const nextStatus = ALL_STATUSES[(currentIdx + 1) % ALL_STATUSES.length]
     // Optimistic update
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: nextStatus } : i))
     const result = await updateStatusAction(item.id, nextStatus)
@@ -292,7 +291,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
           <CardDescription>
             {items.length === 0
               ? 'Load the camp packing guide, then customize it. Tap status buttons to track each item through your packing journey!'
-              : 'Tap an item\'s status to advance it: Need → Ordered → Have → Packed'
+              : 'Tap an item\'s status to cycle it: Need → Ordered → Have → Packed → Camp Provided → N/A'
             }
           </CardDescription>
         </CardHeader>
@@ -523,7 +522,7 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                           <button
                             onClick={() => cycleStatus(item)}
                             className={`flex-shrink-0 min-w-[70px] px-1.5 py-1 text-[11px] font-bold rounded-md border transition-all hover:scale-105 active:scale-95 ${STATUS_CONFIG[item.status].color}`}
-                            title={`Click to advance status (current: ${STATUS_CONFIG[item.status].label}). Use edit to set Camp Provided or N/A.`}
+                            title={`Click to change status (current: ${STATUS_CONFIG[item.status].label}). Cycles Need → Ordered → Have → Packed → Camp Provided → N/A.`}
                           >
                             {STATUS_CONFIG[item.status].icon} {STATUS_CONFIG[item.status].label}
                           </button>
