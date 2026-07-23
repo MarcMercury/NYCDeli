@@ -64,11 +64,11 @@ export async function syncMissingBaseItemsAction(
   }
 
   const existingKeys = new Set(
-    existingItems.map(i => `${(i.category || '').toLowerCase()}|${i.item.toLowerCase()}`)
+    existingItems.map(i => i.item.trim().toLowerCase())
   )
 
   const missing = baseItems.filter(
-    b => !existingKeys.has(`${(b.category || '').toLowerCase()}|${b.item.toLowerCase()}`)
+    b => !existingKeys.has(b.item.trim().toLowerCase())
   )
 
   if (missing.length === 0) {

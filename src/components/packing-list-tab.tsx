@@ -35,12 +35,6 @@ const STATUS_CONFIG = {
   na: { label: 'N/A', icon: '🚫', color: 'bg-gray-100 text-gray-400 border-gray-200', barColor: 'bg-gray-300' },
 } as const
 
-const PRIORITY_COLORS = {
-  must: 'bg-red-100 text-red-800 border-red-200',
-  nice: 'bg-blue-100 text-blue-800 border-blue-200',
-  optional: 'bg-gray-100 text-gray-600 border-gray-200',
-} as const
-
 const PRIORITY_LABELS = {
   must: 'Essential',
   nice: 'Recommended',
@@ -284,6 +278,11 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
         </Alert>
       )}
 
+      {/* Universal list disclosure */}
+      <p className="text-[11px] leading-snug text-gray-500">
+        This is a universal packing list made up of dozens of campers&rsquo; lists. Some items on this list may be provided by your camp &mdash; check with your camp with questions.
+      </p>
+
       {/* Header Card */}
       <Card className="border-2 border-yellow-300">
         <CardHeader className="pb-3">
@@ -426,32 +425,6 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
         </Card>
       )}
 
-      {/* Priority filter pills */}
-      {items.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-400">Priority:</span>
-          {(['all', 'must', 'nice', 'optional'] as PriorityFilter[]).map(f => {
-            const count = f === 'all' ? items.length : items.filter(i => i.priority === f).length
-            return (
-              <button
-                key={f}
-                onClick={() => setPriorityFilter(f)}
-                className={`px-2.5 py-0.5 text-xs font-bold border rounded-full transition-colors ${
-                  priorityFilter === f
-                    ? 'bg-black text-white border-black'
-                    : f === 'must' ? 'border-red-200 text-red-600 hover:bg-red-50'
-                    : f === 'nice' ? 'border-blue-200 text-blue-600 hover:bg-blue-50'
-                    : f === 'optional' ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {f === 'all' ? `All ${count}` : `${PRIORITY_LABELS[f]} ${count}`}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {/* Category cards */}
       {sortedCategories.map(category => {
         const categoryItems = grouped[category]
@@ -532,9 +505,6 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={`text-sm ${RESOLVED_STATUSES.includes(item.status) ? 'line-through text-gray-400' : ''}`}>
                                 {item.item}
-                              </span>
-                              <span className={`text-[9px] font-bold px-1 py-0.5 rounded border ${PRIORITY_COLORS[item.priority]}`}>
-                                {PRIORITY_LABELS[item.priority]}
                               </span>
                             </div>
                             {item.notes && (
