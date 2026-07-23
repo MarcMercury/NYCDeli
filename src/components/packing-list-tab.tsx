@@ -425,6 +425,38 @@ export default function PackingListTab({ camper }: PackingListTabProps) {
         </Card>
       )}
 
+      {/* Status filter pills */}
+      {items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-400">Show:</span>
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-2.5 py-0.5 text-xs font-bold border rounded-full transition-colors ${
+              statusFilter === 'all'
+                ? 'bg-black text-white border-black'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            All {items.length}
+          </button>
+          {ALL_STATUSES.map(s => {
+            const cfg = STATUS_CONFIG[s]
+            const isActive = statusFilter === s
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(isActive ? 'all' : s)}
+                className={`px-2.5 py-0.5 text-xs font-bold border rounded-full transition-colors ${
+                  isActive ? 'bg-black text-white border-black' : `${cfg.color} hover:opacity-80`
+                }`}
+              >
+                {cfg.icon} {cfg.label} {statusCounts[s]}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Category cards */}
       {sortedCategories.map(category => {
         const categoryItems = grouped[category]
