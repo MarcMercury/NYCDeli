@@ -1048,6 +1048,22 @@ export function FloorplanEditor() {
                   >
                     📷 Export
                   </Button>
+                  <a
+                    href="/admin/staking-plan"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-bold uppercase px-2 py-0.5 border-2 border-black bg-white hover:bg-yellow-300 inline-flex items-center"
+                  >
+                    🖨️ Staking Plan
+                  </a>
+                  <a
+                    href="/admin/tent-map"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-bold uppercase px-2 py-0.5 border-2 border-black bg-white hover:bg-yellow-300 inline-flex items-center"
+                  >
+                    ⛺ Tent Map
+                  </a>
                   {/* Zoom */}
                   <div className="flex items-center gap-1 ml-2">
                     <Button
