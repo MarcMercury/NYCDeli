@@ -8,7 +8,7 @@ import {
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
-import { updateCamperAction, deleteCamperAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
+import { updateCamperAction, deleteCamperAction, deleteUserEntityAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
 import { resolveTentMateIds } from '@/lib/tent-mates'
 import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
@@ -223,6 +223,22 @@ export default function AdminPage() {
       setMessage({ type: 'error', text: result.error || 'Delete failed' })
     } else {
       setMessage({ type: 'success', text: 'Camper deleted' })
+      setSelectedCamper(null)
+      setSelectedUser(null)
+      fetchData()
+    }
+  }
+
+  const deleteUserEntity = async (user: UserWithCamper) => {
+    const label = user.camper?.full_name || user.camper?.playa_name || user.email
+    if (!confirm(`Permanently delete ${label}? This removes their camper profile, login, and all associated data. This cannot be undone.`)) return
+
+    const profileId = user.id.startsWith('orphan-') ? null : user.id
+    const result = await deleteUserEntityAction({ profileId, camperId: user.camper_id })
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Delete failed' })
+    } else {
+      setMessage({ type: 'success', text: `Deleted ${label}` })
       setSelectedCamper(null)
       setSelectedUser(null)
       fetchData()
@@ -1282,6 +1298,17 @@ export default function AdminPage() {
                                   Reset PW
                                 </Button>
                               )}
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteUserEntity(user)
+                                }}
+                                title="Permanently delete this user and all their data"
+                              >
+                                Delete
+                              </Button>
                             </div>
                           </td>
                         </tr>

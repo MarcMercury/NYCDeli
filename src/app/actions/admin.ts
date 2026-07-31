@@ -28,58 +28,82 @@ export async function updateCamperAction(
   return { success: true }
 }
 
-export async function deleteCamperAction(
-  camperId: string
-): Promise<AdminActionResult> {
+/**
+ * Permanently remove a user/camper entity and ALL associated data — the camper
+ * record, the user_profiles row, and the auth login — regardless of status
+ * (pending, unlinked, orphan camper, or fully linked). Pass whichever ids exist:
+ * a pending user has only a profileId; an orphan camper has only a camperId.
+ */
+export async function deleteUserEntityAction(params: {
+  profileId?: string | null
+  camperId?: string | null
+}): Promise<AdminActionResult> {
   await requireAdmin()
   const adminClient = createServiceClient()
 
-  // Look up the camper to resolve their email (used to match orphan profiles).
-  const { data: camper } = await adminClient
-    .from('campers')
-    .select('id, email')
-    .eq('id', camperId)
-    .maybeSingle()
+  const camperId = params.camperId || null
+  // Synthetic "orphan-<id>" ids aren't real auth users — ignore them here.
+  const explicitProfileId =
+    params.profileId && !params.profileId.startsWith('orphan-') ? params.profileId : null
 
-  const email = (camper as { email?: string } | null)?.email
+  const profileIds = new Set<string>()
+  if (explicitProfileId) profileIds.add(explicitProfileId)
 
-  // Find every user profile tied to this camper — by FK link or matching email.
-  const orFilter = email
-    ? `camper_id.eq.${camperId},email.eq.${email}`
-    : `camper_id.eq.${camperId}`
-  const { data: profiles } = await adminClient
-    .from('user_profiles')
-    .select('id')
-    .or(orFilter)
-
-  // Clear any tent-share references pointing at this camper so the FK doesn't block deletion.
-  for (const col of [
-    'sharing_tent_with',
-    'sharing_tent_with_2',
-    'sharing_tent_with_3',
-    'sharing_tent_with_4',
-    'sharing_tent_with_5',
-  ]) {
-    await adminClient
+  // Resolve the camper's email so we can catch any profile linked only by email.
+  let email: string | undefined
+  if (camperId) {
+    const { data: camper } = await adminClient
       .from('campers')
-      .update({ [col]: null } as never)
-      .eq(col, camperId)
+      .select('email')
+      .eq('id', camperId)
+      .maybeSingle()
+    email = (camper as { email?: string } | null)?.email
+  }
+
+  // Gather every profile tied to this entity — by FK link or matching email.
+  const filters: string[] = []
+  if (camperId) filters.push(`camper_id.eq.${camperId}`)
+  if (email) filters.push(`email.eq.${email}`)
+  if (filters.length) {
+    const { data: profiles } = await adminClient
+      .from('user_profiles')
+      .select('id')
+      .or(filters.join(','))
+    for (const p of (profiles || []) as { id: string }[]) profileIds.add(p.id)
+  }
+
+  if (camperId) {
+    // Clear any tent-share references pointing at this camper so FKs don't block deletion.
+    for (const col of [
+      'sharing_tent_with',
+      'sharing_tent_with_2',
+      'sharing_tent_with_3',
+      'sharing_tent_with_4',
+      'sharing_tent_with_5',
+    ]) {
+      await adminClient
+        .from('campers')
+        .update({ [col]: null } as never)
+        .eq(col, camperId)
+    }
+
+    const { error } = await adminClient.from('campers').delete().eq('id', camperId)
+    if (error) return { success: false, error: error.message }
   }
 
   // Delete the auth user(s); ON DELETE CASCADE removes their user_profiles row too.
-  for (const profile of (profiles || []) as { id: string }[]) {
-    const { error: authError } = await adminClient.auth.admin.deleteUser(profile.id)
+  for (const pid of profileIds) {
+    const { error: authError } = await adminClient.auth.admin.deleteUser(pid)
     if (authError) return { success: false, error: authError.message }
   }
 
-  // Finally remove the camper record itself.
-  const { error } = await adminClient
-    .from('campers')
-    .delete()
-    .eq('id', camperId)
-
-  if (error) return { success: false, error: error.message }
   return { success: true }
+}
+
+export async function deleteCamperAction(
+  camperId: string
+): Promise<AdminActionResult> {
+  return deleteUserEntityAction({ camperId })
 }
 
 export async function updateTaskStatusAction(
