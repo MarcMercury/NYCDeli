@@ -395,6 +395,22 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </Link>
+          <Link href="/admin/staking-plan" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🚩</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Staking Plan</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/tent-map" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">⛺</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Tent Map</p>
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/admin/applicants" className="block">
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
