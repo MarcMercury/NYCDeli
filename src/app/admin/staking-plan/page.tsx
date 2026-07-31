@@ -119,6 +119,7 @@ export default function StakingPlanPage() {
   const [loading, setLoading] = useState(true)
   // Which object ids are included on the plan. null = not yet initialised.
   const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(true)
 
   useEffect(() => {
     let active = true
@@ -237,42 +238,51 @@ export default function StakingPlanPage() {
       <div className="no-print max-w-4xl mx-auto px-6 pt-6">
         <div className="border-2 border-black">
           <div className="flex items-center justify-between gap-3 bg-gray-100 px-3 py-2 border-b-2 border-black flex-wrap">
-            <span className="font-black uppercase tracking-wider text-sm">
+            <button
+              onClick={() => setPickerOpen(o => !o)}
+              className="flex items-center gap-2 font-black uppercase tracking-wider text-sm"
+              aria-expanded={pickerOpen}
+            >
+              <span className="inline-block w-3 text-xs">{pickerOpen ? '▾' : '▸'}</span>
               Include on plan · {placed.length}/{stakeable.length} objects
-            </span>
+            </button>
             <div className="flex items-center gap-2 text-xs">
               <button onClick={selectAll} className="font-bold underline">All</button>
               <button onClick={selectNone} className="font-bold underline">None</button>
               <button onClick={selectLargeOnly} className="font-bold underline">Large / delivered only</button>
             </div>
           </div>
-          <p className="px-3 pt-2 text-[11px] text-gray-600">
-            Tick the objects you want measured on the printable plan. The schematic, corner table, and
-            coordinate table update automatically. Tents are on the separate Tent Location Map.
-          </p>
-          <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-auto">
-            {stakeable.length === 0 && (
-              <p className="col-span-full text-sm text-gray-500">No stakeable objects in this layout.</p>
-            )}
-            {stakeable.map(o => {
-              const checked = sel.has(o.id)
-              return (
-                <label key={o.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleOne(o.id)}
-                    className="w-4 h-4 accent-black"
-                  />
-                  <span className={checked ? '' : 'text-gray-400'}>
-                    {o.label || typeLabel(o.object_type)}
-                    {isLargeDelivered(o) && <span className="text-red-600 font-bold"> ▲</span>}
-                    <span className="text-gray-400 text-[11px]"> · {typeLabel(o.object_type)}</span>
-                  </span>
-                </label>
-              )
-            })}
-          </div>
+          {pickerOpen && (
+            <>
+              <p className="px-3 pt-2 text-[11px] text-gray-600">
+                Tick the objects you want measured on the printable plan. The schematic, corner table, and
+                coordinate table update automatically. Tents are on the separate Tent Location Map.
+              </p>
+              <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-auto">
+                {stakeable.length === 0 && (
+                  <p className="col-span-full text-sm text-gray-500">No stakeable objects in this layout.</p>
+                )}
+                {stakeable.map(o => {
+                  const checked = sel.has(o.id)
+                  return (
+                    <label key={o.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleOne(o.id)}
+                        className="w-4 h-4 accent-black"
+                      />
+                      <span className={checked ? '' : 'text-gray-400'}>
+                        {o.label || typeLabel(o.object_type)}
+                        {isLargeDelivered(o) && <span className="text-red-600 font-bold"> ▲</span>}
+                        <span className="text-gray-400 text-[11px]"> · {typeLabel(o.object_type)}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
