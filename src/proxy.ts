@@ -2,7 +2,10 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that don't require auth at all — no Supabase calls needed
-const publicRoutes = ['/', '/login', '/register', '/pending', '/intake']
+const publicRoutes = ['/', '/login', '/register', '/pending', '/intake', '/stone-age']
+
+// During maintenance, only these paths stay reachable for non-admins
+const MAINTENANCE_ALLOWLIST = ['/stone-age', '/login']
 
 // Routes that require admin role (need profile query)
 const adminRoutes = ['/admin']
@@ -59,8 +62,73 @@ function createSupabaseMiddlewareClient(request: NextRequest) {
   return { supabase, getResponse: () => supabaseResponse }
 }
 
+// Read-only Supabase client for lightweight proxy lookups (no cookie writes).
+function createReadClient(request: NextRequest) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll() {},
+      },
+    }
+  )
+}
+
+// Global maintenance flag, cached briefly so we don't hit the DB on every nav.
+let maintenanceCache = { value: false, at: 0 }
+const MAINTENANCE_TTL_MS = 15_000
+
+async function isMaintenanceMode(request: NextRequest): Promise<boolean> {
+  const now = Date.now()
+  if (now - maintenanceCache.at < MAINTENANCE_TTL_MS) return maintenanceCache.value
+  try {
+    const supabase = createReadClient(request)
+    const { data } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'maintenance_mode')
+      .maybeSingle()
+    const on = (data as { value?: string } | null)?.value === 'true'
+    maintenanceCache = { value: on, at: now }
+    return on
+  } catch {
+    return maintenanceCache.value
+  }
+}
+
+async function requestIsAdmin(request: NextRequest): Promise<boolean> {
+  try {
+    const supabase = createReadClient(request)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return false
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    return (profile as { role?: string } | null)?.role === 'admin'
+  } catch {
+    return false
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // 0. Global maintenance kill switch: divert ALL non-admin traffic to /stone-age
+  if (await isMaintenanceMode(request)) {
+    const allowed =
+      MAINTENANCE_ALLOWLIST.includes(pathname) || pathname.startsWith('/api')
+    if (!allowed && !(await requestIsAdmin(request))) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/stone-age'
+      return NextResponse.redirect(url)
+    }
+  }
 
   // 1. Public routes: pass through with NO Supabase calls
   if (isPublicRoute(pathname)) {

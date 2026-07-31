@@ -11,6 +11,7 @@ import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
 import { updateCamperAction, deleteCamperAction, deleteUserEntityAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
 import { resolveTentMateIds } from '@/lib/tent-mates'
+import { SETTINGS_SCHEMA, SETTING_GROUPS, MAINTENANCE_KEY } from '@/lib/settings'
 import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
 
 type Tab = { id: string; label: string }
@@ -1629,41 +1630,64 @@ export default function AdminPage() {
         {/* Settings Tab */}
         <TabPanel tabId="settings" activeTab={activeTab}>
           <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>
-                  Core system configuration values.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {settings.map(setting => (
-                    <div key={setting.id}>
-                      <label className="text-xs font-bold uppercase tracking-wider">
-                        {setting.key.replace(/_/g, ' ')}
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={setting.value}
-                          onChange={(e) => {
-                            setSettings(settings.map(s => 
-                              s.id === setting.id ? { ...s, value: e.target.value } : s
-                            ))
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => updateSetting(setting.key, setting.value)}
-                        >
-                          Save
-                        </Button>
+            <div className="space-y-6">
+              {SETTING_GROUPS.map(group => {
+                const fields = SETTINGS_SCHEMA.filter(
+                  def => def.group === group && settings.some(s => s.key === def.key)
+                )
+                if (fields.length === 0) return null
+                return (
+                  <Card key={group}>
+                    <CardHeader>
+                      <CardTitle>{group}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {fields.map(def => {
+                          const row = settings.find(s => s.key === def.key)!
+                          const setLocal = (value: string) =>
+                            setSettings(settings.map(s => (s.id === row.id ? { ...s, value } : s)))
+                          if (def.type === 'boolean') {
+                            const on = row.value === 'true'
+                            return (
+                              <div key={def.key} className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-bold uppercase tracking-wider">{def.label}</p>
+                                  {def.help && <p className="text-xs text-gray-500">{def.help}</p>}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant={on ? 'primary' : 'secondary'}
+                                  onClick={() => updateSetting(def.key, on ? 'false' : 'true')}
+                                >
+                                  {on ? 'On' : 'Off'}
+                                </Button>
+                              </div>
+                            )
+                          }
+                          return (
+                            <div key={def.key}>
+                              <label className="text-xs font-bold uppercase tracking-wider">{def.label}</label>
+                              {def.help && <p className="text-xs text-gray-500">{def.help}</p>}
+                              <div className="flex gap-2">
+                                <Input
+                                  type={def.type === 'date' ? 'date' : def.type === 'number' ? 'number' : 'text'}
+                                  value={row.value}
+                                  onChange={e => setLocal(e.target.value)}
+                                />
+                                <Button size="sm" onClick={() => updateSetting(def.key, row.value)}>
+                                  Save
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
 
             <Card variant="error">
               <CardHeader>
@@ -1673,39 +1697,47 @@ export default function AdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="border-2 border-red-500 p-4">
-                  <h4 className="font-bold mb-2">System Sunset</h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Disable all forms and convert to read-only mode.
-                  </p>
-                  <Button 
-                    variant="danger"
-                    onClick={() => {
-                      if (confirm('This will disable all intake forms. Are you sure?')) {
-                        updateSetting('intake_open', 'false')
-                      }
-                    }}
-                  >
-                    Disable Intake
-                  </Button>
-                </div>
-
-                <div className="border-2 border-red-500 p-4">
-                  <h4 className="font-bold mb-2">Full System Shutdown</h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Deactivate the entire system.
-                  </p>
-                  <Button 
-                    variant="danger"
-                    onClick={() => {
-                      if (confirm('This will shut down the entire system. Are you REALLY sure?')) {
-                        updateSetting('system_active', 'false')
-                      }
-                    }}
-                  >
-                    Shutdown System
-                  </Button>
-                </div>
+                {(() => {
+                  const maintOn = settings.find(s => s.key === MAINTENANCE_KEY)?.value === 'true'
+                  return (
+                    <div className={cn('border-2 p-4', maintOn ? 'border-red-600 bg-red-50' : 'border-red-500')}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-bold">Stone Age Mode (Full Shutdown)</h4>
+                        <Badge variant={maintOn ? 'error' : 'success'}>
+                          {maintOn ? 'STONE AGE — SITE DARK' : 'LIVE'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        When enabled, every non-admin visitor is redirected to the hidden
+                        &ldquo;stone age&rdquo; page and the entire site goes dark. Admins keep
+                        full access so you can turn it back on. Takes effect within ~15 seconds.
+                      </p>
+                      {maintOn ? (
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            if (confirm('Bring the site back online for everyone?')) {
+                              updateSetting(MAINTENANCE_KEY, 'false')
+                            }
+                          }}
+                        >
+                          Reopen the Site
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          onClick={() => {
+                            if (confirm('This shuts the entire site down for ALL non-admin users and sends them to the stone age page. Continue?')) {
+                              updateSetting(MAINTENANCE_KEY, 'true')
+                            }
+                          }}
+                        >
+                          Shut Down the Site
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           </div>

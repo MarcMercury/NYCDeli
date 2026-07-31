@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useSyncExternalStore } from 'react'
 import Image from 'next/image'
+import { fetchBurnStartDate } from '@/lib/settings'
 
-const TARGET_DATE = new Date('2026-08-30T00:00:00-07:00') // Aug 30, 2026 PDT (Black Rock City time)
+// Fallback if the burn_start_date setting is unset. Aug 30, 2026 PDT (BRC time).
+const DEFAULT_TARGET_DATE = new Date('2026-08-30T00:00:00-07:00')
 
-function getTimeLeft() {
+function getTimeLeft(target: Date) {
   const now = new Date()
-  const diff = TARGET_DATE.getTime() - now.getTime()
+  const diff = target.getTime() - now.getTime()
 
   if (diff <= 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true }
@@ -122,15 +124,26 @@ function CountdownDisplay({ values }: {
 }
 
 export function CountdownTimer() {
-  const [timeLeft, setTimeLeft] = useState(getTimeLeft)
+  const [target, setTarget] = useState(DEFAULT_TARGET_DATE)
+  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(DEFAULT_TARGET_DATE))
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   useEffect(() => {
+    let active = true
+    fetchBurnStartDate().then(date => {
+      if (active && date) setTarget(date)
+    })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reflect new target immediately
+    setTimeLeft(getTimeLeft(target))
     const interval = setInterval(() => {
-      setTimeLeft(getTimeLeft())
+      setTimeLeft(getTimeLeft(target))
     }, 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [target])
 
   if (!mounted) {
     return <CountdownDisplay placeholder />

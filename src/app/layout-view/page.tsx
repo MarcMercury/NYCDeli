@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Alert } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn, getInitials } from '@/lib/utils'
+import { fetchCampDimensions, type CampDimensions } from '@/lib/settings'
 import type { Camper } from '@/types/database'
 
 interface PlacedCamper extends Camper {
@@ -13,7 +14,7 @@ interface PlacedCamper extends Camper {
   displayHeight: number
 }
 
-// Camp dimensions in feet
+// Camp dimension fallbacks (used until settings load)
 const CAMP_WIDTH = 150
 const CAMP_LENGTH = 300
 const MIN_SPACING = 3
@@ -36,9 +37,9 @@ const zones = [
 ]
 
 // Simple auto-placement algorithm (defined outside component to avoid reference-before-declaration)
-function autoPlaceCampers(camperList: Camper[]): PlacedCamper[] {
+function autoPlaceCampers(camperList: Camper[], dims: CampDimensions): PlacedCamper[] {
   const placed: PlacedCamper[] = []
-  let currentX = MIN_SPACING
+  let currentX = dims.minSpacingFt
   let currentY = 40 // Start below the fixed zones
   let rowHeight = 0
 
@@ -59,15 +60,15 @@ function autoPlaceCampers(camperList: Camper[]): PlacedCamper[] {
     }
 
     // Check if fits in current row
-    if (currentX + width + MIN_SPACING > CAMP_WIDTH) {
+    if (currentX + width + dims.minSpacingFt > dims.widthFt) {
       // Move to next row
-      currentX = MIN_SPACING
-      currentY += rowHeight + MIN_SPACING
+      currentX = dims.minSpacingFt
+      currentY += rowHeight + dims.minSpacingFt
       rowHeight = 0
     }
 
     // Check if fits in camp
-    if (currentY + height > CAMP_LENGTH) {
+    if (currentY + height > dims.lengthFt) {
       console.warn(`Camp is full! Cannot place ${camper.full_name}`)
       continue
     }
@@ -80,7 +81,7 @@ function autoPlaceCampers(camperList: Camper[]): PlacedCamper[] {
       displayHeight: height,
     })
 
-    currentX += width + MIN_SPACING
+    currentX += width + dims.minSpacingFt
     rowHeight = Math.max(rowHeight, height)
   }
 
@@ -99,9 +100,16 @@ export default function LayoutPage() {
     grid: true,
   })
   const [viewScale, setViewScale] = useState(2) // pixels per foot
+  const [dims, setDims] = useState<CampDimensions>({
+    widthFt: CAMP_WIDTH,
+    lengthFt: CAMP_LENGTH,
+    minSpacingFt: MIN_SPACING,
+  })
 
   const fetchCampers = useCallback(async () => {
     const supabase = createClient()
+    const campDims = await fetchCampDimensions()
+    setDims(campDims)
     const { data, error } = await supabase
       .from('campers')
       .select('*')
@@ -113,7 +121,7 @@ export default function LayoutPage() {
     }
 
     // Auto-place campers that don't have positions
-    const placed = autoPlaceCampers(data || [])
+    const placed = autoPlaceCampers(data || [], campDims)
     setCampers(placed)
     setLoading(false)
   }, [])
@@ -221,7 +229,7 @@ export default function LayoutPage() {
                   </div>
                   <div className="flex justify-between">
                     <span>Camp Size:</span>
-                    <span className="font-bold">{CAMP_WIDTH} × {CAMP_LENGTH} ft</span>
+                    <span className="font-bold">{dims.widthFt} × {dims.lengthFt} ft</span>
                   </div>
                 </div>
               </CardContent>
@@ -283,15 +291,15 @@ export default function LayoutPage() {
               <CardHeader>
                 <CardTitle>Camp Map</CardTitle>
                 <CardDescription>
-                  {CAMP_WIDTH}ft × {CAMP_LENGTH}ft — Click a tent to see details
+                  {dims.widthFt}ft × {dims.lengthFt}ft — Click a tent to see details
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 overflow-auto">
                 <div 
                   className="relative bg-amber-100 border-4 border-black"
                   style={{ 
-                    width: CAMP_WIDTH * viewScale,
-                    height: CAMP_LENGTH * viewScale,
+                    width: dims.widthFt * viewScale,
+                    height: dims.lengthFt * viewScale,
                     backgroundImage: showLayers.grid ? 
                       `linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
                        linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)` : 'none',
