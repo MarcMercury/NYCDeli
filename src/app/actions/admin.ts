@@ -32,9 +32,48 @@ export async function deleteCamperAction(
   camperId: string
 ): Promise<AdminActionResult> {
   await requireAdmin()
-  const supabase = await createClient()
+  const adminClient = createServiceClient()
 
-  const { error } = await supabase
+  // Look up the camper to resolve their email (used to match orphan profiles).
+  const { data: camper } = await adminClient
+    .from('campers')
+    .select('id, email')
+    .eq('id', camperId)
+    .maybeSingle()
+
+  const email = (camper as { email?: string } | null)?.email
+
+  // Find every user profile tied to this camper — by FK link or matching email.
+  const orFilter = email
+    ? `camper_id.eq.${camperId},email.eq.${email}`
+    : `camper_id.eq.${camperId}`
+  const { data: profiles } = await adminClient
+    .from('user_profiles')
+    .select('id')
+    .or(orFilter)
+
+  // Clear any tent-share references pointing at this camper so the FK doesn't block deletion.
+  for (const col of [
+    'sharing_tent_with',
+    'sharing_tent_with_2',
+    'sharing_tent_with_3',
+    'sharing_tent_with_4',
+    'sharing_tent_with_5',
+  ]) {
+    await adminClient
+      .from('campers')
+      .update({ [col]: null } as never)
+      .eq(col, camperId)
+  }
+
+  // Delete the auth user(s); ON DELETE CASCADE removes their user_profiles row too.
+  for (const profile of (profiles || []) as { id: string }[]) {
+    const { error: authError } = await adminClient.auth.admin.deleteUser(profile.id)
+    if (authError) return { success: false, error: authError.message }
+  }
+
+  // Finally remove the camper record itself.
+  const { error } = await adminClient
     .from('campers')
     .delete()
     .eq('id', camperId)
