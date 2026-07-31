@@ -27,18 +27,24 @@ function typeColor(type: string, fallback: string): string {
 // Painted zones / annotations — surveyed as areas, not delivered objects.
 const ZONE_TYPES = new Set([
   'fire_lane', 'road', 'path_of_travel', 'neighbor_zone', 'fence',
-  'common_area', 'distance_marker', 'sign', 'custom',
+  'distance_marker', 'sign', 'custom',
 ])
+
+// Excluded from the staking plan entirely (like tents & roads).
+const EXCLUDED_TYPES = new Set(['tent', 'road', 'shade_structure', 'shade_sail'])
+
+// Located on the plan but never corner-flagged, even when large.
+const NEVER_FLAG_TYPES = new Set(['bike_parking', 'storage', 'swamp_cooler'])
 
 // Types that always arrive by truck/trailer and must be corner-flagged first.
 const DELIVERY_TYPES = new Set([
-  'refrigerated_truck', 'pc_container', 'storage', 'shower_container',
-  'greywater_tank', 'generator', 'rv', 'art_car', 'shade_structure',
-  'water_station', 'fuel_storage', 'propane_storage', 'swamp_cooler',
+  'refrigerated_truck', 'pc_container', 'shower_container',
+  'greywater_tank', 'generator', 'rv', 'art_car',
+  'water_station', 'fuel_storage', 'propane_storage',
 ])
 
 function isLargeDelivered(o: FloorplanObjectRow): boolean {
-  if (ZONE_TYPES.has(o.object_type)) return false
+  if (ZONE_TYPES.has(o.object_type) || NEVER_FLAG_TYPES.has(o.object_type)) return false
   const area = o.width_ft * o.height_ft
   return DELIVERY_TYPES.has(o.object_type) || area >= 200 || o.width_ft >= 20 || o.height_ft >= 20
 }
@@ -160,7 +166,7 @@ export default function StakingPlanPage() {
   // Number objects top-to-bottom, left-to-right so refs match reading order.
   // Individual tents live on the separate Tent Location Map, not here.
   const sorted = [...objects]
-    .filter(o => o.object_type !== 'road' && o.object_type !== 'tent')
+    .filter(o => !EXCLUDED_TYPES.has(o.object_type))
     .sort((a, b) => a.y - b.y || a.x - b.x)
   const placed: Placed[] = sorted.map((o, i) => ({
     ...o,
