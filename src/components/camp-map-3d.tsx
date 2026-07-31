@@ -1890,8 +1890,8 @@ function MapObject3D({
         )}
       </Suspense>
 
-      {/* Floating label */}
-      {showLabels && (
+      {/* Floating label — only shown when the object has a non-empty label */}
+      {showLabels && obj.label?.trim() && (
         <Html
           position={[0, heightM + 0.5, 0]}
           center
@@ -1909,7 +1909,7 @@ function MapObject3D({
             letterSpacing: '0.5px',
           }}
         >
-          {obj.label || obj.object_type.replace(/_/g, ' ')}
+          {obj.label.trim()}
           {camper && spot?.reservations.some(r => r.camper_id === camper.id) && ' ⭐'}
         </Html>
       )}
