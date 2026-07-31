@@ -22,12 +22,37 @@ function colLetter(n: number): string {
   return s
 }
 
-function tentEntrance(o: FloorplanObjectRow): string {
-  const side = o.properties?.entrance_side
-  const count = o.properties?.entrance_count
-  const sideTxt = side === 'length' ? 'long side' : side === 'width' ? 'short side' : side === 'both' ? 'long + short' : ''
-  if (!side && !count) return '—'
-  return `${count ? `${count}× ` : ''}${sideTxt}`.trim()
+interface Box { x0: number; y0: number; x1: number; y1: number }
+
+function inBox(o: FloorplanObjectRow, b: Box): boolean {
+  const cx = o.x + o.width_ft / 2
+  const cy = o.y + o.height_ft / 2
+  return cx >= b.x0 && cx <= b.x1 && cy >= b.y0 && cy <= b.y1
+}
+
+// A short opening segment on a tent edge plus its outward normal (nx, ny).
+interface Edge { x1: number; y1: number; x2: number; y2: number; nx: number; ny: number }
+
+// Entrance/opening edge(s) in the tent's local (unrotated) coords, so they
+// rotate with the tent group and point in the real on-ground direction.
+function entranceEdges(t: FloorplanObjectRow): Edge[] {
+  const side = t.properties?.entrance_side
+  if (!side) return []
+  const w = t.width_ft, h = t.height_ft
+  const longVertical = h >= w
+  const frac = 0.6
+  const longEdge = (): Edge =>
+    longVertical
+      ? { x1: t.x + w, y1: t.y + h / 2 - (h * frac) / 2, x2: t.x + w, y2: t.y + h / 2 + (h * frac) / 2, nx: 1, ny: 0 }
+      : { x1: t.x + w / 2 - (w * frac) / 2, y1: t.y + h, x2: t.x + w / 2 + (w * frac) / 2, y2: t.y + h, nx: 0, ny: 1 }
+  const shortEdge = (): Edge =>
+    longVertical
+      ? { x1: t.x + w / 2 - (w * frac) / 2, y1: t.y + h, x2: t.x + w / 2 + (w * frac) / 2, y2: t.y + h, nx: 0, ny: 1 }
+      : { x1: t.x + w, y1: t.y + h / 2 - (h * frac) / 2, x2: t.x + w, y2: t.y + h / 2 + (h * frac) / 2, nx: 1, ny: 0 }
+  if (side === 'length') return [longEdge()]
+  if (side === 'width') return [shortEdge()]
+  if (side === 'both') return [longEdge(), shortEdge()]
+  return []
 }
 
 function truncate(s: string, max: number): string {
@@ -85,8 +110,20 @@ export default function TentMapPage() {
 
   const grid = config.grid_size_ft || 10
   const shades = objects.filter(o => SHADE_TYPES.has(o.object_type))
+
+  // The zone is the union footprint of all shade structures — the only area shown.
+  const zone: Box | null = shades.length > 0
+    ? {
+        x0: Math.min(...shades.map(s => s.x)),
+        y0: Math.min(...shades.map(s => s.y)),
+        x1: Math.max(...shades.map(s => s.x + s.width_ft)),
+        y1: Math.max(...shades.map(s => s.y + s.height_ft)),
+      }
+    : null
+
+  // Only tents whose center falls inside the shade zone are shown here.
   const tents: TentRow[] = objects
-    .filter(o => o.object_type === 'tent')
+    .filter(o => o.object_type === 'tent' && (!zone || inBox(o, zone)))
     .sort((a, b) => a.y - b.y || a.x - b.x)
     .map((o, i) => ({
       ...o,
@@ -94,23 +131,19 @@ export default function TentMapPage() {
       gridCell: `${colLetter(o.x / grid)}${Math.floor(o.y / grid) + 1}`,
     }))
 
-  // Crop the view to the shade area (plus tents), padded and clamped to the lot.
-  const framed = shades.length > 0 ? shades : tents
-  const pad = 8
+  // Crop tightly to the shade zone (fallback to tents / whole lot), padded + clamped.
+  const pad = 4
   let x0 = 0, y0 = 0, x1 = config.width_ft, y1 = config.length_ft
-  if (framed.length > 0) {
-    x0 = Math.min(...framed.map(o => o.x))
-    y0 = Math.min(...framed.map(o => o.y))
-    x1 = Math.max(...framed.map(o => o.x + o.width_ft))
-    y1 = Math.max(...framed.map(o => o.y + o.height_ft))
-    // Include any tents that spill outside the shade footprint
-    for (const t of tents) {
-      x0 = Math.min(x0, t.x); y0 = Math.min(y0, t.y)
-      x1 = Math.max(x1, t.x + t.width_ft); y1 = Math.max(y1, t.y + t.height_ft)
-    }
-    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad)
-    x1 = Math.min(config.width_ft, x1 + pad); y1 = Math.min(config.length_ft, y1 + pad)
+  if (zone) {
+    ;({ x0, y0, x1, y1 } = zone)
+  } else if (tents.length > 0) {
+    x0 = Math.min(...tents.map(o => o.x))
+    y0 = Math.min(...tents.map(o => o.y))
+    x1 = Math.max(...tents.map(o => o.x + o.width_ft))
+    y1 = Math.max(...tents.map(o => o.y + o.height_ft))
   }
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad)
+  x1 = Math.min(config.width_ft, x1 + pad); y1 = Math.min(config.length_ft, y1 + pad)
   const viewW = x1 - x0
   const viewH = y1 - y0
   const M = 14
@@ -165,101 +198,95 @@ export default function TentMapPage() {
 
         {tents.length === 0 ? (
           <div className="border-2 border-black p-6 text-center text-sm">
-            No tents placed on the active layout yet. Generate and place tents in the{' '}
+            No tents placed inside the shade zone on the active layout yet. Generate and place tents in the{' '}
             <a href="/admin/layout-builder" className="underline font-bold">Layout Builder</a> first.
           </div>
         ) : (
-          <>
-            {/* Schematic */}
-            <section>
-              <p className="text-xs mb-2">
-                Personal tents inside the shaded area, labeled by occupant. Numbers match the roster below.
-                Grid squares are {grid}&apos; × {grid}&apos;.
-              </p>
-              <div className="border-2 border-black p-2">
-                <svg
-                  viewBox={`${x0 - M} ${y0 - M} ${viewW + 2 * M} ${viewH + 2 * M}`}
-                  width="100%"
-                  style={{ height: 'auto', maxHeight: '920px' }}
-                  preserveAspectRatio="xMidYMid meet"
-                >
-                  {/* Grid */}
-                  {vLines.map(gx => (
-                    <line key={`v${gx}`} x1={gx} y1={y0} x2={gx} y2={y1} stroke="#e5e7eb" strokeWidth={0.4} />
-                  ))}
-                  {hLines.map(gy => (
-                    <line key={`h${gy}`} x1={x0} y1={gy} x2={x1} y2={gy} stroke="#e5e7eb" strokeWidth={0.4} />
-                  ))}
-                  {/* Grid coordinate labels */}
-                  {vLines.map(gx => (
-                    <text key={`vl${gx}`} x={gx + grid / 2} y={y0 - 4} fontSize={4} textAnchor="middle" fill="#9ca3af" fontWeight="bold">
-                      {colLetter(gx / grid)}
-                    </text>
-                  ))}
-                  {hLines.map(gy => (
-                    <text key={`hl${gy}`} x={x0 - 5} y={gy + grid / 2 + 1.5} fontSize={4} textAnchor="middle" fill="#9ca3af" fontWeight="bold">
-                      {gy / grid + 1}
-                    </text>
-                  ))}
+          <section>
+            <p className="text-xs mb-2">
+              Personal tents inside the shaded area, labeled by occupant. The{' '}
+              <span className="text-red-600 font-bold">red ▸ marker</span> shows each tent&apos;s entrance /
+              opening direction. Grid squares are {grid}&apos; × {grid}&apos;.
+            </p>
+            <div className="border-2 border-black p-2">
+              <svg
+                viewBox={`${x0 - M} ${y0 - M} ${viewW + 2 * M} ${viewH + 2 * M}`}
+                width="100%"
+                style={{ height: 'auto', maxHeight: '920px' }}
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {/* Grid */}
+                {vLines.map(gx => (
+                  <line key={`v${gx}`} x1={gx} y1={y0} x2={gx} y2={y1} stroke="#e5e7eb" strokeWidth={0.4} />
+                ))}
+                {hLines.map(gy => (
+                  <line key={`h${gy}`} x1={x0} y1={gy} x2={x1} y2={gy} stroke="#e5e7eb" strokeWidth={0.4} />
+                ))}
+                {/* Grid coordinate labels */}
+                {vLines.map(gx => (
+                  <text key={`vl${gx}`} x={gx + grid / 2} y={y0 - 4} fontSize={4} textAnchor="middle" fill="#9ca3af" fontWeight="bold">
+                    {colLetter(gx / grid)}
+                  </text>
+                ))}
+                {hLines.map(gy => (
+                  <text key={`hl${gy}`} x={x0 - 5} y={gy + grid / 2 + 1.5} fontSize={4} textAnchor="middle" fill="#9ca3af" fontWeight="bold">
+                    {gy / grid + 1}
+                  </text>
+                ))}
 
-                  {/* Shade areas */}
-                  {shades.map(s => (
-                    <g key={s.id}>
-                      <rect x={s.x} y={s.y} width={s.width_ft} height={s.height_ft}
-                        fill="#f59e0b" fillOpacity={0.12} stroke="#b45309" strokeWidth={0.8} strokeDasharray="3 2" />
-                      <text x={s.x + s.width_ft / 2} y={s.y + 4} fontSize={3.5} textAnchor="middle" fill="#92400e" fontWeight="bold">
-                        SHADE {s.width_ft}×{s.height_ft}
+                {/* Shade areas */}
+                {shades.map(s => (
+                  <g key={s.id}>
+                    <rect x={s.x} y={s.y} width={s.width_ft} height={s.height_ft}
+                      fill="#f59e0b" fillOpacity={0.12} stroke="#b45309" strokeWidth={0.8} strokeDasharray="3 2" />
+                    <text x={s.x + s.width_ft / 2} y={s.y + 4} fontSize={3.5} textAnchor="middle" fill="#92400e" fontWeight="bold">
+                      SHADE {s.width_ft}×{s.height_ft}
+                    </text>
+                  </g>
+                ))}
+
+                {/* Tents with entrance-direction markers */}
+                {tents.map(t => {
+                  const cx = t.x + t.width_ft / 2
+                  const cy = t.y + t.height_ft / 2
+                  const nameSize = Math.max(1.6, Math.min(3, Math.min(t.width_ft, t.height_ft) * 0.26))
+                  const maxChars = Math.max(3, Math.floor(t.width_ft / (nameSize * 0.62)))
+                  const name = truncate(t.label || `Tent ${t.ref}`, maxChars)
+                  const edges = entranceEdges(t)
+                  return (
+                    <g key={t.id} transform={t.rotation ? `rotate(${t.rotation} ${cx} ${cy})` : undefined}>
+                      <rect x={t.x} y={t.y} width={t.width_ft} height={t.height_ft}
+                        fill={t.color || '#60a5fa'} fillOpacity={0.4} stroke="#1e3a8a" strokeWidth={0.5} />
+                      {edges.map((e, i) => {
+                        const mx = (e.x1 + e.x2) / 2, my = (e.y1 + e.y2) / 2
+                        const a = Math.max(1.2, Math.min(t.width_ft, t.height_ft) * 0.2)
+                        const tip = { x: mx + e.nx * a, y: my + e.ny * a }
+                        const px = -e.ny, py = e.nx, b = a * 0.55
+                        return (
+                          <g key={i}>
+                            <line x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} stroke="#dc2626" strokeWidth={1.1} strokeLinecap="round" />
+                            <polygon points={`${mx + px * b},${my + py * b} ${tip.x},${tip.y} ${mx - px * b},${my - py * b}`} fill="#dc2626" />
+                          </g>
+                        )
+                      })}
+                      <text x={t.x + 1} y={t.y + 3.5} fontSize={2.6} fill="#1e3a8a" fontWeight="bold">{t.ref}</text>
+                      <text x={cx} y={cy + nameSize * 0.35} fontSize={nameSize} textAnchor="middle" fill="#111827" fontWeight="bold">
+                        {name}
                       </text>
                     </g>
-                  ))}
+                  )
+                })}
+              </svg>
+            </div>
 
-                  {/* Tents */}
-                  {tents.map(t => {
-                    const cx = t.x + t.width_ft / 2
-                    const cy = t.y + t.height_ft / 2
-                    const nameSize = Math.max(1.6, Math.min(3, Math.min(t.width_ft, t.height_ft) * 0.26))
-                    const maxChars = Math.max(3, Math.floor(t.width_ft / (nameSize * 0.62)))
-                    const name = truncate(t.label || `Tent ${t.ref}`, maxChars)
-                    return (
-                      <g key={t.id} transform={t.rotation ? `rotate(${t.rotation} ${cx} ${cy})` : undefined}>
-                        <rect x={t.x} y={t.y} width={t.width_ft} height={t.height_ft}
-                          fill={t.color || '#60a5fa'} fillOpacity={0.4} stroke="#1e3a8a" strokeWidth={0.5} />
-                        <text x={t.x + 1} y={t.y + 3.5} fontSize={2.6} fill="#1e3a8a" fontWeight="bold">{t.ref}</text>
-                        <text x={cx} y={cy + nameSize * 0.35} fontSize={nameSize} textAnchor="middle" fill="#111827" fontWeight="bold">
-                          {name}
-                        </text>
-                      </g>
-                    )
-                  })}
-                </svg>
-              </div>
-            </section>
-
-            {/* Roster */}
-            <section className="break-before">
-              <h2 className="text-lg font-black uppercase tracking-wider mb-1">Tent Roster</h2>
-              <table className="w-full text-xs border-2 border-black border-collapse">
-                <thead>
-                  <tr className="bg-black text-white">
-                    <Th>#</Th><Th>Occupant(s)</Th><Th>Size (W×L)</Th><Th>Grid</Th><Th>Entrance</Th><Th>Make / Model</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tents.map(t => (
-                    <tr key={t.id} className="border-t border-black">
-                      <Td className="font-bold">{t.ref}</Td>
-                      <Td>{t.label || '—'}</Td>
-                      <Td>{t.width_ft}&apos; × {t.height_ft}&apos;</Td>
-                      <Td>{t.gridCell}</Td>
-                      <Td>{tentEntrance(t)}</Td>
-                      <Td>{t.properties?.tent_make_model || '—'}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-xs mt-2 font-bold">{tents.length} tents</p>
-            </section>
-          </>
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 text-[11px] mt-2">
+              <span className="flex items-center gap-1"><span className="text-red-600 font-bold">▸</span> Entrance / opening direction</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 border border-blue-900 bg-blue-400/40" /> Tent (numbered by occupant)</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 border border-dashed border-amber-700" /> Shade structure</span>
+            </div>
+            <p className="text-xs mt-2 font-bold">{tents.length} tents in shade zone</p>
+          </section>
         )}
 
         <footer className="text-[10px] text-gray-500 pt-4 border-t border-gray-300">
@@ -268,11 +295,4 @@ export default function TentMapPage() {
       </div>
     </div>
   )
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="border border-black px-1.5 py-1 text-left font-bold">{children}</th>
-}
-function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <td className={`border border-black px-1.5 py-1 ${className}`}>{children}</td>
 }
