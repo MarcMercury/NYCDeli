@@ -30,6 +30,7 @@ export interface TentNeed {
 interface CamperRow {
   id: string
   full_name: string
+  email: string | null
   shelter_type: string | null
   shelter_width_ft: number | null
   shelter_length_ft: number | null
@@ -50,7 +51,9 @@ const DEFAULT_RV_L = 22
 
 /**
  * Fetch every camper from Supabase and compute the list of individual tents
- * required to house them all. Sharing partners (via sharing_tent_with /
+ * required to house them all. Campers whose account is still pending approval
+ * (or was denied) are excluded — only accepted campers (and admin-added
+ * account-less attendees) get tents. Sharing partners (via sharing_tent_with /
  * sharing_tent_with_2) are collapsed into one tent per group sized to the
  * largest member's tent. Campers with missing/zero dimensions fall back to
  * a 10×10 default so they still get a draggable object.
@@ -60,12 +63,32 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   const { data, error } = await supabase
     .from('campers')
     .select(
-      'id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5, tent_entrance_count, tent_opening_side, tent_make_model',
+      'id, full_name, email, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5, tent_entrance_count, tent_opening_side, tent_make_model',
     )
     .order('full_name')
 
   if (error || !data) return []
-  const rows = data as unknown as CamperRow[]
+  const allRows = data as unknown as CamperRow[]
+
+  // Exclude campers whose account is still awaiting approval (role='pending')
+  // or was denied. These applicants must not occupy layout space until accepted.
+  // Account-less campers (admin-added, no profile) are kept — they are real
+  // attendees who still need a physical tent.
+  const { data: unapprovedRows } = await supabase
+    .from('user_profiles')
+    .select('camper_id, email')
+    .or('role.eq.pending,denied_at.not.is.null')
+  const norm = (e: string | null) => (e ?? '').trim().toLowerCase()
+  const excludedCamperIds = new Set<string>()
+  const excludedEmails = new Set<string>()
+  for (const p of unapprovedRows ?? []) {
+    const row = p as { camper_id: string | null; email: string | null }
+    if (row.camper_id) excludedCamperIds.add(row.camper_id)
+    if (row.email) excludedEmails.add(norm(row.email))
+  }
+  const rows = allRows.filter(
+    r => !excludedCamperIds.has(r.id) && !excludedEmails.has(norm(r.email)),
+  )
 
   // Campers linked to a Builder or Admin profile get a distinct tent color.
   const { data: profileRows } = await supabase
