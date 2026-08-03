@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { buildTentShareGroups } from '@/lib/union-find'
+import { filterOutUnapprovedCampers } from '@/lib/tent-needs'
 import type { FloorplanObjectRow } from '@/types/database'
 
 /* ── CSV path (served from public/) ─────────────────────────────── */
@@ -327,12 +328,16 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
       const supabase = createClient()
       const { data } = await supabase
         .from('campers')
-        .select('id, full_name, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5')
+        .select('id, full_name, email, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5')
         .order('full_name')
       if (!data || data.length === 0) return null
 
-      type Row = { id: string; full_name: string; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null; sharing_tent_with_2: string | null; sharing_tent_with_3: string | null; sharing_tent_with_4: string | null; sharing_tent_with_5: string | null }
-      const rows = data as unknown as Row[]
+      type Row = { id: string; full_name: string; email: string | null; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null; sharing_tent_with_2: string | null; sharing_tent_with_3: string | null; sharing_tent_with_4: string | null; sharing_tent_with_5: string | null }
+      const allRows = data as unknown as Row[]
+
+      // Exclude pending/denied applicants so the tent-count math matches the
+      // generator (src/lib/tent-needs.ts) — only accepted campers need tents.
+      const rows = await filterOutUnapprovedCampers(supabase, allRows)
 
       const camperList: CamperInfo[] = []
       const idToName = new Map<string, string>()

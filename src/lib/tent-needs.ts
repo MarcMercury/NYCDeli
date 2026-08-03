@@ -50,6 +50,35 @@ const DEFAULT_RV_W = 10
 const DEFAULT_RV_L = 22
 
 /**
+ * Remove campers whose account is still awaiting approval (role='pending') or
+ * was denied — these applicants must not occupy layout space until accepted.
+ * Account-less campers (admin-added, no profile) are kept: they are real
+ * attendees who still need a physical tent. Shared by the tent generator
+ * (computeTentNeeds) and the layout tent-count summary so both agree on exactly
+ * which campers need tents.
+ */
+export async function filterOutUnapprovedCampers<T extends { id: string; email: string | null }>(
+  supabase: ReturnType<typeof createClient>,
+  rows: T[],
+): Promise<T[]> {
+  const { data: unapprovedRows } = await supabase
+    .from('user_profiles')
+    .select('camper_id, email')
+    .or('role.eq.pending,denied_at.not.is.null')
+  const norm = (e: string | null) => (e ?? '').trim().toLowerCase()
+  const excludedCamperIds = new Set<string>()
+  const excludedEmails = new Set<string>()
+  for (const p of unapprovedRows ?? []) {
+    const row = p as { camper_id: string | null; email: string | null }
+    if (row.camper_id) excludedCamperIds.add(row.camper_id)
+    if (row.email) excludedEmails.add(norm(row.email))
+  }
+  return rows.filter(
+    r => !excludedCamperIds.has(r.id) && !excludedEmails.has(norm(r.email)),
+  )
+}
+
+/**
  * Fetch every camper from Supabase and compute the list of individual tents
  * required to house them all. Campers whose account is still pending approval
  * (or was denied) are excluded — only accepted campers (and admin-added
@@ -70,25 +99,9 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   if (error || !data) return []
   const allRows = data as unknown as CamperRow[]
 
-  // Exclude campers whose account is still awaiting approval (role='pending')
-  // or was denied. These applicants must not occupy layout space until accepted.
-  // Account-less campers (admin-added, no profile) are kept — they are real
-  // attendees who still need a physical tent.
-  const { data: unapprovedRows } = await supabase
-    .from('user_profiles')
-    .select('camper_id, email')
-    .or('role.eq.pending,denied_at.not.is.null')
-  const norm = (e: string | null) => (e ?? '').trim().toLowerCase()
-  const excludedCamperIds = new Set<string>()
-  const excludedEmails = new Set<string>()
-  for (const p of unapprovedRows ?? []) {
-    const row = p as { camper_id: string | null; email: string | null }
-    if (row.camper_id) excludedCamperIds.add(row.camper_id)
-    if (row.email) excludedEmails.add(norm(row.email))
-  }
-  const rows = allRows.filter(
-    r => !excludedCamperIds.has(r.id) && !excludedEmails.has(norm(r.email)),
-  )
+  // Exclude campers whose account is still pending approval (or was denied) so
+  // they don't occupy layout space until accepted; keep account-less attendees.
+  const rows = await filterOutUnapprovedCampers(supabase, allRows)
 
   // Campers linked to a Builder or Admin profile get a distinct tent color.
   const { data: profileRows } = await supabase
