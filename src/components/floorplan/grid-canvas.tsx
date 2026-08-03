@@ -43,6 +43,7 @@ interface GridCanvasProps {
       openingSide?: 'length' | 'width' | 'both' | null
       tentMakeModel?: string | null
       isPrivileged?: boolean
+      camperIds?: string[]
     },
   ) => void
   showGrid: boolean
@@ -213,6 +214,7 @@ export function GridCanvas({
           openingSide: data.openingSide ?? null,
           tentMakeModel: data.tentMakeModel ?? null,
           isPrivileged: data.isPrivileged ?? false,
+          camperIds: data.camperIds ?? [],
         })
       }
     } catch (err) {

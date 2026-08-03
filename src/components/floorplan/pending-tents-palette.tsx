@@ -26,6 +26,7 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
         openingSide: tent.openingSide,
         tentMakeModel: tent.tentMakeModel,
         isPrivileged: tent.isPrivileged,
+        camperIds: tent.camperIds,
       }),
     )
     e.dataTransfer.effectAllowed = 'copy'

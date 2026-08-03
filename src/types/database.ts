@@ -906,6 +906,8 @@ export interface FloorplanObjectRow {
   z_index: number
   is_locked: boolean
   parent_id: string | null
+  /** Camper UUIDs this object (tent) houses — used to skip already-placed campers when generating tents */
+  camper_ids: string[]
   properties: FloorplanObjectProperties
   created_at: string
   updated_at: string
@@ -924,6 +926,7 @@ export interface FloorplanObjectInsert {
   z_index?: number
   is_locked?: boolean
   parent_id?: string | null
+  camper_ids?: string[]
   properties?: FloorplanObjectProperties
 }
 
@@ -939,6 +942,7 @@ export interface FloorplanObjectUpdate {
   z_index?: number
   is_locked?: boolean
   parent_id?: string | null
+  camper_ids?: string[]
   properties?: FloorplanObjectProperties
 }
 

@@ -19,6 +19,8 @@ export interface TentNeed {
   isPrivileged: boolean
   /** Names of campers this tent serves */
   camperNames: string[]
+  /** Camper UUIDs this tent serves — stored on the placed object so it can be skipped next time */
+  camperIds: string[]
   /** Number of physical entrance sides (1–4) — taken from the primary camper used for sizing */
   entranceCount: number | null
   /** Which physical side of the tent has the main opening — taken from the primary camper */
@@ -80,15 +82,21 @@ export async function filterOutUnapprovedCampers<T extends { id: string; email: 
 
 /**
  * Fetch every camper from Supabase and compute the list of individual tents
- * required to house them all. Campers whose account is still pending approval
- * (or was denied) are excluded — only accepted campers (and admin-added
- * account-less attendees) get tents. Sharing partners (via sharing_tent_with /
+ * required to house them. Only campers linked to an approved user account
+ * (a `user_profiles` row that is neither pending nor denied) are included —
+ * account-less attendees and unapproved applicants get no tent. Campers whose
+ * id appears in `placedCamperIds` (already placed on the saved layout) are
+ * skipped, and if any member of a sharing group is already placed the whole
+ * group's tent is skipped. Sharing partners (via sharing_tent_with /
  * sharing_tent_with_2) are collapsed into one tent per group sized to the
  * largest member's tent. Campers with missing/zero dimensions fall back to
  * a 10×10 default so they still get a draggable object.
  */
-export async function computeTentNeeds(): Promise<TentNeed[]> {
+export async function computeTentNeeds(
+  placedCamperIds: Iterable<string> = [],
+): Promise<TentNeed[]> {
   const supabase = createClient()
+  const placed = new Set<string>(placedCamperIds)
   const { data, error } = await supabase
     .from('campers')
     .select(
@@ -99,20 +107,21 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
   if (error || !data) return []
   const allRows = data as unknown as CamperRow[]
 
-  // Exclude campers whose account is still pending approval (or was denied) so
-  // they don't occupy layout space until accepted; keep account-less attendees.
-  const rows = await filterOutUnapprovedCampers(supabase, allRows)
-
-  // Campers linked to a Builder or Admin profile get a distinct tent color.
+  // Only campers linked to an approved user account/profile get tents. A profile
+  // is approved when its role isn't 'pending' and it hasn't been denied.
   const { data: profileRows } = await supabase
     .from('user_profiles')
-    .select('camper_id, role')
-    .in('role', ['builder', 'admin'])
-  const privilegedCamperIds = new Set<string>(
-    (profileRows ?? [])
-      .map(p => (p as { camper_id: string | null }).camper_id)
-      .filter((id): id is string => Boolean(id)),
-  )
+    .select('camper_id, role, denied_at')
+  const approvedCamperIds = new Set<string>()
+  const privilegedCamperIds = new Set<string>()
+  for (const p of profileRows ?? []) {
+    const row = p as { camper_id: string | null; role: string | null; denied_at: string | null }
+    if (!row.camper_id || row.role === 'pending' || row.denied_at) continue
+    approvedCamperIds.add(row.camper_id)
+    if (row.role === 'builder' || row.role === 'admin') privilegedCamperIds.add(row.camper_id)
+  }
+
+  const rows = allRows.filter(r => approvedCamperIds.has(r.id))
 
   // Union-find over both partner columns so 3-person shares (A↔B, A↔C)
   // collapse into a single group (shared with src/lib/tent-mates.ts).
@@ -135,6 +144,10 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
     const names = members.map(m => m.full_name).filter(Boolean)
     if (names.length === 0) continue
 
+    // Skip the whole group if any member is already placed on the saved layout.
+    if (members.some(m => placed.has(m.id))) continue
+
+    const camperIds = members.map(m => m.id)
     const isPrivileged = members.some(m => privilegedCamperIds.has(m.id))
 
     const allRV = members.every(
@@ -164,6 +177,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
         isRV: true,
         isPrivileged,
         camperNames: names,
+        camperIds,
         entranceCount: primary?.tent_entrance_count ?? null,
         openingSide: primary?.tent_opening_side ?? null,
         tentMakeModel: primary?.tent_make_model ?? null,
@@ -201,6 +215,7 @@ export async function computeTentNeeds(): Promise<TentNeed[]> {
       isRV: false,
       isPrivileged,
       camperNames: names,
+      camperIds,
       entranceCount: primary?.tent_entrance_count ?? null,
       openingSide: primary?.tent_opening_side ?? null,
       tentMakeModel: primary?.tent_make_model ?? null,

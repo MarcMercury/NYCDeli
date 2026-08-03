@@ -165,7 +165,10 @@ export function FloorplanEditor() {
     setGeneratingTents(true)
     setError(null)
     try {
-      const needs = await computeTentNeeds()
+      // Read the saved layout: campers already placed in existing tents are
+      // skipped so we only generate tents for the not-yet-placed campers.
+      const placedCamperIds = objects.flatMap(o => o.camper_ids ?? [])
+      const needs = await computeTentNeeds(placedCamperIds)
       setPendingTents(needs)
     } catch (err) {
       console.error('Generate tents failed:', err)
@@ -188,6 +191,7 @@ export function FloorplanEditor() {
       openingSide?: 'length' | 'width' | 'both' | null
       tentMakeModel?: string | null
       isPrivileged?: boolean
+      camperIds?: string[]
     },
   ) {
     if (!config) return
@@ -218,6 +222,7 @@ export function FloorplanEditor() {
       z_index: objects.length,
       is_locked: false,
       parent_id: null,
+      camper_ids: meta?.camperIds ?? [],
       properties: props as FloorplanObjectRow['properties'],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -239,6 +244,7 @@ export function FloorplanEditor() {
       height_ft: heightFt,
       color,
       z_index: objects.length,
+      camper_ids: meta?.camperIds ?? [],
       properties: props as FloorplanObjectRow['properties'],
     })
 
@@ -258,6 +264,7 @@ export function FloorplanEditor() {
         isRV: false,
         isPrivileged: meta?.isPrivileged ?? false,
         camperNames: [],
+        camperIds: meta?.camperIds ?? [],
         entranceCount: meta?.entranceCount ?? null,
         openingSide: meta?.openingSide ?? null,
         tentMakeModel: meta?.tentMakeModel ?? null,
