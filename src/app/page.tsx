@@ -28,6 +28,14 @@ const modules = [
     statusColor: 'text-green-400',
   },
   {
+    href: '/map',
+    icon: '🏕️',
+    title: 'Camp Map',
+    description: 'Interactive 2D & 3D camp map — explore tents, kitchen, shade, and zones with pan, zoom, and search.',
+    status: 'Active',
+    statusColor: 'text-green-400',
+  },
+  {
     href: '/layout-view',
     icon: '🗺️',
     title: 'Camp Layout',
