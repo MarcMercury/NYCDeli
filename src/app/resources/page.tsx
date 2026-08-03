@@ -344,7 +344,7 @@ Thank you everyone for paying camp fees promptly. This lets Brian pay vendors ea
     title: 'Tent Spots',
     slug: 'tent',
     category: 'camp-amenities',
-    tags: ['tent', 'camping', 'shelter', 'spot', 'reservation'],
+    tags: ['tent', 'camping', 'shelter', 'spot'],
     content: `**Your Home on the Playa**
 
 Each camper gets a designated tent spot with:
@@ -354,7 +354,7 @@ Each camper gets a designated tent spot with:
 
 **Tent Size Guidelines:**
 • Measure your tent footprint (width × length) before arrival
-• Spots vary in size — check the Camp Map to see which spots fit your tent
+• Spots vary in size — your spot will be assigned to fit your tent
 • If your tent doesn't fit any available spots, DM Brian for help
 
 **Tips:**

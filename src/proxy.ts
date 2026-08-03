@@ -13,8 +13,8 @@ const adminRoutes = ['/admin']
 // Routes where pending users must be redirected (need profile query)
 const roleCheckRoutes = [
   '/campers', '/ideas', '/kitchen', '/layout', '/layout-view',
-  '/map', '/profile', '/resources', '/schedule', '/shift-draft',
-  '/build-week', '/camp-selection',
+  '/profile', '/resources', '/schedule', '/shift-draft',
+  '/build-week',
 ]
 
 function isPublicRoute(pathname: string) {

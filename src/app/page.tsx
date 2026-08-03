@@ -28,14 +28,6 @@ const modules = [
     statusColor: 'text-green-400',
   },
   {
-    href: '/map',
-    icon: '🏕️',
-    title: 'Camp Map',
-    description: 'Interactive camp map with spot selection, zone assignments, and real-time camper placement.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
     href: '/layout-view',
     icon: '🗺️',
     title: 'Camp Layout',

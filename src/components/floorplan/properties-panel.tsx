@@ -239,18 +239,6 @@ export function PropertiesPanel({
             Functions
           </p>
           <div className="space-y-2">
-            {/* Reservable toggle */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!selectedObject.properties?.reservable}
-                onChange={e => updateProp('reservable', e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm font-bold">Reservable</span>
-              <span className="text-[10px] text-gray-500">(users can reserve this)</span>
-            </label>
-
             {/* Capacity */}
             <Input
               label="Capacity"
@@ -268,7 +256,6 @@ export function PropertiesPanel({
               onChange={e => updateProp('linked_to', e.target.value || undefined)}
               options={[
                 { value: '', label: 'None' },
-                { value: 'reservations', label: 'Reservation Portal' },
                 { value: 'kitchen_shifts', label: 'Kitchen Shifts' },
                 { value: 'build_tasks', label: 'Build Tasks' },
                 { value: 'schedule', label: 'Schedule' },

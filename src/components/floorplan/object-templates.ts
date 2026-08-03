@@ -23,8 +23,8 @@ export const OBJECT_TEMPLATES: ObjectTemplate[] = [
     defaultHeight: 10,
     defaultColor: '#60a5fa',
     category: 'structures',
-    description: 'Camper tent — can be marked reservable',
-    defaultProperties: { reservable: true },
+    description: 'Camper tent',
+    defaultProperties: {},
   },
   {
     type: 'shade_structure',

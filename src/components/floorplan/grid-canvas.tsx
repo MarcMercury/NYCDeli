@@ -594,14 +594,6 @@ export function GridCanvas({
                     {obj.properties.sign_text}
                   </span>
                 )}
-                {obj.properties?.reservable && (
-                  <span className={cn(
-                    "bg-green-500 text-white px-1 rounded-sm mt-0.5",
-                    exporting ? "text-xs" : "text-[7px]"
-                  )}>
-                    RESERVABLE
-                  </span>
-                )}
                 {hasChildren && (
                   <span className={cn(
                     "bg-purple-500 text-white px-1 rounded-sm mt-0.5",

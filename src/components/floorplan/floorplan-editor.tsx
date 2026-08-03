@@ -17,7 +17,6 @@ import {
   createUtilityLine,
   deleteUtilityLine,
 } from '@/lib/floorplan'
-import { syncSpotsFromFloorplan } from '@/lib/camp-spots'
 import { GridCanvas, type DrawingMode } from './grid-canvas'
 import { ObjectPalette } from './object-palette'
 import { PropertiesPanel } from './properties-panel'
@@ -33,8 +32,6 @@ export function FloorplanEditor() {
   const [objects, setObjects] = useState<FloorplanObjectRow[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<string | null>(null)
   const [generatingTents, setGeneratingTents] = useState(false)
   const [pendingTents, setPendingTents] = useState<TentNeed[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -163,33 +160,6 @@ export function FloorplanEditor() {
     setSaving(false)
   }
 
-  // Sync reservable objects → camp_spots table
-  async function handleSyncSpots() {
-    setSyncing(true)
-    setSyncResult(null)
-    setError(null)
-    try {
-      const result = await syncSpotsFromFloorplan(objects)
-      const parts: string[] = []
-      if (result.created > 0) parts.push(`${result.created} created`)
-      if (result.updated > 0) parts.push(`${result.updated} updated`)
-      if (result.deleted > 0) parts.push(`${result.deleted} orphans removed`)
-      if (parts.length === 0) {
-        const reservableCount = objects.filter(o => o.properties?.reservable).length
-        setSyncResult(reservableCount === 0
-          ? 'No reservable objects found — mark tents as reservable first'
-          : `All ${reservableCount} spots already synced`)
-      } else {
-        setSyncResult(`Synced: ${parts.join(', ')}`)
-      }
-    } catch (err) {
-      console.error('Sync failed:', err)
-      setError('Failed to sync spots — check console for details')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   // Generate one pending tent object per camper / sharing group
   async function handleGenerateTents() {
     setGeneratingTents(true)
@@ -226,7 +196,6 @@ export function FloorplanEditor() {
     const color = meta?.isPrivileged ? '#86efac' : (template?.defaultColor ?? '#60a5fa')
     const props: FloorplanObjectRow['properties'] = {
       ...(template?.defaultProperties ?? {}),
-      reservable: true,
       // Generated tents default to A-frame roof and 6ft elevation
       roof_shape: 'a_frame',
       elevation_ft: 6,
@@ -665,9 +634,6 @@ export function FloorplanEditor() {
             {hasUnsavedChanges && (
               <Badge variant="warning">Unsaved Changes</Badge>
             )}
-            {syncResult && (
-              <Badge>{syncResult}</Badge>
-            )}
             <Button
               variant="secondary"
               onClick={handleGenerateTents}
@@ -676,14 +642,6 @@ export function FloorplanEditor() {
               title="Create one draggable tent per camper / sharing group"
             >
               ⛺ Generate Tents
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleSyncSpots}
-              loading={syncing}
-              disabled={syncing}
-            >
-              🔄 Sync Spots
             </Button>
             <Button
               onClick={handleSaveAll}
@@ -1126,10 +1084,6 @@ export function FloorplanEditor() {
             <div className="flex flex-wrap gap-3 mt-3 text-xs">
               <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
                 <span className="font-bold">Objects:</span> {objects.length}
-              </div>
-              <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
-                <span className="font-bold">Reservable:</span>{' '}
-                {objects.filter(o => o.properties?.reservable).length}
               </div>
               <div className="flex items-center gap-1.5 bg-white border-2 border-black px-3 py-1.5">
                 <span className="font-bold">Kitchen Areas:</span>{' '}
