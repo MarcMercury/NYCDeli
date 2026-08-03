@@ -55,8 +55,22 @@ function entranceEdges(t: FloorplanObjectRow): Edge[] {
   return []
 }
 
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, Math.max(1, max - 1)) + '…' : s
+// Split an occupant label into stacked lines (one word/name per line) so it
+// reads cleanly upright. Common separators (space, slash, ampersand, comma).
+function wrapLabel(label: string): string[] {
+  const words = label.split(/[\s/&,]+/).map(w => w.trim()).filter(Boolean)
+  return words.length > 0 ? words : [label]
+}
+
+// The horizontal footprint available for upright text depends on how the tent
+// is oriented. Tent layouts snap to orthogonal angles, so treat rotations near
+// 90°/270° as swapping the width/height that faces horizontal.
+function uprightExtent(t: FloorplanObjectRow): { availW: number; availH: number } {
+  const rot = ((t.rotation || 0) % 180 + 180) % 180
+  const swapped = rot > 45 && rot < 135
+  return swapped
+    ? { availW: t.height_ft, availH: t.width_ft }
+    : { availW: t.width_ft, availH: t.height_ft }
 }
 
 interface TentRow extends FloorplanObjectRow {
@@ -245,13 +259,10 @@ export default function TentMapPage() {
                   </g>
                 ))}
 
-                {/* Tents with entrance-direction markers */}
+                {/* Tents with entrance-direction markers (rotate with the tent) */}
                 {tents.map(t => {
                   const cx = t.x + t.width_ft / 2
                   const cy = t.y + t.height_ft / 2
-                  const nameSize = Math.max(1.6, Math.min(3, Math.min(t.width_ft, t.height_ft) * 0.26))
-                  const maxChars = Math.max(3, Math.floor(t.width_ft / (nameSize * 0.62)))
-                  const name = truncate(t.label || `Tent ${t.ref}`, maxChars)
                   const edges = entranceEdges(t)
                   return (
                     <g key={t.id} transform={t.rotation ? `rotate(${t.rotation} ${cx} ${cy})` : undefined}>
@@ -270,9 +281,42 @@ export default function TentMapPage() {
                         )
                       })}
                       <text x={t.x + 1} y={t.y + 3.5} fontSize={2.6} fill="#1e3a8a" fontWeight="bold">{t.ref}</text>
-                      <text x={cx} y={cy + nameSize * 0.35} fontSize={nameSize} textAnchor="middle" fill="#111827" fontWeight="bold">
-                        {name}
-                      </text>
+                    </g>
+                  )
+                })}
+
+                {/* Occupant names — always upright, sized to fit, drawn on top */}
+                {tents.map(t => {
+                  const cx = t.x + t.width_ft / 2
+                  const cy = t.y + t.height_ft / 2
+                  const lines = wrapLabel(t.label || `Tent ${t.ref}`)
+                  const maxLen = Math.max(...lines.map(l => l.length))
+                  const { availW, availH } = uprightExtent(t)
+                  // Fit both across (char width ≈ 0.60·font) and down (line height 1.15·font).
+                  const fsW = (availW * 0.92) / (maxLen * 0.6)
+                  const fsH = (availH * 0.9) / (lines.length * 1.15)
+                  const fs = Math.max(1.8, Math.min(6, fsW, fsH))
+                  const lineH = fs * 1.15
+                  const y0text = cy - (lines.length * lineH) / 2 + fs * 0.85
+                  return (
+                    <g key={t.id}>
+                      {lines.map((ln, i) => (
+                        <text
+                          key={i}
+                          x={cx}
+                          y={y0text + i * lineH}
+                          fontSize={fs}
+                          textAnchor="middle"
+                          fill="#111827"
+                          fontWeight="bold"
+                          stroke="#ffffff"
+                          strokeWidth={fs * 0.16}
+                          paintOrder="stroke"
+                          strokeLinejoin="round"
+                        >
+                          {ln}
+                        </text>
+                      ))}
                     </g>
                   )
                 })}
