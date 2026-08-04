@@ -35,24 +35,42 @@ interface Edge { x1: number; y1: number; x2: number; y2: number; nx: number; ny:
 
 // Entrance/opening edge(s) in the tent's local (unrotated) coords, so they
 // rotate with the tent group and point in the real on-ground direction.
+// Edge selection MUST mirror TentDetail in object-detail-svg.tsx so the
+// entrance markers here match exactly what the Layout Builder shows.
+type EdgeDir = 'top' | 'bottom' | 'left' | 'right'
 function entranceEdges(t: FloorplanObjectRow): Edge[] {
   const side = t.properties?.entrance_side
   if (!side) return []
   const w = t.width_ft, h = t.height_ft
-  const longVertical = h >= w
   const frac = 0.6
-  const longEdge = (): Edge =>
-    longVertical
-      ? { x1: t.x + w, y1: t.y + h / 2 - (h * frac) / 2, x2: t.x + w, y2: t.y + h / 2 + (h * frac) / 2, nx: 1, ny: 0 }
-      : { x1: t.x + w / 2 - (w * frac) / 2, y1: t.y + h, x2: t.x + w / 2 + (w * frac) / 2, y2: t.y + h, nx: 0, ny: 1 }
-  const shortEdge = (): Edge =>
-    longVertical
-      ? { x1: t.x + w / 2 - (w * frac) / 2, y1: t.y + h, x2: t.x + w / 2 + (w * frac) / 2, y2: t.y + h, nx: 0, ny: 1 }
-      : { x1: t.x + w, y1: t.y + h / 2 - (h * frac) / 2, x2: t.x + w, y2: t.y + h / 2 + (h * frac) / 2, nx: 1, ny: 0 }
-  if (side === 'length') return [longEdge()]
-  if (side === 'width') return [shortEdge()]
-  if (side === 'both') return [longEdge(), shortEdge()]
-  return []
+  const edgeFor = (dir: EdgeDir): Edge => {
+    switch (dir) {
+      case 'top':
+        return { x1: t.x + w / 2 - (w * frac) / 2, y1: t.y, x2: t.x + w / 2 + (w * frac) / 2, y2: t.y, nx: 0, ny: -1 }
+      case 'bottom':
+        return { x1: t.x + w / 2 - (w * frac) / 2, y1: t.y + h, x2: t.x + w / 2 + (w * frac) / 2, y2: t.y + h, nx: 0, ny: 1 }
+      case 'left':
+        return { x1: t.x, y1: t.y + h / 2 - (h * frac) / 2, x2: t.x, y2: t.y + h / 2 + (h * frac) / 2, nx: -1, ny: 0 }
+      case 'right':
+        return { x1: t.x + w, y1: t.y + h / 2 - (h * frac) / 2, x2: t.x + w, y2: t.y + h / 2 + (h * frac) / 2, nx: 1, ny: 0 }
+    }
+  }
+
+  // Same axis mapping as TentDetail: longer physical dimension is the "length".
+  const longIsVertical = h >= w
+  const longEdges: EdgeDir[] = longIsVertical ? ['left', 'right'] : ['top', 'bottom']
+  const shortEdges: EdgeDir[] = longIsVertical ? ['top', 'bottom'] : ['left', 'right']
+
+  const chosen = new Set<EdgeDir>()
+  if (side === 'length') longEdges.forEach(s => chosen.add(s))
+  else if (side === 'width') shortEdges.forEach(s => chosen.add(s))
+  else if (side === 'both') { longEdges.forEach(s => chosen.add(s)); shortEdges.forEach(s => chosen.add(s)) }
+
+  // Prefer long edges first, then short — identical ordering to TentDetail.
+  const ordered = [...longEdges, ...shortEdges].filter(s => chosen.has(s))
+  const count = t.properties?.entrance_count
+  const cap = typeof count === 'number' && count > 0 ? count : ordered.length
+  return ordered.slice(0, cap).map(edgeFor)
 }
 
 // Split an occupant label into stacked lines (one word/name per line) so it
