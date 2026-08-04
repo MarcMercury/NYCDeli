@@ -82,6 +82,7 @@ export interface CamperRow {
   sharing_tent_with_4: string | null
   sharing_tent_with_5: string | null
   is_admin: boolean
+  paid: boolean
   notes: string | null
 }
 
@@ -141,6 +142,7 @@ export interface CamperInsert {
   sharing_tent_with_4?: string | null
   sharing_tent_with_5?: string | null
   is_admin?: boolean
+  paid?: boolean
   notes?: string | null
 }
 
@@ -199,6 +201,7 @@ export interface CamperUpdate {
   sharing_tent_with_4?: string | null
   sharing_tent_with_5?: string | null
   is_admin?: boolean
+  paid?: boolean
   notes?: string | null
 }
 

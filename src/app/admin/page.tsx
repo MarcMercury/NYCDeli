@@ -20,7 +20,21 @@ interface UserWithCamper extends UserProfileRow {
   camper: Camper | null
 }
 
-type UserSortKey = 'name' | 'role' | 'status' | 'shelter' | 'sharing' | 'arrival' | 'lastLogin'
+type UserSortKey = 'name' | 'role' | 'status' | 'shelter' | 'sharing' | 'arrival' | 'lastLogin' | 'phone' | 'paid' | 'tent' | 'exit'
+
+/**
+ * A tent is "confirmed" once real dimensions have been entered — i.e. it has a
+ * positive length and width and isn't the default 11×11 placeholder footprint.
+ */
+function isTentConfirmed(c: Camper | null): boolean {
+  if (!c) return false
+  const l = Number(c.shelter_length_ft)
+  const w = Number(c.shelter_width_ft)
+  const h = c.shelter_height_ft == null ? 0 : Number(c.shelter_height_ft)
+  if (!(l > 0) || !(w > 0)) return false
+  if (l === 11 && w === 11 && h === 0) return false
+  return true
+}
 
 const tabs: Tab[] = [
   { id: 'campers', label: 'Campers & Users' },
@@ -174,6 +188,10 @@ export default function AdminPage() {
       }
       case 'arrival': return u.camper?.arrival_date || ''
       case 'lastLogin': return u.last_sign_in_at || ''
+      case 'phone': return u.camper?.phone || ''
+      case 'paid': return u.camper?.paid ? '1' : '0'
+      case 'tent': return isTentConfirmed(u.camper) ? '1' : '0'
+      case 'exit': return u.camper?.departure_date || ''
       default: return ''
     }
   }
@@ -204,6 +222,41 @@ export default function AdminPage() {
       setMessage({ type: 'success', text: 'Camper updated successfully' })
       fetchData()
     }
+  }
+
+  const togglePaid = async (camper: Camper, paid: boolean) => {
+    // Optimistic update so the checkbox responds immediately.
+    setCampers(prev => prev.map(c => (c.id === camper.id ? { ...c, paid } : c)))
+    setUsers(prev => prev.map(u => (u.camper?.id === camper.id ? { ...u, camper: { ...u.camper, paid } } : u)))
+    const result = await updateCamperAction(camper.id, { paid })
+    if (!result.success) {
+      setMessage({ type: 'error', text: result.error || 'Failed to update paid status' })
+      fetchData()
+    }
+  }
+
+  const exportUsersCsv = () => {
+    const headers = ['Name', 'Email', 'Number', 'Paid', 'Tent Confirmed', 'Arrival Date', 'Exit Date']
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const rows = sortedUsers.map(u => [
+      u.camper?.full_name || u.camper?.playa_name || '',
+      u.email || '',
+      u.camper?.phone || '',
+      u.camper?.paid ? 'Yes' : 'No',
+      isTentConfirmed(u.camper) ? 'Yes' : 'No',
+      u.camper?.arrival_date || '',
+      u.camper?.departure_date || '',
+    ].map(v => escape(String(v))).join(','))
+    const csv = [headers.map(escape).join(','), ...rows].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `campers-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const updateSetting = async (key: string, value: string) => {
@@ -1114,21 +1167,26 @@ export default function AdminPage() {
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>All Users & Campers ({filteredUsers.length})</CardTitle>
-                  <div className="flex gap-1 flex-wrap">
-                    {(['all', 'linked', 'unlinked', 'admin', 'builder', 'pending'] as const).map(f => (
-                      <button
-                        key={f}
-                        onClick={() => setUserFilter(f)}
-                        className={cn(
-                          "text-xs px-2 py-1 border-2 uppercase tracking-wider font-bold transition-colors",
-                          userFilter === f
-                            ? "bg-black text-white border-black"
-                            : "border-gray-300 text-gray-500 hover:border-black"
-                        )}
-                      >
-                        {f === 'linked' ? 'Has Profile' : f === 'unlinked' ? 'No Profile' : f}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex gap-1 flex-wrap">
+                      {(['all', 'linked', 'unlinked', 'admin', 'builder', 'pending'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setUserFilter(f)}
+                          className={cn(
+                            "text-xs px-2 py-1 border-2 uppercase tracking-wider font-bold transition-colors",
+                            userFilter === f
+                              ? "bg-black text-white border-black"
+                              : "border-gray-300 text-gray-500 hover:border-black"
+                          )}
+                        >
+                          {f === 'linked' ? 'Has Profile' : f === 'unlinked' ? 'No Profile' : f}
+                        </button>
+                      ))}
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={exportUsersCsv} title="Download the current list as a CSV">
+                      ⬇ Export CSV
+                    </Button>
                   </div>
                 </div>
                 <Input
@@ -1145,11 +1203,15 @@ export default function AdminPage() {
                       <tr>
                         {([
                           { key: 'name', label: 'Name / Email', className: '' },
+                          { key: 'phone', label: 'Number', className: 'hidden md:table-cell' },
                           { key: 'role', label: 'Role', className: 'hidden md:table-cell' },
+                          { key: 'paid', label: 'Paid', className: '' },
+                          { key: 'tent', label: 'Tent ✓', className: 'hidden sm:table-cell' },
                           { key: 'status', label: 'Status', className: 'hidden md:table-cell' },
                           { key: 'shelter', label: 'Shelter', className: 'hidden md:table-cell' },
                           { key: 'sharing', label: 'Sharing Tent With', className: 'hidden lg:table-cell' },
                           { key: 'arrival', label: 'Arrival', className: 'hidden lg:table-cell' },
+                          { key: 'exit', label: 'Exit', className: 'hidden lg:table-cell' },
                           { key: 'lastLogin', label: 'Last Login', className: 'hidden lg:table-cell' },
                         ] as const).map(col => (
                           <th key={col.key} className={cn('text-left p-3 font-bold uppercase tracking-wider', col.className)}>
@@ -1184,6 +1246,9 @@ export default function AdminPage() {
                             </p>
                             <p className="text-xs text-gray-500">{user.email}</p>
                           </td>
+                          <td className="p-3 hidden md:table-cell text-xs text-gray-600">
+                            {user.camper?.phone || '—'}
+                          </td>
                           <td className="p-3 hidden md:table-cell">
                             <Badge variant={
                               user.role === 'admin' ? 'error' :
@@ -1191,6 +1256,30 @@ export default function AdminPage() {
                             }>
                               {user.role}
                             </Badge>
+                          </td>
+                          <td className="p-3">
+                            {user.camper ? (
+                              <input
+                                type="checkbox"
+                                checked={!!user.camper.paid}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => togglePaid(user.camper!, e.target.checked)}
+                                className="h-4 w-4 cursor-pointer accent-black"
+                                title="Mark whether this camper has paid"
+                              />
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="p-3 hidden sm:table-cell">
+                            <input
+                              type="checkbox"
+                              checked={isTentConfirmed(user.camper)}
+                              readOnly
+                              disabled
+                              className="h-4 w-4 accent-black"
+                              title="Tent confirmed — checked when tent dimensions have been entered"
+                            />
                           </td>
                           <td className="p-3 hidden md:table-cell">
                             {user.camper ? (
@@ -1214,6 +1303,9 @@ export default function AdminPage() {
                           </td>
                           <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
                             {user.camper?.arrival_date || '—'}
+                          </td>
+                          <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
+                            {user.camper?.departure_date || '—'}
                           </td>
                           <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
                             {user.last_sign_in_at ? formatDate(user.last_sign_in_at) : '—'}
@@ -1316,7 +1408,7 @@ export default function AdminPage() {
                       ))}
                       {filteredUsers.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="p-8 text-center text-gray-500">
+                          <td colSpan={12} className="p-8 text-center text-gray-500">
                             No users matching your filters.
                           </td>
                         </tr>
