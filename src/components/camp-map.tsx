@@ -599,6 +599,8 @@ export function CampMap() {
                         width={objWidthPx}
                         height={objHeightPx}
                         color={obj.color}
+                        entranceCount={obj.properties?.entrance_count ?? null}
+                        entranceSide={obj.properties?.entrance_side ?? null}
                       />
 
                       {/* Shade structure support posts — corners + every 10 ft along the perimeter.
