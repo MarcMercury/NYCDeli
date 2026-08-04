@@ -346,6 +346,7 @@ export function FloorplanEditor() {
       z_index: defaultZIndex,
       is_locked: false,
       parent_id: null,
+      camper_ids: [],
       properties: template.defaultProperties as FloorplanObjectRow['properties'],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
