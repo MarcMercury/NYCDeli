@@ -236,12 +236,13 @@ export default function AdminPage() {
   }
 
   const exportUsersCsv = () => {
-    const headers = ['Name', 'Email', 'Number', 'Paid', 'Tent Confirmed', 'Arrival Date', 'Exit Date']
+    const headers = ['Name', 'Email', 'Number', 'Role', 'Paid', 'Tent Confirmed', 'Arrival Date', 'Exit Date']
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const rows = sortedUsers.map(u => [
       u.camper?.full_name || u.camper?.playa_name || '',
       u.email || '',
       u.camper?.phone || '',
+      u.role || '',
       u.camper?.paid ? 'Yes' : 'No',
       isTentConfirmed(u.camper) ? 'Yes' : 'No',
       u.camper?.arrival_date || '',
