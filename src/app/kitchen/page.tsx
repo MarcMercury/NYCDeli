@@ -278,6 +278,8 @@ export default function KitchenPage() {
   const [openingRanking, setOpeningRanking] = useState(false)
   // Admin editing state
   const [isAdmin, setIsAdmin] = useState(false)
+  // Whether the current user may see the Sign-Up Sheet & Draft tab (hidden from 'user' role)
+  const [canSeeDraft, setCanSeeDraft] = useState(false)
   const [adminEditing, setAdminEditing] = useState(false)
   const [editingCell, setEditingCell] = useState<{ catIdx: number; posIdx: number; field: 'role' | 'time' | 'description' } | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -359,6 +361,7 @@ export default function KitchenPage() {
           .eq('id', user.id)
           .single() as unknown as { data: { role: string } | null }
         setIsAdmin(profile?.role === 'admin')
+        setCanSeeDraft(profile?.role === 'admin' || profile?.role === 'builder')
       }
 
       // Load shift position overrides
@@ -623,8 +626,8 @@ export default function KitchenPage() {
           </div>
         )}
 
-        {/* Tabs */}
-        <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        {/* Tabs (Sign-Up Sheet & Draft hidden from 'user' role) */}
+        <Tabs tabs={canSeeDraft ? tabs : tabs.filter(t => t.id !== 'signup')} activeTab={activeTab} onChange={setActiveTab} />
 
         {/* Roles & Descriptions Tab */}
         <TabPanel tabId="roles" activeTab={activeTab}>
@@ -976,8 +979,8 @@ export default function KitchenPage() {
           </div>
         </TabPanel>
 
-        {/* Sign-Up Sheet & Draft Tab — Rankings */}
-        <TabPanel tabId="signup" activeTab={activeTab}>
+        {/* Sign-Up Sheet & Draft Tab — Rankings (hidden from 'user' role) */}
+        <TabPanel tabId="signup" activeTab={canSeeDraft ? activeTab : '__hidden__'}>
           <div className="space-y-6">
             {!draft && (
               <Alert variant="info">
