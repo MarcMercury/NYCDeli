@@ -942,7 +942,8 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Safety & Medical */}
+              {/* Safety & Medical — visible to admins only */}
+              {viewerRole === 'admin' && (
               <Card className="mb-6">
                 <CardHeader>
                   <CardTitle>Safety &amp; Medical</CardTitle>
@@ -981,6 +982,7 @@ export default function ProfilePage() {
                   />
                 </CardContent>
               </Card>
+              )}
 
               {/* About You */}
               <Card className="mb-6">
