@@ -1274,6 +1274,7 @@ export interface BuildMeetingRow {
   title: string
   subtitle: string
   primary_goal: string | null
+  canvas_md: string | null
   sort_order: number
   created_at: string
   updated_at: string

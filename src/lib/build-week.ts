@@ -883,6 +883,7 @@ export async function updateBuildMeeting(id: string, updates: {
   title?: string
   subtitle?: string
   primary_goal?: string | null
+  canvas_md?: string | null
 }): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase
