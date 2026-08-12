@@ -2300,7 +2300,7 @@ function ScheduleItemRow({
 
         {item.time_slot && (
           <span className="hidden sm:inline text-[10px] text-gray-400">
-            {item.time_slot === 'morning' ? '🌅 AM' : item.time_slot === 'afternoon' ? '☀️ PM' : '📆 All day'}
+            {item.time_slot === 'morning' ? '🌅 AM' : item.time_slot === 'afternoon' ? '☀️ PM' : item.time_slot === 'evening' ? '🌙 Evening' : '📆 All day'}
           </span>
         )}
 
@@ -2509,6 +2509,7 @@ function ScheduleItemForm({
               <option value="">Not specified</option>
               <option value="morning">Morning</option>
               <option value="afternoon">Afternoon</option>
+              <option value="evening">Evening</option>
               <option value="all_day">All Day</option>
             </select>
           </div>
