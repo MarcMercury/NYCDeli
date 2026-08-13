@@ -11,6 +11,7 @@ import ElectricalLoadTab from './electrical-load-tab'
 import LayoutSyncTab from './layout-sync-tab'
 import MeetingAgendasTab from './meeting-agendas-tab'
 import ShadeSchemaTab from './shade-schema-tab'
+import ShadeInstructionsSection from './shade-instructions-section'
 import {
   fetchBuildStagesWithGoals,
   fetchBuildResources,
@@ -1074,6 +1075,16 @@ export default function BuildWeekPage() {
                 </div>
               </div>
             </div>
+
+            {/* Printable erection instructions */}
+            <RefSection
+              title="Instructions"
+              icon="📋"
+              isOpen={!!expandedRef.shadeInstructions}
+              onToggle={() => toggleRef('shadeInstructions')}
+            >
+              <ShadeInstructionsSection />
+            </RefSection>
 
             {/* Structure Types */}
             <RefSection
