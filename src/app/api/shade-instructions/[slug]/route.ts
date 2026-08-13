@@ -1,32 +1,22 @@
 import { NextRequest } from 'next/server'
 import { requireAuthAPI } from '@/lib/auth'
-import { buildPdf } from '@/lib/pdf'
-import {
-  COMPLETE_SET_SLUG,
-  SHADE_INSTRUCTION_SHEETS,
-  getSheet,
-  pdfFileName,
-} from '@/lib/shade-instructions'
-
-const RUNNING_HEAD = 'NYC DELI RATS 2026 - SHADE STRUCTURE ERECTION'
+import { buildGuidePdf } from '@/lib/pdf'
+import { getShadeSheets } from '@/lib/shade-guide-art'
+import { COMPLETE_SET_SLUG, pdfFileName } from '@/lib/shade-instructions'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const auth = await requireAuthAPI()
   if (auth instanceof Response) return auth
 
   const { slug } = await params
+  const all = getShadeSheets()
+  const sheets = slug === COMPLETE_SET_SLUG ? all : all.filter(s => s.slug === slug)
 
-  const sheets =
-    slug === COMPLETE_SET_SLUG
-      ? SHADE_INSTRUCTION_SHEETS
-      : (() => {
-          const sheet = getSheet(slug)
-          return sheet ? [sheet] : null
-        })()
+  if (sheets.length === 0) {
+    return Response.json({ error: 'Unknown instruction sheet' }, { status: 404 })
+  }
 
-  if (!sheets) return Response.json({ error: 'Unknown instruction sheet' }, { status: 404 })
-
-  const bytes = buildPdf({ runningHead: RUNNING_HEAD, sheets })
+  const bytes = buildGuidePdf(sheets)
 
   return new Response(bytes as BodyInit, {
     headers: {
