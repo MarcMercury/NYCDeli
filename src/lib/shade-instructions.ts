@@ -64,58 +64,58 @@ export const SHADE_SHEET_TEXT: SheetText[] = [
   {
     slug: 'layout-marking',
     code: '2/6',
-    title: 'LAYOUT & MARKING — FIELD GUIDE 2/6',
-    subtitle: 'Flag the whole footprint before a pole leaves the pile',
-    summary: 'Baselines, squaring by diagonal, flagging every 10 ft, shared walls.',
+    title: 'SITE & SECTIONS — FIELD GUIDE 2/6',
+    subtitle: 'The corners are already flagged. Confirm the area, then build',
+    summary: 'Confirm the surveyed corners, find your section, stage inside the footprint.',
     panels: [
       {
-        title: 'Pull the baselines',
+        title: 'Confirm the corners',
         lines: [
-          'Run the 50 ft and 30 ft baselines off the camp frontage line.',
-          'Flag all four corners of the bay.',
+          'The survey crew has already flagged the corners. Walk them,',
+          'confirm they match the camp map, and trust them.',
         ],
       },
       {
-        title: 'Square the rectangle',
+        title: 'Find your section',
         lines: [
-          'Both diagonals must read 58 ft 4 in and match within 1 in.',
-          'Or use the 3-4-5 rule at full scale: 30-40-50 ft.',
+          '8 bays tiled 3 x 3 with one left open, about 150 ft x 90 ft.',
+          'Know which 50 ft x 30 ft section your crew owns before you start.',
         ],
       },
       {
-        title: 'Flag every 10 ft',
+        title: 'Spacing is built in',
         lines: [
-          'A flag at every post point: 6 per long wall, 4 per end wall.',
-          'Walk and flag every bay before assembling any of them.',
+          'No 10 ft flagging. Walls are assembled on the ground and the rail',
+          'lengths set the post spacing for you.',
         ],
       },
       {
         title: 'Shared walls, built once',
         lines: [
-          'Where two bays meet there is ONE wall and ONE set of poles.',
-          'The owning bay builds it. Do not stage a second set.',
+          'Where two sections meet there is ONE wall and ONE set of poles.',
+          'The owning section builds it. Do not stage a second set.',
         ],
       },
     ],
     checklist: [
-      'Four corners flagged',
-      'Both diagonals 58 ft 4 in',
-      'Post flag every 10 ft',
-      'Shared walls marked once',
+      'Four corners confirmed against the map',
+      'Section footprint walked and clear',
+      'Poles, rails, connectors staged inside',
+      'Shared walls assigned to one crew',
     ],
   },
   {
     slug: 'wall-assembly',
     code: '3/6',
-    title: 'WALL ASSEMBLY — FIELD GUIDE 3/6',
-    subtitle: 'Every joint is easier at knee height than overhead',
-    summary: 'Laying out a run, orienting fittings, set screws, base flanges.',
+    title: 'GROUND ASSEMBLY — FIELD GUIDE 3/6',
+    subtitle: 'Everything happens on the ground, including the straps',
+    summary: 'Laying out a run, orienting fittings, flanges, and pre-hanging every strap.',
     panels: [
       {
-        title: 'Lay the run out flat',
+        title: 'Lay the wall out flat',
         lines: [
-          'Verticals, top rails and the right connector at every node,',
-          'laid out on the ground in the order they go together.',
+          'Verticals, top rails and the right connector at every node.',
+          'The rail lengths set your post spacing - no measuring needed.',
         ],
       },
       {
@@ -126,70 +126,76 @@ export const SHADE_SHEET_TEXT: SheetText[] = [
         ],
       },
       {
-        title: 'Seat it, then set screw',
+        title: 'Seat it, screw it, flange it',
         lines: [
-          'Push the pipe fully home, then snug the set screw plus a firm',
-          'quarter turn. Do not strip it.',
+          'Pipe fully home, set screw snug plus a firm quarter turn,',
+          'base flange on the bottom of every vertical.',
         ],
       },
       {
-        title: 'Flange every vertical',
-        lines: ['Base flange on the bottom of every pole while the wall is still flat.'],
+        title: 'Pre-hang every strap',
+        lines: [
+          'Clip each ratchet strap to its top connector now and let the free',
+          'end hang loose. Straps get tensioned at the very end of the build.',
+        ],
       },
     ],
     checklist: [
       'Correct connector at every node',
       'All ports sighted and oriented',
-      'Every set screw snug + 1/4 turn',
-      'Flange on every vertical',
+      'Set screws snug + 1/4 turn',
+      'Straps hung, free ends loose',
     ],
   },
   {
     slug: 'raising',
     code: '4/6',
-    title: 'RAISING & SQUARING — FIELD GUIDE 4/6',
-    subtitle: 'Six people minimum. Nobody lets go until it is tied',
-    summary: 'Lifting walls, closing the box with end rails, plumb and diagonal check.',
+    title: 'RAISING THE L — FIELD GUIDE 4/6',
+    subtitle: 'Long wall, then a short wall - the L stands on its own',
+    summary: 'Long wall 4+2, short wall 3+1+ladder, then no holders needed.',
     panels: [
       {
-        title: 'Raise the first long wall',
+        title: 'Long wall: 4 lift, 2 hold',
         lines: [
-          'One lifter at every other pole, two people holding it plumb.',
-          'Nobody releases the wall until it is braced or tied.',
+          'Four lifters walk the long wall up, two hold it plumb.',
+          'Nobody lets go until the short wall is connected to it.',
         ],
       },
       {
-        title: 'Raise the opposite wall',
-        lines: ['Same crew, same call-out, same hold. Keep both walls plumb.'],
-      },
-      {
-        title: 'Close the box',
+        title: 'Short wall: 3 lift, 1 hold, 1 up',
         lines: [
-          'Walk the end-wall rails into the open ports and set-screw them.',
-          'Work end to end so tolerance does not stack up.',
+          'Three raise the short wall, one holds, one goes up the ladder and',
+          'connects the top corner into the long wall.',
         ],
       },
       {
-        title: 'Square and plumb',
+        title: 'The L is self-standing',
         lines: [
-          'Re-check both diagonals, plumb each corner, tap flanges onto',
-          'their marks. Only now tighten the last screws.',
+          'Once the corner is made the holders come off. Four keep raising,',
+          'two or three secure the joints, everyone else builds on the ground.',
+        ],
+      },
+      {
+        title: 'Follow behind with lag screws',
+        lines: [
+          'Spare hands lag the base flanges into the playa on any run whose',
+          'measurements are already verified.',
         ],
       },
     ],
     checklist: [
-      'Six-person lift, callout given',
-      'End rails seated both ends',
-      'Diagonals still matching',
-      'Corner posts plumb',
+      'Long wall up, held plumb',
+      'Top corner connected from the ladder',
+      'Holders released, L standing free',
+      'Verified flanges lagged down',
     ],
   },
   {
     slug: 'strapping',
     code: '5/6',
     title: 'STRAPPING & ANCHORS — FIELD GUIDE 5/6',
-    subtitle: 'The straps are the structure. The pipe is just the shape',
-    summary: 'Pyramid pattern per node type, strap technique, ground anchors.',
+    subtitle: 'Last job on the section - drop the hanging straps and tension',
+    summary: 'Pyramid pattern per node type, tensioning, ground anchors.',
     panels: [
       {
         title: 'Corner: 3-leg pyramid',
@@ -221,9 +227,9 @@ export const SHADE_SHEET_TEXT: SheetText[] = [
       },
     ],
     checklist: [
+      'Every hanging strap accounted for',
       'Webbing flat, no twists',
       'Firm tension, not maximum',
-      'Every tail rolled and tied',
       'Anchors 7 ft out at 45 deg',
     ],
   },

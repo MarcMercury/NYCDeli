@@ -206,65 +206,81 @@ const s1p4: Art = (d, b) => {
 // ───────────────────────── sheet 2: layout & marking ─────────────────────────
 
 const s2p1: Art = (d, b) => {
-  const r = fit(b, 50 / 30, 170, 22, 12)
+  const r = fit(b, 50 / 30, 168, 22, 16)
   bayPlan(d, r)
-  d.line(r.x - 16, r.y - 8, r.x + r.w + 16, r.y - 8, { stroke: C.ink, lw: 2.4 })
-  d.text(r.x + r.w / 2, r.y - 19, 'CAMP FRONTAGE LINE', {
-    size: 6.8,
-    font: 'bold',
-    align: 'center',
-  })
   for (const [fx, fy] of [
     [r.x, r.y],
     [r.x + r.w, r.y],
     [r.x, r.y + r.h],
     [r.x + r.w, r.y + r.h],
   ]) {
-    flagStake(d, fx, fy, C.red, 13)
+    flagStake(d, fx, fy, C.red, 14)
+    tick(d, fx, fy - 9, true)
   }
-  d.dimH(r.x, r.x + r.w, r.y + r.h + 12, "50'")
-  d.dimV(r.y, r.y + r.h, r.x - 15, "30'")
+  d.dimH(r.x, r.x + r.w, r.y + r.h / 2 + 8, "50'")
+  d.dimV(r.y, r.y + r.h, r.x - 16, "30'")
+  d.text(r.x + r.w / 2, r.y - 16, 'ALREADY PLACED BY THE SURVEY CREW', {
+    size: 7,
+    font: 'bold',
+    color: C.gray,
+    align: 'center',
+  })
 }
 
 const s2p2: Art = (d, b) => {
-  const r = fit(b, 50 / 30, 168, 18, 10)
-  bayPlan(d, r)
-  d.line(r.x, r.y, r.x + r.w, r.y + r.h, { stroke: C.red, lw: 1.3, dash: [4, 2.6] })
-  d.line(r.x, r.y + r.h, r.x + r.w, r.y, { stroke: C.red, lw: 1.3, dash: [4, 2.6] })
-  const w = 46
-  d.rect(r.x + r.w / 2 - w / 2, r.y + r.h / 2 - 6, w, 13, { fill: C.white, stroke: C.red, lw: 1 })
-  d.text(r.x + r.w / 2, r.y + r.h / 2 - 2.6, '58\' 4"', {
-    size: 8,
+  const r = fit(b, 150 / 90, 176, 20, 14)
+  const cw = r.w / 3
+  const ch = r.h / 3
+  const has = (cx: number, cy: number) => !(cx === 0 && cy === 2)
+  for (let cx = 0; cx < 3; cx++) {
+    for (let cy = 0; cy < 3; cy++) {
+      if (!has(cx, cy)) continue
+      const mine = cx === 1 && cy === 1
+      d.rect(r.x + cx * cw, r.y + r.h - (cy + 1) * ch, cw, ch, {
+        fill: mine ? C.sky : C.panelTint,
+        stroke: C.ink,
+        lw: mine ? 1.8 : 1,
+      })
+    }
+  }
+  d.text(r.x + cw * 1.5, r.y + r.h - ch * 1.5 - 3, 'YOUR', {
+    size: 6.6,
     font: 'bold',
-    color: C.red,
     align: 'center',
   })
-  tick(d, r.x + r.w + 14, r.y + r.h - 6, true)
-  d.text(r.x + r.w / 2, r.y - 14, 'BOTH DIAGONALS MUST MATCH WITHIN 1 IN', {
-    size: 6.8,
+  d.text(r.x + cw * 1.5, r.y + r.h - ch * 1.5 - 11, 'SECTION', {
+    size: 6.6,
     font: 'bold',
-    color: C.gray,
     align: 'center',
   })
+  d.text(r.x + cw / 2, r.y + ch / 2 - 4, 'OPEN', {
+    size: 7,
+    font: 'bold',
+    color: C.midGray,
+    align: 'center',
+  })
+  d.dimH(r.x, r.x + r.w, r.y - 13, "150'")
+  d.dimV(r.y, r.y + r.h, r.x - 15, "90'")
 }
 
 const s2p3: Art = (d, b) => {
-  const r = fit(b, 50 / 30, 168, 22, 10)
-  bayPlan(d, r)
+  const y = baseline(b, 60, 18) + 34
+  const x0 = b.x + 26
+  const w = Math.min(b.w - 66, 168)
+  ground(d, b.x + 8, b.x + b.w - 8, y - 34)
+  d.rect(x0, y - 2.5, w, 5, { fill: C.steel, radius: 1 })
   for (let i = 0; i <= 5; i++) {
-    const x = r.x + (r.w / 5) * i
-    flagStake(d, x, r.y + r.h, C.red, 11)
-    flagStake(d, x, r.y, C.orange, 11)
+    const x = x0 + (w / 5) * i
+    d.circle(x, y, 4, { fill: C.blue })
+    d.rect(x - 1.5, y - 26, 3, 24, { fill: C.steel })
   }
-  for (let i = 1; i <= 2; i++) {
-    const y = r.y + (r.h / 3) * i
-    flagStake(d, r.x, y, C.blue, 11)
-    flagStake(d, r.x + r.w, y, C.blue, 11)
-  }
-  d.dimH(r.x, r.x + r.w / 5, r.y - 13, "10'", C.red)
-  d.text(r.x + r.w / 2 + 20, r.y - 13, 'every post point gets a flag', {
+  d.dimH(x0, x0 + w / 5, y + 14, "10' RAIL", C.orange)
+  tick(d, b.x + b.w - 16, y + 12, true)
+  d.text(b.x + b.w / 2, b.y + 6, 'THE RAIL SETS THE SPACING - NO FLAGGING', {
     size: 7,
+    font: 'bold',
     color: C.gray,
+    align: 'center',
   })
 }
 
@@ -376,16 +392,19 @@ const s3p3: Art = (d, b) => {
 }
 
 const s3p4: Art = (d, b) => {
-  const cx = b.x + b.w / 2
   const h = Math.min(b.h - 46, 60)
-  const yBase = baseline(b, h + 16, 16)
-  ground(d, b.x + 16, b.x + b.w - 16, yBase)
-  d.rect(cx - 3, yBase, 6, h, { fill: C.steel })
-  d.rect(cx - 16, yBase - 5, 32, 6, { fill: C.ink, radius: 1.5 })
-  for (const dx of [-11, 11]) d.circle(cx + dx, yBase - 2, 1.8, { fill: C.white })
-  flagStake(d, cx + 34, yBase, C.red, 12)
-  d.text(cx + 44, yBase + 2, 'flag mark', { size: 7, color: C.gray })
-  d.text(cx, b.y + 8, 'FLANGE LANDS ON THE FLAG, NOT NEAR IT', {
+  const yBase = baseline(b, h + 20, 16)
+  const cx = b.x + b.w * 0.4
+  ground(d, b.x + 12, b.x + b.w - 12, yBase)
+  poleElev(d, cx, yBase, h, C.blue)
+  d.line(cx, yBase + h, cx + 30, yBase + h, { stroke: C.steel, lw: 3.4 })
+  // Strap clipped at the top connector, free end hanging loose
+  d.line(cx + 3, yBase + h - 2, cx + 9, yBase + h * 0.42, { stroke: C.orange, lw: 2 })
+  d.rect(cx + 6, yBase + h * 0.3, 13, 9, { fill: C.ink, radius: 1.5 })
+  d.line(cx + 12, yBase + h * 0.3, cx + 15, yBase + 6, { stroke: C.orange, lw: 2 })
+  d.circle(cx + 17, yBase + 5, 5, { stroke: C.orange, lw: 2 })
+  badgeText(d, b.x + b.w - 74, yBase + h - 6, 'TENSION LATER', C.orange)
+  d.text(b.x + b.w / 2, b.y + 6, 'FREE END HANGS LOOSE THROUGH THE LIFT', {
     size: 7,
     font: 'bold',
     color: C.gray,
@@ -393,33 +412,61 @@ const s3p4: Art = (d, b) => {
   })
 }
 
-// ───────────────────────── sheet 4: raising ─────────────────────────
+// ───────────────────────── sheet 4: raising the L ─────────────────────────
+
+/** Wall drawn receding to the upper right, for the axonometric L. */
+function wallAxo(
+  d: Draw,
+  x0: number,
+  y0: number,
+  dx: number,
+  dy: number,
+  count: number,
+  h: number,
+  cap: RGB
+) {
+  for (let i = 0; i < count; i++) {
+    const x = x0 + (dx / (count - 1)) * i
+    const y = y0 + (dy / (count - 1)) * i
+    d.rect(x - 1.8, y, 3.6, h, { fill: C.steel })
+    d.rect(x - 5, y - 2.5, 10, 3, { fill: C.ink })
+    d.circle(x, y + h, 3.2, { fill: cap })
+  }
+  d.line(x0, y0 + h, x0 + dx, y0 + dy + h, { stroke: C.steel, lw: 3 })
+}
 
 const s4p1: Art = (d, b) => {
-  const yBase = baseline(b, 92, 16)
+  const yBase = baseline(b, 96, 16)
   ground(d, b.x + 8, b.x + b.w - 8, yBase)
-  const x0 = b.x + 30
-  const len = Math.min(b.w - 60, 150)
-  const ang = (38 * Math.PI) / 180
+  const x0 = b.x + 34
+  const len = Math.min(b.w - 74, 148)
+  const ang = (40 * Math.PI) / 180
   d.line(x0, yBase, x0 + Math.cos(ang) * len, yBase + Math.sin(ang) * len, {
     stroke: C.steel,
     lw: 5,
   })
   for (let i = 1; i <= 3; i++) {
     const t = (i / 4) * len
-    const px = x0 + Math.cos(ang) * t
-    const py = yBase + Math.sin(ang) * t
-    d.line(px, py, px + 10, py - 22, { stroke: C.steel, lw: 3 })
+    d.line(
+      x0 + Math.cos(ang) * t,
+      yBase + Math.sin(ang) * t,
+      x0 + Math.cos(ang) * t + 9,
+      yBase + Math.sin(ang) * t - 20,
+      { stroke: C.steel, lw: 3 }
+    )
   }
-  d.arrow(x0 + len * 0.92, yBase + 8, x0 + len * 0.78, yBase + len * 0.72, {
+  d.arrow(x0 + len * 0.9, yBase + 10, x0 + len * 0.76, yBase + len * 0.7, {
     stroke: C.red,
     lw: 1.6,
     head: 5,
   })
-  figure(d, b.x + 26, yBase, 30, C.red)
-  figure(d, b.x + 62, yBase, 30, C.orange)
-  figure(d, b.x + 98, yBase, 30, C.green)
-  d.text(b.x + b.w / 2, b.y + 8, 'ONE LIFTER AT EVERY OTHER POLE', {
+  const shirts: RGB[] = [C.red, C.red, C.red, C.red, C.blue, C.blue]
+  shirts.forEach((shirt, i) => {
+    figure(d, b.x + 22 + i * 20, yBase, 26, shirt)
+  })
+  badgeText(d, b.x + 18, yBase + 30, '4 LIFT', C.red)
+  badgeText(d, b.x + 100, yBase + 30, '2 HOLD', C.blue)
+  d.text(b.x + b.w / 2, b.y + 4, 'NOBODY LETS GO UNTIL THE CORNER IS MADE', {
     size: 7,
     font: 'bold',
     color: C.gray,
@@ -428,22 +475,38 @@ const s4p1: Art = (d, b) => {
 }
 
 const s4p2: Art = (d, b) => {
-  const h = Math.min(b.h - 46, 62)
-  const yBase = baseline(b, h + 14, 16)
+  const h = Math.min(b.h - 52, 56)
+  const yBase = baseline(b, h + 34, 16)
   ground(d, b.x + 8, b.x + b.w - 8, yBase)
-  const drawWall = (x0: number, w: number) => {
-    for (let i = 0; i <= 3; i++) poleElev(d, x0 + (w / 3) * i, yBase, h, C.blue)
-    d.rect(x0 - 3, yBase + h - 2, w + 6, 4, { fill: C.steel })
-  }
-  drawWall(b.x + 24, b.w * 0.32)
-  drawWall(b.x + b.w * 0.52, b.w * 0.32)
-  d.arrow(b.x + 24 + b.w * 0.34, yBase + h * 0.55, b.x + b.w * 0.5, yBase + h * 0.55, {
-    stroke: C.red,
-    lw: 1.3,
-    dash: [3, 2],
-    heads: 'both',
+  // Standing long wall on the left
+  const lx = b.x + 26
+  for (let i = 0; i < 3; i++) poleElev(d, lx + i * 22, yBase, h, C.blue)
+  d.rect(lx - 3, yBase + h - 2, 47, 4, { fill: C.steel })
+  // Short wall coming up at an angle
+  const sx = lx + 44
+  const ang = (55 * Math.PI) / 180
+  const len = Math.min(b.w - 130, 74)
+  d.line(sx, yBase, sx + Math.cos(ang) * len, yBase + Math.sin(ang) * len, {
+    stroke: C.steel,
+    lw: 4.5,
   })
-  d.text(b.x + b.w / 2, b.y + 8, 'BOTH LONG WALLS UP AND HELD PLUMB', {
+  d.arrow(sx + 34, yBase + 12, sx + 26, yBase + 44, { stroke: C.red, lw: 1.5, head: 4.6 })
+  // Ladder at the corner
+  const ldx = sx + 52
+  d.line(ldx, yBase, ldx + 8, yBase + h + 6, { stroke: C.ink, lw: 1.6 })
+  d.line(ldx + 12, yBase, ldx + 20, yBase + h + 6, { stroke: C.ink, lw: 1.6 })
+  for (let i = 1; i <= 4; i++) {
+    const t = i / 5
+    d.line(ldx + 8 * t, yBase + (h + 6) * t, ldx + 12 + 8 * t, yBase + (h + 6) * t, {
+      stroke: C.ink,
+      lw: 1.2,
+    })
+  }
+  figure(d, ldx + 16, yBase + h - 16, 22, C.green)
+  badgeText(d, b.x + 10, yBase + h + 14, '3 LIFT', C.red)
+  badgeText(d, b.x + 58, yBase + h + 14, '1 HOLD', C.blue)
+  badgeText(d, b.x + 108, yBase + h + 14, '1 UP TOP', C.green)
+  d.text(b.x + b.w / 2, b.y + 4, 'LADDER HAND MAKES THE TOP CORNER', {
     size: 7,
     font: 'bold',
     color: C.gray,
@@ -452,35 +515,45 @@ const s4p2: Art = (d, b) => {
 }
 
 const s4p3: Art = (d, b) => {
-  const r = fit(b, 50 / 30, 168, 20, 10)
-  bayPlan(d, r, { posts: true })
-  d.arrow(r.x - 26, r.y + r.h / 2, r.x - 4, r.y + r.h / 2, { stroke: C.red, lw: 1.6, head: 5 })
-  d.arrow(r.x + r.w + 26, r.y + r.h / 2, r.x + r.w + 4, r.y + r.h / 2, {
-    stroke: C.red,
-    lw: 1.6,
-    head: 5,
-  })
-  d.line(r.x, r.y, r.x, r.y + r.h, { stroke: C.red, lw: 2.6 })
-  d.line(r.x + r.w, r.y, r.x + r.w, r.y + r.h, { stroke: C.red, lw: 2.6 })
-  d.text(r.x + r.w / 2, r.y + r.h / 2 - 3, 'END RAILS IN LAST', {
-    size: 7.4,
-    font: 'bold',
-    color: C.red,
-    align: 'center',
+  const h = Math.min(b.h - 56, 48)
+  const yBase = baseline(b, h + 40, 16)
+  ground(d, b.x + 8, b.x + b.w - 8, yBase)
+  const cornerX = b.x + b.w * 0.36
+  const depth = Math.min(b.w * 0.34, 92)
+  d.line(cornerX, yBase, cornerX + depth, yBase + 30, { stroke: C.midGray, lw: 0.9, dash: [3, 2] })
+  wallAxo(d, cornerX, yBase, -Math.min(b.w * 0.3, 84), 0, 4, h, C.blue)
+  wallAxo(d, cornerX, yBase, depth, 30, 3, h, C.blue)
+  d.circle(cornerX, yBase + h, 4.6, { fill: C.green })
+  badgeText(d, b.x + b.w - 92, yBase + h + 22, 'NO HOLDERS NEEDED', C.green)
+  const notes = ['4 keep raising', '2-3 secure joints', 'rest build on ground']
+  notes.forEach((t, i) => {
+    d.circle(b.x + 12, yBase - 12 - i * 0, 0, {})
+    d.text(b.x + 10 + i * (b.w / 3), b.y + 4, t, { size: 6.8, font: 'bold', color: C.gray })
   })
 }
 
 const s4p4: Art = (d, b) => {
-  const r = fit(b, 50 / 30, 150, 20, 10)
-  bayPlan(d, r)
-  d.line(r.x, r.y, r.x + r.w, r.y + r.h, { stroke: C.red, lw: 1.2, dash: [4, 2.6] })
-  d.line(r.x, r.y + r.h, r.x + r.w, r.y, { stroke: C.red, lw: 1.2, dash: [4, 2.6] })
-  tick(d, r.x + r.w / 2, r.y + r.h / 2, true)
-  const px = r.x + r.w + 34
-  d.rect(px - 2.5, r.y, 5, r.h, { fill: C.steel })
-  d.line(px + 12, r.y + r.h, px + 12, r.y, { stroke: C.blue, lw: 1, dash: [3, 2] })
-  d.circle(px + 12, r.y + 4, 3, { fill: C.blue })
-  d.text(px + 18, r.y + r.h / 2, 'plumb', { size: 7, font: 'bold', color: C.blue })
+  const yBase = baseline(b, 66, 16)
+  ground(d, b.x + 14, b.x + b.w - 14, yBase)
+  const cx = b.x + b.w * 0.36
+  d.rect(cx - 3, yBase, 6, Math.min(b.h - 50, 50), { fill: C.steel })
+  d.rect(cx - 17, yBase - 5, 34, 6, { fill: C.ink, radius: 1.5 })
+  for (const dx of [-12, 12]) {
+    d.circle(cx + dx, yBase - 2, 2, { fill: C.orange })
+    d.line(cx + dx, yBase - 2, cx + dx, yBase - 13, { stroke: C.orange, lw: 2.2 })
+  }
+  // Impact driver
+  const dxr = cx + 44
+  d.rect(dxr, yBase + 4, 26, 13, { fill: C.red, radius: 2 })
+  d.rect(dxr + 6, yBase - 10, 11, 15, { fill: C.ink, radius: 2 })
+  d.line(dxr, yBase + 10, dxr - 16, yBase + 10, { stroke: C.steel, lw: 2.4 })
+  tick(d, b.x + b.w - 20, yBase + 26, true)
+  d.text(b.x + b.w / 2, b.y + 4, 'ONLY LAG RUNS WITH VERIFIED MEASUREMENTS', {
+    size: 7,
+    font: 'bold',
+    color: C.gray,
+    align: 'center',
+  })
 }
 
 // ───────────────────────── sheet 5: strapping ─────────────────────────
@@ -737,30 +810,30 @@ const SIDEBARS: Record<string, GuideSheet['sidebar']> = {
     ],
   },
   'layout-marking': {
-    heading: '4-PERSON CREW',
+    heading: 'BEFORE YOU BUILD',
     items: [
-      { badge: '1', color: C.red, title: 'Tape lead', lines: ['Pulls and holds the long baseline.'] },
-      { badge: '2', color: C.orange, title: 'Tape tail', lines: ['Holds the far end, keeps it tight.'] },
-      { badge: '3', color: C.green, title: 'Diagonal', lines: ['Checks 58 ft 4 in on both diagonals.'] },
-      { badge: '4', color: C.blue, title: 'Flagger', lines: ['Places a flag at every 10 ft post point.'] },
+      { badge: '1', color: C.red, title: 'Corners', lines: ['Walk all four survey flags, confirm against the map.'] },
+      { badge: '2', color: C.orange, title: 'Section', lines: ['Know which 50 x 30 you own and who owns the shared wall.'] },
+      { badge: '3', color: C.green, title: 'Staging', lines: ['Poles, rails, connectors and straps inside the footprint.'] },
+      { badge: '4', color: C.blue, title: 'Ground clear', lines: ['Nothing to trip a lift crew walking a wall up.'] },
     ],
   },
   raising: {
-    heading: '6-PERSON LIFT',
+    heading: '8-PERSON CREW',
     items: [
-      { badge: '1', color: C.red, title: 'Caller', lines: ['Owns the plan, calls the lift out loud.'] },
-      { badge: '2', color: C.orange, title: 'Lifters x4', lines: ['One at every other pole, lift together.'] },
-      { badge: '3', color: C.blue, title: 'Holders x2', lines: ['Hold plumb until the wall is tied.'] },
-      { badge: '4', color: C.green, title: 'Rail runner', lines: ['Walks end rails into the open ports.'] },
+      { badge: '4', color: C.red, title: 'Lifters', lines: ['Walk up the long wall, then every wall after it.'] },
+      { badge: '2', color: C.blue, title: 'Holders', lines: ['Hold plumb until the L closes, then rejoin the build.'] },
+      { badge: '1', color: C.green, title: 'Ladder hand', lines: ['Goes up and connects the top corner.'] },
+      { badge: '1', color: C.orange, title: 'Follower', lines: ['Lags verified flanges, keeps ground assembly moving.'] },
     ],
   },
   strapping: {
     heading: 'STRAP RULES',
     items: [
-      { badge: '1', color: C.red, title: 'Flat webbing', lines: ['A twist costs about half the strength.'] },
-      { badge: '2', color: C.orange, title: 'Firm, not max', lines: ['Over-cranking bows EMT and cracks fittings.'] },
-      { badge: '3', color: C.green, title: 'Dress the tail', lines: ['Roll and tie every tail or it becomes MOOP.'] },
-      { badge: '4', color: C.blue, title: 'Inspect', lines: ['Retire any strap that is frayed or faded.'] },
+      { badge: '1', color: C.red, title: 'Already hung', lines: ['Every strap went on during ground assembly.'] },
+      { badge: '2', color: C.orange, title: 'Flat webbing', lines: ['A twist costs about half the strength.'] },
+      { badge: '3', color: C.green, title: 'Firm, not max', lines: ['Over-cranking bows EMT and cracks fittings.'] },
+      { badge: '4', color: C.blue, title: 'Dress the tail', lines: ['Roll and tie every tail or it becomes MOOP.'] },
     ],
   },
 }
