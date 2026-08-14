@@ -42,6 +42,7 @@ interface GridCanvasProps {
       entranceCount?: number | null
       openingSide?: 'length' | 'width' | 'both' | null
       tentMakeModel?: string | null
+      isRV?: boolean
       isPrivileged?: boolean
       camperIds?: string[]
     },
@@ -213,6 +214,7 @@ export function GridCanvas({
           entranceCount: data.entranceCount ?? null,
           openingSide: data.openingSide ?? null,
           tentMakeModel: data.tentMakeModel ?? null,
+          isRV: data.isRV ?? false,
           isPrivileged: data.isPrivileged ?? false,
           camperIds: data.camperIds ?? [],
         })

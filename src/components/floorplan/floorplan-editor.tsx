@@ -190,6 +190,7 @@ export function FloorplanEditor() {
       entranceCount?: number | null
       openingSide?: 'length' | 'width' | 'both' | null
       tentMakeModel?: string | null
+      isRV?: boolean
       isPrivileged?: boolean
       camperIds?: string[]
     },
@@ -206,6 +207,7 @@ export function FloorplanEditor() {
       ...(meta?.entranceCount != null ? { entrance_count: meta.entranceCount } : {}),
       ...(meta?.openingSide ? { entrance_side: meta.openingSide } : {}),
       ...(meta?.tentMakeModel ? { tent_make_model: meta.tentMakeModel } : {}),
+      ...(meta?.isRV ? { is_rv: true, elevation_ft: 11, roof_shape: 'flat' as const } : {}),
     }
 
     const newObj: FloorplanObjectRow = {
@@ -261,7 +263,7 @@ export function FloorplanEditor() {
         label,
         width: widthFt,
         height: heightFt,
-        isRV: false,
+        isRV: meta?.isRV ?? false,
         isPrivileged: meta?.isPrivileged ?? false,
         camperNames: [],
         camperIds: meta?.camperIds ?? [],

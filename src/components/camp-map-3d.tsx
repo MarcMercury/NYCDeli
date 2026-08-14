@@ -697,11 +697,27 @@ interface TentStyleProps {
   backDoor: boolean
 }
 
+// Campers sleeping in an RV/vehicle still get an `object_type: 'tent'` object,
+// so detect them from the persisted flag, the "(RV)" label, or the make/model.
+function isRVShelter(obj: FloorplanObjectRow): boolean {
+  if (obj.properties?.is_rv) return true
+  const text = `${obj.label ?? ''} ${obj.properties?.tent_make_model ?? ''}`.toLowerCase()
+  return /\brv\b|\brvs\b|motor\s?home|camper\s?van|campervan|winnebago|airstream|sprinter|travel\s?trailer|fifth\s?wheel|box\s?truck/.test(text)
+}
+
 // ─── Tent (brand-aware dispatcher) ──────────────────────────
 function Tent3D({ obj, widthM, depthM, heightM, color }: { obj: FloorplanObjectRow; widthM: number; depthM: number; heightM: number; color: string }) {
-  const style = classifyTentStyle(obj.properties?.tent_make_model)
   const entranceCount = obj.properties?.entrance_count ?? 1
   const backDoor = entranceCount >= 2 || obj.properties?.entrance_side === 'both'
+
+  // RV/camper shelters render as the same motorhome model as a placed RV object
+  // instead of a tent silhouette.
+  if (isRVShelter(obj)) {
+    const rvHeightM = Math.max(heightM, Math.min(widthM, depthM) * 1.25)
+    return <RV3D widthM={widthM} depthM={depthM} heightM={rvHeightM} color={color} />
+  }
+
+  const style = classifyTentStyle(obj.properties?.tent_make_model)
   // Floor the height so small tents aren't rendered as flat pancakes — a real
   // tent stands a meaningful fraction of its footprint tall.
   const effHeightM = Math.max(heightM, Math.min(widthM, depthM) * 0.72)

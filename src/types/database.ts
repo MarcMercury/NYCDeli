@@ -823,6 +823,8 @@ export interface FloorplanObjectProperties {
   entrance_side?: 'length' | 'width' | 'both'
   /** Tent-only: free-text make/model copied from camper profile */
   tent_make_model?: string
+  /** Tent-only: the camper group sleeps in an RV/vehicle, so render it as an RV */
+  is_rv?: boolean
   road_name?: string
   needs_pumpout?: boolean
   has_generator?: boolean

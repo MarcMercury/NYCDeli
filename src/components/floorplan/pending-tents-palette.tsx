@@ -25,6 +25,7 @@ export function PendingTentsPalette({ tents, onRemove, onClear }: PendingTentsPa
         entranceCount: tent.entranceCount,
         openingSide: tent.openingSide,
         tentMakeModel: tent.tentMakeModel,
+        isRV: tent.isRV,
         isPrivileged: tent.isPrivileged,
         camperIds: tent.camperIds,
       }),
