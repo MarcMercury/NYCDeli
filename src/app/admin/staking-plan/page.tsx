@@ -9,7 +9,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { fetchActiveFloorplan, fetchFloorplanObjects, fetchUtilityLines } from '@/lib/floorplan'
+import {
+  fetchActiveFloorplan,
+  fetchFloorplanObjects,
+  fetchUtilityLines,
+  updateFloorplan,
+} from '@/lib/floorplan'
 import { OBJECT_TEMPLATES } from '@/components/floorplan/object-templates'
 import type { FloorplanConfigRow, FloorplanObjectRow, UtilityLineRow } from '@/types/database'
 
@@ -119,6 +124,10 @@ export default function StakingPlanPage() {
   const [loading, setLoading] = useState(true)
   // Which object ids are included on the plan. null = not yet initialised.
   const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null)
+  // Last selection persisted to the floorplan; null = nothing saved yet.
+  const [savedIds, setSavedIds] = useState<string[] | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(true)
 
   useEffect(() => {
@@ -137,8 +146,17 @@ export default function StakingPlanPage() {
       setConfig(fp)
       setObjects(objs)
       setLines(uls)
-      // Default selection: every stakeable (non-excluded) object.
-      setSelectedIds(new Set(objs.filter(o => !EXCLUDED_TYPES.has(o.object_type)).map(o => o.id)))
+      const stakeableIds = objs.filter(o => !EXCLUDED_TYPES.has(o.object_type)).map(o => o.id)
+      const saved = fp.staking_plan_selection
+      if (saved) {
+        // Drop ids for objects that no longer exist on the layout.
+        const kept = saved.filter(id => stakeableIds.includes(id))
+        setSelectedIds(new Set(kept))
+        setSavedIds(kept)
+      } else {
+        // Default selection: every stakeable (non-excluded) object.
+        setSelectedIds(new Set(stakeableIds))
+      }
       setLoading(false)
     })()
     return () => {
@@ -185,6 +203,21 @@ export default function StakingPlanPage() {
       else next.add(id)
       return next
     })
+
+  const dirty =
+    savedIds === null || savedIds.length !== sel.size || savedIds.some(id => !sel.has(id))
+
+  const savePlan = async () => {
+    setSaving(true)
+    setSaveError(null)
+    const ids = stakeable.filter(o => sel.has(o.id)).map(o => o.id)
+    const updated = await updateFloorplan(config.id, { staking_plan_selection: ids })
+    if (updated) setSavedIds(ids)
+    else setSaveError('Could not save — check your connection and try again.')
+    setSaving(false)
+  }
+
+  const revertPlan = () => setSelectedIds(new Set(savedIds ?? stakeable.map(o => o.id)))
 
   // Selected objects, renumbered 1..n in reading order so refs match the sheet.
   const placed: Placed[] = stakeable
@@ -250,8 +283,26 @@ export default function StakingPlanPage() {
               <button onClick={selectAll} className="font-bold underline">All</button>
               <button onClick={selectNone} className="font-bold underline">None</button>
               <button onClick={selectLargeOnly} className="font-bold underline">Large / delivered only</button>
+              {dirty && savedIds !== null && (
+                <button onClick={revertPlan} className="font-bold underline">Revert</button>
+              )}
+              <button
+                onClick={savePlan}
+                disabled={saving || !dirty}
+                className="font-black uppercase tracking-wider px-3 py-1 border-2 border-black bg-black text-white disabled:bg-gray-200 disabled:text-gray-500 disabled:border-gray-300"
+              >
+                {saving ? 'Saving…' : dirty ? 'Save plan' : '✓ Saved'}
+              </button>
             </div>
           </div>
+          {saveError && (
+            <p className="px-3 pt-2 text-[11px] font-bold text-red-600">{saveError}</p>
+          )}
+          {dirty && savedIds !== null && !saveError && (
+            <p className="px-3 pt-2 text-[11px] font-bold text-yellow-700">
+              Unsaved changes — click Save plan to keep this selection.
+            </p>
+          )}
           {pickerOpen && (
             <>
               <p className="px-3 pt-2 text-[11px] text-gray-600">

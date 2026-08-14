@@ -855,6 +855,8 @@ export interface FloorplanConfigRow {
   contact_email: string | null
   contact_phone: string | null
   layout_version: number
+  /** Object ids saved on the printable staking plan. null = never saved. */
+  staking_plan_selection: string[] | null
   created_at: string
   updated_at: string
 }
@@ -876,6 +878,7 @@ export interface FloorplanConfigInsert {
   contact_email?: string | null
   contact_phone?: string | null
   layout_version?: number
+  staking_plan_selection?: string[] | null
 }
 
 export interface FloorplanConfigUpdate {
@@ -895,6 +898,7 @@ export interface FloorplanConfigUpdate {
   contact_email?: string | null
   contact_phone?: string | null
   layout_version?: number
+  staking_plan_selection?: string[] | null
 }
 
 export interface FloorplanObjectRow {
