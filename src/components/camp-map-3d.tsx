@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useRef, useEffect, useMemo, Suspense } from 'react'
+import React, { useRef, useEffect, useMemo, useContext, createContext, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html, ContactShadows, Text } from '@react-three/drei'
+import { OrbitControls, useGLTF, Html, ContactShadows, Text, RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import type { FloorplanConfigRow, FloorplanObjectRow, RoofShape } from '@/types/database'
 import { computeShadePosts, type ShadePost } from '@/lib/shade-posts'
@@ -31,6 +31,360 @@ function getDefaultElevation(type: string): number {
 function getObjectElevation(obj: FloorplanObjectRow): number {
   if (typeof obj.properties?.elevation_ft === 'number') return obj.properties.elevation_ft
   return getDefaultElevation(obj.object_type)
+}
+
+type V3 = [number, number, number]
+
+// Dense scenes drop the micro-detail (guy lines, stakes, seams) so draw calls
+// stay bounded on big camps and low-end GPUs.
+const HighDetailContext = createContext(true)
+const useHighDetail = () => useContext(HighDetailContext)
+
+// ─── Shared procedural textures ────────────────────────────────
+// Everything below is generated once in the browser on first 3D open. No image
+// downloads, no added bundle weight — surface detail is effectively free at
+// load time and the resulting textures are shared by every material.
+
+function makeRng(seed: number) {
+  let s = seed >>> 0
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0
+    return s / 4294967296
+  }
+}
+
+let _fabricTex: THREE.Texture | null = null
+function getFabricTexture(): THREE.Texture | undefined {
+  if (typeof document === 'undefined') return undefined
+  if (_fabricTex) return _fabricTex
+  const S = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = S
+  const ctx = canvas.getContext('2d')!
+  const img = ctx.createImageData(S, S)
+  const rnd = makeRng(9137)
+  for (let i = 0; i < S * S; i++) {
+    const x = i % S
+    const y = (i / S) | 0
+    // Over-under weave plus fibre noise → micro roughness variation.
+    const weave = ((x >> 1) & 1) === ((y >> 1) & 1) ? 14 : -14
+    const v = Math.max(0, Math.min(255, 176 + weave + (rnd() - 0.5) * 30))
+    const o = i * 4
+    img.data[o] = img.data[o + 1] = img.data[o + 2] = v
+    img.data[o + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(10, 10)
+  _fabricTex = tex
+  return tex
+}
+
+let _playaTex: THREE.Texture | null = null
+function getPlayaTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null
+  if (_playaTex) return _playaTex
+  const S = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = S
+  const ctx = canvas.getContext('2d')!
+  const rnd = makeRng(20260814)
+
+  ctx.fillStyle = '#e0cfa6'
+  ctx.fillRect(0, 0, S, S)
+
+  // Draw every feature nine times (3×3 offsets) so the tile repeats seamlessly.
+  const tiled = (draw: () => void) => {
+    for (let ox = -S; ox <= S; ox += S) {
+      for (let oy = -S; oy <= S; oy += S) {
+        ctx.save()
+        ctx.translate(ox, oy)
+        draw()
+        ctx.restore()
+      }
+    }
+  }
+
+  // Tonal mottling — compacted vs. loose dust.
+  for (let i = 0; i < 60; i++) {
+    const x = rnd() * S
+    const y = rnd() * S
+    const r = 25 + rnd() * 70
+    const light = rnd() > 0.5
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r)
+    grad.addColorStop(0, light ? 'rgba(255,247,225,0.30)' : 'rgba(148,126,90,0.22)')
+    grad.addColorStop(1, 'rgba(0,0,0,0)')
+    tiled(() => {
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  // Cracked-playa polygon network: link each seed to its nearest neighbours.
+  const pts: Array<[number, number]> = []
+  for (let i = 0; i < 110; i++) pts.push([rnd() * S, rnd() * S])
+  ctx.lineCap = 'round'
+  for (const p of pts) {
+    const near = pts
+      .filter(q => q !== p)
+      .map(q => ({ q, d: Math.hypot(q[0] - p[0], q[1] - p[1]) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 3)
+    for (const { q, d } of near) {
+      if (d > S * 0.16) continue
+      const cx = (p[0] + q[0]) / 2 + (rnd() - 0.5) * 8
+      const cy = (p[1] + q[1]) / 2 + (rnd() - 0.5) * 8
+      tiled(() => {
+        ctx.strokeStyle = 'rgba(116,96,66,0.34)'
+        ctx.lineWidth = 1.1
+        ctx.beginPath()
+        ctx.moveTo(p[0], p[1])
+        ctx.quadraticCurveTo(cx, cy, q[0], q[1])
+        ctx.stroke()
+        // Sun-lit lip on one side of the crack gives it depth.
+        ctx.strokeStyle = 'rgba(255,250,236,0.20)'
+        ctx.lineWidth = 0.7
+        ctx.beginPath()
+        ctx.moveTo(p[0] + 1.2, p[1] + 1.2)
+        ctx.quadraticCurveTo(cx + 1.2, cy + 1.2, q[0] + 1.2, q[1] + 1.2)
+        ctx.stroke()
+      })
+    }
+  }
+
+  // Fine grit.
+  const img = ctx.getImageData(0, 0, S, S)
+  const d = img.data
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (rnd() - 0.5) * 20
+    d[i] = Math.max(0, Math.min(255, d[i] + n))
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n))
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n))
+  }
+  ctx.putImageData(img, 0, 0)
+
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  _playaTex = tex
+  return tex
+}
+
+// Equirectangular sky used only as an IBL source — this is what stops metal,
+// mylar and fabric from shading flat/blocky. `dim` scales its energy so the
+// image-based ambient doesn't wash out the direct sun.
+function makeSkyTexture(dim: number): THREE.Texture {
+  const W = 256
+  const H = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  const grad = ctx.createLinearGradient(0, 0, 0, H)
+  grad.addColorStop(0.0, '#2f6fb0')
+  grad.addColorStop(0.3, '#6ba3d6')
+  grad.addColorStop(0.47, '#cfe2ee')
+  grad.addColorStop(0.5, '#efe3c6')
+  grad.addColorStop(0.56, '#ddc99c')
+  grad.addColorStop(1.0, '#b09b6f')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, W, H)
+  const sx = W * 0.72
+  const sy = H * 0.2
+  const sun = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55)
+  sun.addColorStop(0, 'rgba(255,253,240,1)')
+  sun.addColorStop(0.12, 'rgba(255,240,205,0.8)')
+  sun.addColorStop(1, 'rgba(255,232,190,0)')
+  ctx.fillStyle = sun
+  ctx.fillRect(0, 0, W, H)
+  if (dim < 1) {
+    ctx.fillStyle = `rgba(0,0,0,${1 - dim})`
+    ctx.fillRect(0, 0, W, H)
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.mapping = THREE.EquirectangularReflectionMapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
+// Pre-filters the procedural sky into an environment map once per mount.
+function SceneEnvironment({ intensity = 0.55 }: { intensity?: number }) {
+  const gl = useThree(s => s.gl)
+
+  const target = useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl)
+    const src = makeSkyTexture(intensity)
+    const rt = pmrem.fromEquirectangular(src)
+    src.dispose()
+    pmrem.dispose()
+    return rt
+  }, [gl, intensity])
+
+  useEffect(() => () => { target.dispose() }, [target])
+
+  return <primitive attach="environment" object={target.texture} />
+}
+
+// ─── Fabric / mylar materials ──────────────────────────────────
+function FabricMaterial({
+  color,
+  roughness = 1,
+  metalness = 0,
+  envMapIntensity = 0.35,
+  bumpScale = 0.02,
+  side,
+  flatShading = false,
+  transparent,
+  opacity,
+}: {
+  color: THREE.Color | string
+  roughness?: number
+  metalness?: number
+  envMapIntensity?: number
+  bumpScale?: number
+  side?: THREE.Side
+  flatShading?: boolean
+  transparent?: boolean
+  opacity?: number
+}) {
+  const tex = getFabricTexture()
+  return (
+    <meshStandardMaterial
+      color={color}
+      roughness={roughness}
+      metalness={metalness}
+      envMapIntensity={envMapIntensity}
+      roughnessMap={tex}
+      bumpMap={tex}
+      bumpScale={bumpScale}
+      side={side}
+      flatShading={flatShading}
+      transparent={transparent}
+      opacity={opacity}
+    />
+  )
+}
+
+// ─── Geometry helpers: watertight, sagging fabric surfaces ─────
+function buildIndexedGeometry(tris: V3[][]): THREE.BufferGeometry {
+  const lookup = new Map<string, number>()
+  const positions: number[] = []
+  const indices: number[] = []
+  const idx = (p: V3) => {
+    const key = `${p[0].toFixed(4)},${p[1].toFixed(4)},${p[2].toFixed(4)}`
+    let i = lookup.get(key)
+    if (i === undefined) {
+      i = positions.length / 3
+      lookup.set(key, i)
+      positions.push(p[0], p[1], p[2])
+    }
+    return i
+  }
+  for (const t of tris) indices.push(idx(t[0]), idx(t[1]), idx(t[2]))
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+
+// One subdivision pass that dips the new midpoints — turns rigid triangles into
+// slack fabric spanning between poles.
+function sagSubdivide(tris: V3[][], sag: number): V3[][] {
+  const out: V3[][] = []
+  const mid = (p: V3, q: V3): V3 => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2 - sag, (p[2] + q[2]) / 2]
+  for (const [a, b, c] of tris) {
+    const ab = mid(a, b)
+    const bc = mid(b, c)
+    const ca = mid(c, a)
+    out.push([a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca])
+  }
+  return out
+}
+
+// ─── Guy lines + stakes ────────────────────────────────────────
+const GUY_GEO = new THREE.CylinderGeometry(1, 1, 1, 3, 1, true)
+const STAKE_GEO = new THREE.CylinderGeometry(1, 0.5, 1, 5)
+const GUY_MAT = new THREE.MeshStandardMaterial({ color: '#efe7d2', roughness: 0.85, metalness: 0 })
+const STAKE_MAT = new THREE.MeshStandardMaterial({ color: '#8f959b', roughness: 0.55, metalness: 0.6 })
+const UP = new THREE.Vector3(0, 1, 0)
+
+function GuyLines({
+  widthM,
+  depthM,
+  anchorY,
+  spread = 0.32,
+}: {
+  widthM: number
+  depthM: number
+  anchorY: number
+  spread?: number
+}) {
+  const highDetail = useHighDetail()
+
+  const lines = useMemo(() => {
+    const hw = widthM / 2
+    const hd = depthM / 2
+    const corners: V3[] = [
+      [hw, anchorY, hd],
+      [-hw, anchorY, hd],
+      [-hw, anchorY, -hd],
+      [hw, anchorY, -hd],
+    ]
+    return corners.map(c => {
+      const stakeX = c[0] + Math.sign(c[0]) * widthM * spread
+      const stakeZ = c[2] + Math.sign(c[2]) * depthM * spread
+      const v = new THREE.Vector3(stakeX - c[0], -anchorY, stakeZ - c[2])
+      const len = v.length()
+      const quat = new THREE.Quaternion().setFromUnitVectors(UP, v.clone().normalize())
+      return {
+        mid: [(c[0] + stakeX) / 2, anchorY / 2, (c[2] + stakeZ) / 2] as V3,
+        stake: [stakeX, 0.04, stakeZ] as V3,
+        quat,
+        len,
+      }
+    })
+  }, [widthM, depthM, anchorY, spread])
+
+  if (!highDetail) return null
+  const cordR = Math.max(0.006, Math.min(widthM, depthM) * 0.008)
+  const stakeR = cordR * 2.2
+
+  return (
+    <group>
+      {lines.map((l, i) => (
+        <React.Fragment key={i}>
+          <mesh
+            geometry={GUY_GEO}
+            material={GUY_MAT}
+            position={l.mid}
+            quaternion={l.quat}
+            scale={[cordR, l.len, cordR]}
+          />
+          <mesh
+            geometry={STAKE_GEO}
+            material={STAKE_MAT}
+            position={l.stake}
+            scale={[stakeR, 0.12, stakeR]}
+          />
+        </React.Fragment>
+      ))}
+    </group>
+  )
+}
+
+// Reinforced webbing hem where the fabric meets the ground.
+function TentHem({ widthM, depthM, color }: { widthM: number; depthM: number; color: THREE.Color }) {
+  const h = Math.min(widthM, depthM) * 0.045
+  return (
+    <mesh position={[0, h / 2, 0]}>
+      <boxGeometry args={[widthM * 1.015, h, depthM * 1.015]} />
+      <meshStandardMaterial color={color} roughness={0.95} metalness={0} envMapIntensity={0.25} />
+    </mesh>
+  )
 }
 
 // ─── GLB Model Loader ──────────────────────────────────────────
@@ -408,19 +762,20 @@ function classifyTentStyle(makeModel: string | null | undefined): TentStyle {
 
 // ─── Shared tent geometry helpers ───────────────────────────
 // 4-sided hip roof spanning an exact w×d footprint up to a central apex.
+// Subdivided once with a downward dip so the panels read as slack fabric
+// stretched over a frame rather than four hard planes.
 function useHipRoofGeometry(w: number, d: number, h: number) {
   const geo = useMemo(() => {
     const hw = w / 2, hd = d / 2
-    const v = new Float32Array([
-      -hw, 0, -hd,  hw, 0, -hd,  0, h, 0,
-       hw, 0, -hd,  hw, 0,  hd,  0, h, 0,
-       hw, 0,  hd, -hw, 0,  hd,  0, h, 0,
-      -hw, 0,  hd, -hw, 0, -hd,  0, h, 0,
-    ])
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(v, 3))
-    g.computeVertexNormals()
-    return g
+    const apex: V3 = [0, h, 0]
+    const c: V3[] = [[-hw, 0, -hd], [hw, 0, -hd], [hw, 0, hd], [-hw, 0, hd]]
+    const base: V3[][] = [
+      [c[0], c[1], apex],
+      [c[1], c[2], apex],
+      [c[2], c[3], apex],
+      [c[3], c[0], apex],
+    ]
+    return buildIndexedGeometry(sagSubdivide(base, h * 0.055))
   }, [w, d, h])
   useEffect(() => () => { geo.dispose() }, [geo])
   return geo
@@ -430,23 +785,41 @@ function useHipRoofGeometry(w: number, d: number, h: number) {
 function useRidgeRoofGeometry(w: number, d: number, h: number) {
   const geo = useMemo(() => {
     const hw = w / 2, hd = d / 2
-    const v = new Float32Array([
+    const rf: V3 = [0, h, hd]
+    const rb: V3 = [0, h, -hd]
+    const lf: V3 = [-hw, 0, hd]
+    const lb: V3 = [-hw, 0, -hd]
+    const rff: V3 = [hw, 0, hd]
+    const rbb: V3 = [hw, 0, -hd]
+    const base: V3[][] = [
       // left slope
-      -hw, 0, -hd,  -hw, 0, hd,  0, h, hd,
-      -hw, 0, -hd,   0, h, hd,   0, h, -hd,
+      [lb, lf, rf], [lb, rf, rb],
       // right slope
-       hw, 0, -hd,   0, h, hd,   hw, 0, hd,
-       hw, 0, -hd,   0, h, -hd,  0, h, hd,
-      // front gable
-      -hw, 0, hd,    hw, 0, hd,  0, h, hd,
-      // back gable
-       hw, 0, -hd,  -hw, 0, -hd, 0, h, -hd,
-    ])
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(v, 3))
+      [rbb, rf, rff], [rbb, rb, rf],
+      // gable ends
+      [lf, rff, rf], [rbb, lb, rb],
+    ]
+    return buildIndexedGeometry(sagSubdivide(base, h * 0.05))
+  }, [w, d, h])
+  useEffect(() => () => { geo.dispose() }, [geo])
+  return geo
+}
+
+// Slack canopy for open shade structures — a grid that dips between its posts.
+function useCanopyGeometry(w: number, d: number, sag: number, cols = 3, rows = 3) {
+  const geo = useMemo(() => {
+    const g = new THREE.PlaneGeometry(w, d, cols * 4, rows * 4)
+    const pos = g.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < pos.count; i++) {
+      // Local bay coordinates → one sine hump per bay between posts.
+      const u = (pos.getX(i) / w + 0.5) * cols
+      const v = (pos.getY(i) / d + 0.5) * rows
+      const dip = Math.sin(Math.PI * (u % 1)) * Math.sin(Math.PI * (v % 1))
+      pos.setZ(i, -dip * sag)
+    }
     g.computeVertexNormals()
     return g
-  }, [w, d, h])
+  }, [w, d, sag, cols, rows])
   useEffect(() => () => { geo.dispose() }, [geo])
   return geo
 }
@@ -454,48 +827,90 @@ function useRidgeRoofGeometry(w: number, d: number, h: number) {
 // ─── Reusable tent door (fabric doorway flap on a tent face) ──
 function TentDoor({ width, height, faceDepth, back = false, arch = true, frameColor }: { width: number; height: number; faceDepth: number; back?: boolean; arch?: boolean; frameColor?: THREE.Color }) {
   const z = back ? -faceDepth : faceDepth
-  // The door reads as a recessed fabric opening framed by the tent material,
-  // not a free-standing black slab.
+  const highDetail = useHighDetail()
+  // The door is a genuinely recessed cavity framed by proud storm flaps, so it
+  // catches its own shadow instead of reading as a decal on a flat wall.
   const surround = frameColor ?? new THREE.Color('#43474b')
+  const inset = Math.min(width, height) * 0.09
   return (
     <group position={[0, 0, z]} rotation={[0, back ? Math.PI : 0, 0]}>
-      {/* Fabric flap surround (tent material) */}
-      <mesh position={[0, height * 0.54, 0.004]}>
-        <planeGeometry args={[width * 1.18, height * 1.12]} />
-        <meshStandardMaterial color={surround} roughness={0.88} side={THREE.DoubleSide} />
+      {/* Storm-flap surround, slightly proud of the wall */}
+      <mesh castShadow position={[0, height * 0.54, 0.006]}>
+        <boxGeometry args={[width * 1.22, height * 1.14, 0.012]} />
+        <FabricMaterial color={surround} roughness={0.95} envMapIntensity={0.25} />
       </mesh>
-      {/* Recessed opening (shaded interior) */}
-      <mesh position={[0, height / 2, 0.006]}>
-        <planeGeometry args={[width, height]} />
-        <meshStandardMaterial color="#2c2f33" roughness={0.95} side={THREE.DoubleSide} />
+      {/* Recessed cavity — interior shading comes from real depth */}
+      <mesh position={[0, height / 2, 0.006 - inset / 2]}>
+        <boxGeometry args={[width, height, inset]} />
+        <meshStandardMaterial color="#2b2e32" roughness={1} metalness={0} envMapIntensity={0.1} side={THREE.BackSide} />
       </mesh>
       {arch && (
-        <mesh position={[0, height, 0.006]}>
-          <circleGeometry args={[width / 2, 14, 0, Math.PI]} />
-          <meshStandardMaterial color="#2c2f33" roughness={0.95} side={THREE.DoubleSide} />
+        <mesh position={[0, height, 0.008]}>
+          <circleGeometry args={[width / 2, 16, 0, Math.PI]} />
+          <meshStandardMaterial color="#2b2e32" roughness={1} envMapIntensity={0.1} side={THREE.DoubleSide} />
         </mesh>
       )}
       {/* Zipper seam */}
-      <mesh position={[0, height / 2, 0.009]}>
-        <boxGeometry args={[0.01, height * 0.92, 0.004]} />
-        <meshStandardMaterial color="#d8b53a" metalness={0.6} roughness={0.35} />
+      <mesh position={[0, height / 2, 0.013]}>
+        <boxGeometry args={[0.012, height * 0.94, 0.005]} />
+        <meshStandardMaterial color="#d8b53a" metalness={0.7} roughness={0.3} />
       </mesh>
+      {highDetail && (
+        <>
+          {/* Rolled-back door flap toggled above the opening */}
+          <mesh castShadow position={[0, height * 1.02, 0.02]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[height * 0.07, height * 0.07, width * 0.92, 8]} />
+            <FabricMaterial color={surround.clone().multiplyScalar(1.08)} roughness={0.95} envMapIntensity={0.25} />
+          </mesh>
+          {[-0.3, 0.3].map((f, i) => (
+            <mesh key={i} position={[width * f, height * 1.02, 0.03]}>
+              <boxGeometry args={[0.012, height * 0.2, 0.006]} />
+              <meshStandardMaterial color="#5a5f64" roughness={0.85} />
+            </mesh>
+          ))}
+          {/* Zipper pull */}
+          <mesh position={[width * 0.06, height * 0.34, 0.018]}>
+            <sphereGeometry args={[Math.max(0.008, width * 0.03), 8, 6]} />
+            <meshStandardMaterial color="#c9a52f" metalness={0.75} roughness={0.3} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }
 
 // ─── Reusable tent window (mesh-screen panel) ───────────────
 function TentWindow({ position, width, height, rotY = 0 }: { position: [number, number, number]; width: number; height: number; rotY?: number }) {
+  const highDetail = useHighDetail()
+  const screen = getFabricTexture()
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      <mesh>
+      {/* Binding tape around the opening */}
+      <mesh position={[0, 0, 0.002]}>
+        <boxGeometry args={[width * 1.09, height * 1.12, 0.005]} />
+        <meshStandardMaterial color="#6f757b" roughness={0.9} envMapIntensity={0.25} />
+      </mesh>
+      {/* Insect screen — the shared fabric weave doubles as the mesh pattern */}
+      <mesh position={[0, 0, 0.006]}>
         <planeGeometry args={[width, height]} />
-        <meshStandardMaterial color="#16242c" transparent opacity={0.5} roughness={0.25} metalness={0.2} side={THREE.DoubleSide} />
+        <meshStandardMaterial
+          color="#16242c"
+          transparent
+          opacity={0.62}
+          roughness={0.5}
+          metalness={0.15}
+          bumpMap={screen}
+          bumpScale={0.01}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      <mesh position={[0, 0, 0.003]}>
-        <boxGeometry args={[width, 0.008, 0.004]} />
-        <meshStandardMaterial color="#9aa0a6" metalness={0.3} roughness={0.6} />
-      </mesh>
+      {highDetail && (
+        /* Awning lip that shades the window */
+        <mesh castShadow position={[0, height * 0.6, height * 0.13]} rotation={[Math.PI / 2.9, 0, 0]}>
+          <planeGeometry args={[width * 1.18, height * 0.4]} />
+          <FabricMaterial color="#9aa0a6" side={THREE.DoubleSide} envMapIntensity={0.3} />
+        </mesh>
+      )}
     </group>
   )
 }
@@ -503,39 +918,63 @@ function TentWindow({ position, width, height, rotY = 0 }: { position: [number, 
 // ─── Shiftpod (faceted insulated silver dome) ───────────────
 function ShiftpodTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
   const tc = hexToThreeColor(color)
+  const highDetail = useHighDetail()
   // Iconic reflective silver shell — blend hue toward silver but keep enough
   // of the assigned color so builder/camper coding still reads.
   const shell = tc.clone().lerp(new THREE.Color('#d3d7db'), 0.62)
+  const fabric = getFabricTexture()
   const r = 0.5
   const baseH = heightM * 0.46
   const domeH = heightM - baseH
   const sx = widthM / (2 * r), sz = depthM / (2 * r)
   const doorW = Math.min(widthM, depthM) * 0.3
   const doorH = baseH * 0.92
+  const seamR = Math.min(widthM, depthM) * 0.012
   return (
     <group>
       {/* Octagonal insulated base — tall enough for the doorway */}
       <mesh castShadow receiveShadow position={[0, baseH / 2, 0]} scale={[sx, 1, sz]}>
         <cylinderGeometry args={[r, r, baseH, 8]} />
-        <meshStandardMaterial color={shell} roughness={0.5} metalness={0.5} flatShading />
+        <meshStandardMaterial color={shell} roughness={0.34} metalness={0.72} envMapIntensity={1.15} bumpMap={fabric} bumpScale={0.05} flatShading />
       </mesh>
       {/* Faceted blunt dome roof (truncated octagon, not a sharp point) */}
       <mesh castShadow receiveShadow position={[0, baseH, 0]} scale={[sx, 1, sz]}>
         <cylinderGeometry args={[r * 0.22, r, domeH, 8]} />
-        <meshStandardMaterial color={shell.clone().multiplyScalar(1.06)} roughness={0.45} metalness={0.55} flatShading />
+        <meshStandardMaterial color={shell.clone().multiplyScalar(1.06)} roughness={0.3} metalness={0.75} envMapIntensity={1.25} bumpMap={fabric} bumpScale={0.05} flatShading />
       </mesh>
       {/* Top vent cap */}
-      <mesh position={[0, heightM, 0]} scale={[sx, 1, sz]}>
-        <cylinderGeometry args={[r * 0.22, r * 0.22, heightM * 0.05, 8]} />
-        <meshStandardMaterial color="#3a3d40" roughness={0.6} metalness={0.4} />
+      <mesh castShadow position={[0, heightM, 0]} scale={[sx, 1, sz]}>
+        <cylinderGeometry args={[r * 0.22, r * 0.24, heightM * 0.06, 8]} />
+        <meshStandardMaterial color="#3a3d40" roughness={0.55} metalness={0.5} />
       </mesh>
+      {highDetail && (
+        <>
+          {/* Welded seam ribs down each of the eight panel edges */}
+          {Array.from({ length: 8 }, (_, i) => {
+            const a = (i / 8) * Math.PI * 2 + Math.PI / 8
+            return (
+              <mesh key={`seam-${i}`} position={[Math.cos(a) * widthM * 0.5, baseH / 2, Math.sin(a) * depthM * 0.5]}>
+                <cylinderGeometry args={[seamR, seamR, baseH, 4]} />
+                <meshStandardMaterial color={shell.clone().multiplyScalar(0.78)} roughness={0.45} metalness={0.6} />
+              </mesh>
+            )
+          })}
+          {/* Vestibule canopy over the entrance */}
+          <mesh castShadow position={[0, baseH * 0.95, depthM * 0.62]} rotation={[Math.PI / 2.7, 0, 0]}>
+            <planeGeometry args={[doorW * 1.9, depthM * 0.3]} />
+            <FabricMaterial color={shell.clone().multiplyScalar(0.95)} metalness={0.4} roughness={0.5} envMapIntensity={0.8} side={THREE.DoubleSide} />
+          </mesh>
+        </>
+      )}
       <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 * 0.99} arch frameColor={shell.clone().multiplyScalar(0.82)} />
       {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 * 0.99} back arch frameColor={shell.clone().multiplyScalar(0.82)} />}
       {/* Round porthole window on the base side */}
       <mesh position={[widthM / 2 * 0.99, baseH * 0.62, 0]} rotation={[0, Math.PI / 2, 0]}>
         <circleGeometry args={[Math.min(widthM, depthM) * 0.07, 16]} />
-        <meshStandardMaterial color="#16242c" transparent opacity={0.5} roughness={0.2} metalness={0.3} />
+        <meshStandardMaterial color="#16242c" transparent opacity={0.55} roughness={0.2} metalness={0.3} />
       </mesh>
+      <TentHem widthM={widthM * 0.99} depthM={depthM * 0.99} color={shell.clone().multiplyScalar(0.6)} />
+      <GuyLines widthM={widthM} depthM={depthM} anchorY={baseH * 0.95} spread={0.26} />
       <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.45)} />
     </group>
   )
@@ -544,7 +983,9 @@ function ShiftpodTent({ widthM, depthM, heightM, color, backDoor }: TentStylePro
 // ─── No Bake Tent (reflective insulated dome on a wall) ─────
 function NoBakeTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
   const tc = hexToThreeColor(color)
+  const highDetail = useHighDetail()
   const shell = tc.clone().lerp(new THREE.Color('#eef1f3'), 0.7)
+  const fabric = getFabricTexture()
   const r = 0.5
   const wallH = heightM * 0.34
   const domeH = heightM - wallH
@@ -554,22 +995,35 @@ function NoBakeTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps
     <group>
       {/* Insulated vertical wall — gives the doorway a surface to sit on */}
       <mesh castShadow receiveShadow position={[0, wallH / 2, 0]} scale={[widthM / (2 * r), 1, depthM / (2 * r)]}>
-        <cylinderGeometry args={[r, r, wallH, 24]} />
-        <meshStandardMaterial color={shell} roughness={0.4} metalness={0.4} />
+        <cylinderGeometry args={[r, r, wallH, 32]} />
+        <meshStandardMaterial color={shell} roughness={0.3} metalness={0.6} envMapIntensity={1.1} bumpMap={fabric} bumpScale={0.04} />
       </mesh>
       {/* Reflective domed roof */}
       <mesh castShadow receiveShadow position={[0, wallH, 0]} scale={[widthM, domeH * 2, depthM]}>
-        <sphereGeometry args={[r, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={shell.clone().multiplyScalar(1.03)} roughness={0.35} metalness={0.45} side={THREE.DoubleSide} />
+        <sphereGeometry args={[r, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={shell.clone().multiplyScalar(1.03)} roughness={0.26} metalness={0.65} envMapIntensity={1.25} bumpMap={fabric} bumpScale={0.04} side={THREE.DoubleSide} />
       </mesh>
+      {highDetail && (
+        /* Meridian seams where the reflective panels are taped together */
+        <>
+          {Array.from({ length: 6 }, (_, i) => (
+            <mesh key={`mer-${i}`} position={[0, wallH, 0]} rotation={[0, (i / 6) * Math.PI, 0]} scale={[widthM / (2 * r), domeH / r, 1]}>
+              <torusGeometry args={[r, 0.008, 4, 20, Math.PI]} />
+              <meshStandardMaterial color={shell.clone().multiplyScalar(0.82)} roughness={0.4} metalness={0.55} />
+            </mesh>
+          ))}
+        </>
+      )}
       {/* Roof vent */}
-      <mesh position={[0, heightM * 0.97, 0]}>
-        <cylinderGeometry args={[Math.min(widthM, depthM) * 0.07, Math.min(widthM, depthM) * 0.07, heightM * 0.05, 10]} />
-        <meshStandardMaterial color="#9aa0a6" metalness={0.5} roughness={0.5} />
+      <mesh castShadow position={[0, heightM * 0.97, 0]}>
+        <cylinderGeometry args={[Math.min(widthM, depthM) * 0.07, Math.min(widthM, depthM) * 0.08, heightM * 0.06, 12]} />
+        <meshStandardMaterial color="#9aa0a6" metalness={0.55} roughness={0.45} />
       </mesh>
       <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 * 0.95} arch frameColor={shell.clone().multiplyScalar(0.85)} />
       {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 * 0.95} back arch frameColor={shell.clone().multiplyScalar(0.85)} />}
       <TentWindow position={[widthM / 2 * 0.95, wallH * 0.6, 0]} width={depthM * 0.24} height={wallH * 0.5} rotY={Math.PI / 2} />
+      <TentHem widthM={widthM * 0.97} depthM={depthM * 0.97} color={shell.clone().multiplyScalar(0.62)} />
+      <GuyLines widthM={widthM * 0.95} depthM={depthM * 0.95} anchorY={wallH * 0.9} spread={0.3} />
       <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.5)} />
     </group>
   )
@@ -578,37 +1032,62 @@ function NoBakeTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps
 // ─── Canvas wall tent (Kodiak Flex-Bow style) ───────────────
 function CanvasTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
   const tc = hexToThreeColor(color)
+  const highDetail = useHighDetail()
   const canvas = tc.clone().lerp(new THREE.Color('#cdbb90'), 0.55)
   const wallH = heightM * 0.5
   const ridgeH = heightM * 0.5
-  const roofGeo = useRidgeRoofGeometry(widthM, depthM, ridgeH)
+  // Roof overhangs the walls like a real fly, so the eave casts a shadow line.
+  const roofGeo = useRidgeRoofGeometry(widthM * 1.09, depthM * 1.05, ridgeH)
   const doorW = Math.min(widthM, depthM) * 0.3
   const doorH = wallH * 0.9
+  const cornerR = Math.min(widthM, depthM, wallH) * 0.12
   return (
     <group>
-      {/* Canvas walls */}
-      <mesh castShadow receiveShadow position={[0, wallH / 2, 0]}>
-        <boxGeometry args={[widthM, wallH, depthM]} />
-        <meshStandardMaterial color={canvas} roughness={0.95} metalness={0} />
-      </mesh>
-      {/* Peaked canvas roof */}
+      {/* Canvas walls — rounded corners read as fabric over flex-bow poles */}
+      <RoundedBox
+        args={[widthM, wallH, depthM]}
+        radius={cornerR}
+        smoothness={2}
+        castShadow
+        receiveShadow
+        position={[0, wallH / 2, 0]}
+      >
+        <FabricMaterial color={canvas} roughness={1} envMapIntensity={0.3} />
+      </RoundedBox>
+      {/* Peaked canvas roof with slack between the ridge and the eaves */}
       <mesh castShadow receiveShadow geometry={roofGeo} position={[0, wallH, 0]}>
-        <meshStandardMaterial color={canvas.clone().multiplyScalar(0.9)} roughness={0.95} side={THREE.DoubleSide} flatShading />
+        <FabricMaterial color={canvas.clone().multiplyScalar(0.92)} roughness={1} envMapIntensity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Ridge pole running the length of the tent */}
+      <mesh castShadow position={[0, wallH + ridgeH, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[Math.min(widthM, depthM) * 0.018, Math.min(widthM, depthM) * 0.018, depthM * 1.08, 6]} />
+        <meshStandardMaterial color="#8a6a3a" roughness={0.65} metalness={0.15} />
       </mesh>
       {/* Awning over the front door */}
       <mesh castShadow position={[0, wallH * 0.92, depthM / 2 + depthM * 0.16]} rotation={[Math.PI / 2.6, 0, 0]}>
         <planeGeometry args={[doorW * 1.7, depthM * 0.38]} />
-        <meshStandardMaterial color={canvas.clone().multiplyScalar(1.05)} roughness={0.9} side={THREE.DoubleSide} />
+        <FabricMaterial color={canvas.clone().multiplyScalar(1.05)} roughness={1} envMapIntensity={0.3} side={THREE.DoubleSide} />
       </mesh>
       {[-doorW * 0.8, doorW * 0.8].map((sx, i) => (
         <mesh key={i} castShadow position={[sx, wallH * 0.45, depthM / 2 + depthM * 0.3]}>
-          <cylinderGeometry args={[0.02, 0.02, wallH * 0.9, 6]} />
+          <cylinderGeometry args={[0.02, 0.022, wallH * 0.9, 6]} />
           <meshStandardMaterial color="#8a6a3a" roughness={0.7} />
         </mesh>
       ))}
+      {highDetail && (
+        /* Stitched panel seams across the roof slopes */
+        [-1, 1].map(side => (
+          <mesh key={`seam-${side}`} position={[side * widthM * 0.28, wallH + ridgeH * 0.44, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.008, 0.008, depthM * 1.02, 4]} />
+            <meshStandardMaterial color={canvas.clone().multiplyScalar(0.78)} roughness={1} />
+          </mesh>
+        ))
+      )}
       <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} arch={false} />
       {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} back arch={false} />}
       <TentWindow position={[widthM / 2 + 0.005, wallH * 0.62, 0]} width={depthM * 0.24} height={wallH * 0.34} rotY={Math.PI / 2} />
+      <TentHem widthM={widthM} depthM={depthM} color={canvas.clone().multiplyScalar(0.62)} />
+      <GuyLines widthM={widthM} depthM={depthM} anchorY={wallH * 0.98} />
       <GroundSheet widthM={widthM} depthM={depthM} color={canvas.clone().multiplyScalar(0.5)} />
     </group>
   )
@@ -617,28 +1096,48 @@ function CanvasTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps
 // ─── Cabin / instant tent (Coleman, REI Kingdom) ────────────
 function CabinTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
   const tc = hexToThreeColor(color)
+  const highDetail = useHighDetail()
   const wallH = heightM * 0.55
   const roofH = heightM * 0.45
-  const roofGeo = useHipRoofGeometry(widthM, depthM, roofH)
+  const roofGeo = useHipRoofGeometry(widthM * 1.08, depthM * 1.08, roofH)
   const doorW = Math.min(widthM, depthM) * 0.32
   const doorH = wallH * 0.88
   const winW = depthM * 0.26
   const winH = wallH * 0.4
+  const cornerR = Math.min(widthM, depthM, wallH) * 0.1
+  const poleR = Math.min(widthM, depthM) * 0.016
   return (
     <group>
-      {/* Vertical fabric walls */}
-      <mesh castShadow receiveShadow position={[0, wallH / 2, 0]}>
-        <boxGeometry args={[widthM, wallH, depthM]} />
-        <meshStandardMaterial color={tc} roughness={0.85} metalness={0} />
-      </mesh>
-      {/* Tall hip roof */}
+      {/* Vertical fabric walls, softened at the corner poles */}
+      <RoundedBox
+        args={[widthM, wallH, depthM]}
+        radius={cornerR}
+        smoothness={2}
+        castShadow
+        receiveShadow
+        position={[0, wallH / 2, 0]}
+      >
+        <FabricMaterial color={tc} roughness={1} envMapIntensity={0.32} />
+      </RoundedBox>
+      {/* Tall hip roof with an overhanging, slack fly */}
       <mesh castShadow receiveShadow geometry={roofGeo} position={[0, wallH, 0]}>
-        <meshStandardMaterial color={tc.clone().multiplyScalar(0.82)} roughness={0.9} metalness={0} flatShading side={THREE.DoubleSide} />
+        <FabricMaterial color={tc.clone().multiplyScalar(0.84)} roughness={1} envMapIntensity={0.32} side={THREE.DoubleSide} />
       </mesh>
+      {highDetail && (
+        /* Exposed corner frame poles */
+        [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+          <mesh key={`pole-${i}`} castShadow position={[sx * widthM * 0.5, wallH / 2, sz * depthM * 0.5]}>
+            <cylinderGeometry args={[poleR, poleR, wallH, 6]} />
+            <meshStandardMaterial color="#6b7075" metalness={0.55} roughness={0.45} />
+          </mesh>
+        ))
+      )}
       <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} arch={false} frameColor={tc.clone().multiplyScalar(0.62)} />
       {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 + 0.004} back arch={false} frameColor={tc.clone().multiplyScalar(0.62)} />}
       <TentWindow position={[widthM / 2 + 0.005, wallH * 0.58, 0]} width={winW} height={winH} rotY={Math.PI / 2} />
       <TentWindow position={[-widthM / 2 - 0.005, wallH * 0.58, 0]} width={winW} height={winH} rotY={-Math.PI / 2} />
+      <TentHem widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.55)} />
+      <GuyLines widthM={widthM * 1.04} depthM={depthM * 1.04} anchorY={wallH * 0.97} />
       <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.5)} />
     </group>
   )
@@ -647,45 +1146,77 @@ function CabinTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps)
 // ─── Classic dome tent (default for unknown make/model) ─────
 function DomeTent({ widthM, depthM, heightM, color, backDoor }: TentStyleProps) {
   const tc = hexToThreeColor(color)
+  const highDetail = useHighDetail()
   const r = 0.5
   const wallH = heightM * 0.4
   const domeH = heightM - wallH
   const doorW = Math.min(widthM, depthM) * 0.32
   const doorH = wallH * 0.96
+  const fly = tc.clone().multiplyScalar(0.78).lerp(new THREE.Color('#f0e7d4'), 0.12)
   return (
     <group>
       {/* Short vertical fabric wall — the door & windows attach here */}
       <mesh castShadow receiveShadow position={[0, wallH / 2, 0]} scale={[widthM / (2 * r), 1, depthM / (2 * r)]}>
-        <cylinderGeometry args={[r * 0.97, r, wallH, 24]} />
-        <meshStandardMaterial color={tc} roughness={0.82} metalness={0} />
+        <cylinderGeometry args={[r * 0.97, r, wallH, 32]} />
+        <FabricMaterial color={tc} roughness={1} envMapIntensity={0.3} />
       </mesh>
-      {/* Domed canopy on top */}
+      {/* Inner canopy */}
       <mesh castShadow receiveShadow position={[0, wallH, 0]} scale={[widthM, domeH * 2, depthM]}>
-        <sphereGeometry args={[r, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={tc.clone().multiplyScalar(0.96)} roughness={0.8} side={THREE.DoubleSide} />
+        <sphereGeometry args={[r, 28, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <FabricMaterial color={tc.clone().multiplyScalar(0.96)} roughness={1} envMapIntensity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      {/* Arched support ribs over the dome */}
+      {/* Rainfly draped over the top — the offset shell is what makes a dome
+          tent read as a tent instead of a smooth hemisphere. */}
+      <mesh castShadow position={[0, wallH * 0.62, 0]} scale={[widthM * 1.05, (domeH + wallH * 0.38) * 2, depthM * 1.05]}>
+        <sphereGeometry args={[r, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.42]} />
+        <FabricMaterial color={fly} roughness={1} envMapIntensity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Arched support poles crossing over the dome */}
       {[{ rot: 0, span: widthM }, { rot: Math.PI / 2, span: depthM }].map(({ rot, span }, i) => (
-        <mesh key={i} position={[0, wallH, 0]} rotation={[0, rot, 0]} scale={[span / (2 * r), domeH / r, 1]}>
-          <torusGeometry args={[r, 0.01, 6, 18, Math.PI]} />
-          <meshStandardMaterial color="#5b6066" metalness={0.5} roughness={0.5} />
+        <mesh key={i} castShadow position={[0, wallH, 0]} rotation={[0, rot, 0]} scale={[span / (2 * r), domeH / r, 1]}>
+          <torusGeometry args={[r, 0.018, 6, 24, Math.PI]} />
+          <meshStandardMaterial color="#5b6066" metalness={0.6} roughness={0.4} />
         </mesh>
       ))}
+      {highDetail && (
+        /* Vestibule porch over the entrance */
+        <>
+          <mesh castShadow position={[0, wallH * 0.72, depthM * 0.62]} rotation={[Math.PI / 2.5, 0, 0]}>
+            <planeGeometry args={[doorW * 2, depthM * 0.34]} />
+            <FabricMaterial color={fly} roughness={1} envMapIntensity={0.3} side={THREE.DoubleSide} />
+          </mesh>
+          {[-doorW * 0.85, doorW * 0.85].map((sx, i) => (
+            <mesh key={`vp-${i}`} position={[sx, wallH * 0.28, depthM * 0.68]}>
+              <cylinderGeometry args={[0.012, 0.012, wallH * 0.56, 5]} />
+              <meshStandardMaterial color="#5b6066" metalness={0.6} roughness={0.4} />
+            </mesh>
+          ))}
+        </>
+      )}
       <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 * 0.95} arch frameColor={tc.clone().multiplyScalar(0.7)} />
       {backDoor && <TentDoor width={doorW} height={doorH} faceDepth={depthM / 2 * 0.95} back arch frameColor={tc.clone().multiplyScalar(0.7)} />}
       <TentWindow position={[widthM / 2 * 0.95, wallH * 0.58, 0]} width={depthM * 0.26} height={wallH * 0.5} rotY={Math.PI / 2} />
+      <TentHem widthM={widthM * 0.97} depthM={depthM * 0.97} color={tc.clone().multiplyScalar(0.55)} />
+      <GuyLines widthM={widthM * 0.92} depthM={depthM * 0.92} anchorY={wallH + domeH * 0.35} spread={0.38} />
       <GroundSheet widthM={widthM} depthM={depthM} color={tc.clone().multiplyScalar(0.55)} />
     </group>
   )
 }
 
-// Shared ground sheet under every tent.
+// Shared ground sheet under every tent, with a scuffed dust apron around it.
 function GroundSheet({ widthM, depthM, color }: { widthM: number; depthM: number; color: THREE.Color }) {
   return (
-    <mesh receiveShadow position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[widthM * 1.04, depthM * 1.04]} />
-      <meshStandardMaterial color={color} roughness={1} />
-    </mesh>
+    <group>
+      <mesh receiveShadow position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[widthM * 1.04, depthM * 1.04]} />
+        <meshStandardMaterial color={color} roughness={1} envMapIntensity={0.2} />
+      </mesh>
+      {/* Trodden dust ring from people walking around the tent */}
+      <mesh receiveShadow position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[widthM * 1.5, depthM * 1.5]} />
+        <meshStandardMaterial color="#cdb98d" roughness={1} transparent opacity={0.35} />
+      </mesh>
+    </group>
   )
 }
 
@@ -1508,6 +2039,27 @@ function StairsLadder3D({ widthM, depthM, heightM, color }: { widthM: number; de
   )
 }
 
+// ─── Shade sail (slack tensioned fabric panel) ──────────────────
+function ShadeSail({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+  const geo = useCanopyGeometry(widthM, depthM, Math.min(widthM, depthM) * 0.06, 1, 1)
+  return (
+    <mesh castShadow receiveShadow geometry={geo} position={[0, heightM, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <FabricMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.42} roughness={1} envMapIntensity={0.35} />
+    </mesh>
+  )
+}
+
+// ─── Shade structure canopy (fabric slung between the posts) ────
+function ShadeCanopy({ widthM, depthM, heightM, color, cols, rows }: { widthM: number; depthM: number; heightM: number; color: THREE.Color; cols: number; rows: number }) {
+  const sag = Math.min(widthM / Math.max(1, cols), depthM / Math.max(1, rows)) * 0.09
+  const geo = useCanopyGeometry(widthM, depthM, sag, cols, rows)
+  return (
+    <mesh castShadow receiveShadow geometry={geo} position={[0, heightM, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <FabricMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.55} roughness={1} envMapIntensity={0.35} />
+    </mesh>
+  )
+}
+
 // ─── Fallback Procedural Object ────────────────────────────────
 function ProceduralObject({
   obj,
@@ -1585,29 +2137,10 @@ function ProceduralObject({
       return <StairsLadder3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
   }
 
-  // Shade sail: just a thin translucent off-white sail at canopy height — no posts.
+  // Shade sail: a slack fabric panel at canopy height — no posts.
   if (obj.object_type === 'shade_sail') {
     const sailColor = obj.color && obj.color.toLowerCase() !== '#93c5fd' ? obj.color : '#f5f0e6'
-    return (
-      <group>
-        <mesh
-          castShadow
-          receiveShadow
-          position={[0, heightM, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <planeGeometry args={[widthM, depthM, 1, 1]} />
-          <meshStandardMaterial
-            color={sailColor}
-            side={THREE.DoubleSide}
-            transparent
-            opacity={0.35}
-            roughness={0.9}
-            metalness={0}
-          />
-        </mesh>
-      </group>
-    )
+    return <ShadeSail widthM={widthM} depthM={depthM} heightM={heightM} color={sailColor} />
   }
 
   // Shade structures: open canopy with perimeter poles every 10 ft.
@@ -1669,19 +2202,31 @@ function ProceduralObject({
         {/* Perimeter poles */}
         {pts.map((p, i) => (
           <mesh key={i} castShadow position={[p.x, heightM / 2, p.z]}>
-            <cylinderGeometry args={[postRadius, postRadius, heightM, 8]} />
+            <cylinderGeometry args={[postRadius, postRadius * 1.15, heightM, 10]} />
             <meshStandardMaterial
-              color={p.shared ? '#d97706' : '#555555'}
-              metalness={0.9}
-              roughness={0.2}
+              color={p.shared ? '#d97706' : '#6a6f75'}
+              metalness={0.85}
+              roughness={0.3}
+              envMapIntensity={0.9}
             />
           </mesh>
         ))}
-        {/* Thin translucent canopy on top */}
-        <mesh castShadow receiveShadow position={[0, heightM, 0]}>
-          <boxGeometry args={[widthM, 0.05, depthM]} />
-          <meshStandardMaterial color={threeColor} roughness={0.6} metalness={0.0} transparent opacity={0.45} />
-        </mesh>
+        {/* Base plates so the posts sit on the playa rather than float */}
+        {pts.map((p, i) => (
+          <mesh key={`bp-${i}`} receiveShadow position={[p.x, 0.012, p.z]}>
+            <cylinderGeometry args={[postRadius * 2.4, postRadius * 2.4, 0.024, 8]} />
+            <meshStandardMaterial color="#4b5056" metalness={0.7} roughness={0.5} />
+          </mesh>
+        ))}
+        {/* Fabric canopy slung between the posts */}
+        <ShadeCanopy
+          widthM={widthM}
+          depthM={depthM}
+          heightM={heightM}
+          color={threeColor}
+          cols={Math.max(1, xs.length - 1)}
+          rows={Math.max(1, zs.length - 1)}
+        />
         {/* Top edge beams connecting poles */}
         {/* Front beam */}
         <mesh position={[0, heightM, -depthM * 0.47]}>
@@ -1921,54 +2466,80 @@ function MapObject3D({
 
 // ─── Grid restricted to camp boundary ──────────────────────────
 function BoundaryGrid({ widthM, depthM, gridSize }: { widthM: number; depthM: number; gridSize: number }) {
+  // Grid lines live on their own transparent layer so the playa surface below
+  // stays visible instead of being flattened into a solid tan slab.
   const gridTexture = useMemo(() => {
-    const cellPx = 64
+    const cellPx = 32
     const cols = Math.max(1, Math.round(widthM / gridSize))
     const rows = Math.max(1, Math.round(depthM / gridSize))
-    const canvasW = cols * cellPx
-    const canvasH = rows * cellPx
+    const canvasW = Math.min(2048, cols * cellPx)
+    const canvasH = Math.min(2048, rows * cellPx)
     const canvas = document.createElement('canvas')
     canvas.width = canvasW
     canvas.height = canvasH
     const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#f5e6c8'
-    ctx.fillRect(0, 0, canvasW, canvasH)
-    ctx.strokeStyle = 'rgba(0,0,0,0.06)'
+    ctx.clearRect(0, 0, canvasW, canvasH)
+    ctx.strokeStyle = 'rgba(60,45,20,0.16)'
     ctx.lineWidth = 1
     for (let c = 0; c <= cols; c++) {
-      const x = c * cellPx
+      const x = (c / cols) * canvasW
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvasH); ctx.stroke()
     }
     for (let r = 0; r <= rows; r++) {
-      const y = r * cellPx
+      const y = (r / rows) * canvasH
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvasW, y); ctx.stroke()
     }
     const tex = new THREE.CanvasTexture(canvas)
     tex.wrapS = THREE.ClampToEdgeWrapping
     tex.wrapT = THREE.ClampToEdgeWrapping
-    tex.minFilter = THREE.LinearFilter
+    tex.colorSpace = THREE.SRGBColorSpace
     return tex
   }, [widthM, depthM, gridSize])
 
+  useEffect(() => () => { gridTexture.dispose() }, [gridTexture])
+
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
       <planeGeometry args={[widthM, depthM]} />
-      <meshStandardMaterial map={gridTexture} roughness={0.9} metalness={0} />
+      <meshBasicMaterial map={gridTexture} transparent depthWrite={false} />
     </mesh>
   )
 }
 
 // ─── Ground Plane ──────────────────────────────────────────────
 function GroundPlane({ widthM, depthM, gridSize }: { widthM: number; depthM: number; gridSize: number }) {
+  const gl = useThree(s => s.gl)
+
+  // One cracked-playa tile, reused at two densities: coarse for the open desert,
+  // finer inside the camp footprint where the camera actually gets close.
+  // The clone shares the source bitmap, so the second density is free.
+  const { outer, inner } = useMemo(() => {
+    const base = getPlayaTexture()
+    if (!base) return { outer: null, inner: null }
+    const maxAniso = gl.capabilities.getMaxAnisotropy()
+    const tileM = 7
+    base.anisotropy = maxAniso
+    base.repeat.set((widthM * 3) / tileM, (depthM * 3) / tileM)
+    const i = base.clone()
+    i.anisotropy = maxAniso
+    i.repeat.set(widthM / (tileM * 0.5), depthM / (tileM * 0.5))
+    return { outer: base, inner: i }
+  }, [gl, widthM, depthM])
+
   return (
     <group>
-      {/* Outer flat ground (no grid) */}
+      {/* Open playa */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[widthM * 3, depthM * 3]} />
-        <meshStandardMaterial color="#e8d5a3" roughness={1} metalness={0} />
+        <meshStandardMaterial map={outer ?? undefined} color="#e8d5a3" roughness={1} metalness={0} envMapIntensity={0.35} />
       </mesh>
 
-      {/* Camp boundary with grid lines */}
+      {/* Camp footprint — dust compacted a shade darker by traffic */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+        <planeGeometry args={[widthM, depthM]} />
+        <meshStandardMaterial map={inner ?? undefined} color="#dcc99a" roughness={1} metalness={0} envMapIntensity={0.3} />
+      </mesh>
+
       <BoundaryGrid widthM={widthM} depthM={depthM} gridSize={gridSize} />
     </group>
   )
@@ -2031,53 +2602,81 @@ export function CampMap3D({
   // is accurate and the renderer doesn't double-draw them.
   const shadePostsByObj = useMemo(() => computeShadePosts(objects), [objects])
 
+  const span = Math.max(widthM, depthM)
+  // Very dense camps drop the micro-detail pass to keep draw calls bounded.
+  const highDetail = visibleObjects.length <= 110
+
   return (
     <div className="w-full h-full">
       <Canvas
-        shadows
-        camera={{ fov: 50, near: 0.1, far: 1000 }}
-        style={{ background: 'linear-gradient(180deg, #87CEEB 0%, #B8D4E3 40%, #E8D5A3 100%)' }}
+        shadows="soft"
+        dpr={[1, 1.75]}
+        performance={{ min: 0.5 }}
+        camera={{ fov: 45, near: 0.1, far: 1000 }}
+        gl={{
+          antialias: true,
+          powerPreference: 'high-performance',
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.05,
+        }}
+        style={{ background: 'linear-gradient(180deg, #3f7fbe 0%, #7fb0dc 36%, #cfe2ee 50%, #e6d5ac 100%)' }}
         onPointerMissed={() => onSelectObject(null as unknown as FloorplanObjectRow)}
       >
+        {/* Desert haze gives distance objects aerial perspective */}
+        <fog attach="fog" args={['#dfd2ae', span * 1.1, span * 5]} />
+
         <CameraSetup widthM={widthM} depthM={depthM} />
         <OrbitControls
           makeDefault
           minPolarAngle={0.1}
           maxPolarAngle={Math.PI / 2 - 0.05}
           minDistance={2}
-          maxDistance={Math.max(widthM, depthM) * 2}
+          maxDistance={span * 2}
           enableDamping
           dampingFactor={0.05}
         />
 
-        {/* Lighting */}
-        <ambientLight intensity={0.5} />
+        {/* Lighting — a procedural sky drives image-based lighting, so metal,
+            mylar and fabric pick up real reflections instead of flat shading.
+            Direct lights stay low so shadows and form still read. */}
+        <SceneEnvironment intensity={0.55} />
+        <ambientLight intensity={0.12} />
+        <hemisphereLight color="#bcd9ef" groundColor="#c9b184" intensity={0.4} />
         <directionalLight
-          position={[widthM * 0.5, widthM * 0.8, -depthM * 0.3]}
-          intensity={1.5}
+          color="#fff3dd"
+          position={[widthM * 0.55, widthM * 0.85, -depthM * 0.35]}
+          intensity={2.1}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
-          shadow-camera-far={widthM * 3}
+          shadow-bias={-0.0004}
+          shadow-normalBias={0.02}
+          shadow-camera-far={widthM * 4}
           shadow-camera-left={-widthM}
           shadow-camera-right={widthM}
           shadow-camera-top={depthM}
           shadow-camera-bottom={-depthM}
         />
-        <hemisphereLight color="#87CEEB" groundColor="#E8D5A3" intensity={0.3} />
+        {/* Cool sky bounce so shadowed faces aren't dead flat */}
+        <directionalLight color="#cfe0f0" position={[-widthM * 0.6, widthM * 0.4, depthM * 0.5]} intensity={0.35} />
 
         {/* Ground */}
         <GroundPlane widthM={widthM} depthM={depthM} gridSize={gridSizeM} />
 
-        {/* Contact shadows for extra realism */}
+        {/* Soft occlusion where objects meet the playa. Captured over the first
+            couple of seconds then frozen — no per-frame scene re-render. */}
         <ContactShadows
-          position={[0, 0, 0]}
-          opacity={0.4}
-          scale={Math.max(widthM, depthM) * 1.5}
-          blur={2}
-          far={10}
+          position={[0, 0.015, 0]}
+          opacity={0.55}
+          scale={span * 1.6}
+          blur={2.4}
+          far={4}
+          resolution={1024}
+          frames={120}
+          color="#5a4a2c"
         />
 
+        <HighDetailContext.Provider value={highDetail}>
         {/* Ground marking objects (roads, fire lanes) */}
         {groundObjects.map(obj => {
           const posX = (obj.x + obj.width_ft / 2) * feetToMeters - originX
@@ -2113,6 +2712,7 @@ export function CampMap3D({
             shadePosts={shadePostsByObj.get(obj.id)}
           />
         ))}
+        </HighDetailContext.Provider>
 
         {/* Border labels as 3D text */}
         {config.border_label_north && (
