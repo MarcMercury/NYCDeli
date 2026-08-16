@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { UserProfileRow, CamperRow } from '@/types/database'
 import { adminResetPasswordAction } from '@/app/actions/admin'
+import AddApplicantForm from './add-applicant-form'
 
 interface ApplicantWithCamper extends UserProfileRow {
   camper: CamperRow | null
@@ -28,6 +29,7 @@ export default function ApplicantReviewPage() {
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [aiSummary, setAiSummary] = useState<string | null>(null)
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
 
   const fetchApplicants = useCallback(async () => {
     const supabase = createClient()
@@ -182,10 +184,24 @@ export default function ApplicantReviewPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-black uppercase tracking-wider">📋 Applicant Review</h1>
-        <p className="text-gray-600 mt-1">Review, approve, or deny camp applicants</p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black uppercase tracking-wider">📋 Applicant Review</h1>
+          <p className="text-gray-600 mt-1">Review, approve, or deny camp applicants</p>
+        </div>
+        <Button onClick={() => setShowAddForm(true)}>➕ Add Applicant</Button>
       </div>
+
+      {showAddForm && (
+        <AddApplicantForm
+          onClose={() => setShowAddForm(false)}
+          onCreated={(text) => {
+            setShowAddForm(false)
+            setMessage({ type: 'success', text })
+            fetchApplicants()
+          }}
+        />
+      )}
 
       {message && (
         <Alert variant={message.type === 'success' ? 'success' : 'error'} className="mb-6">

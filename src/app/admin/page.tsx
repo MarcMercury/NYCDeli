@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
 import { updateCamperAction, deleteCamperAction, deleteUserEntityAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
+import AddApplicantForm from './applicants/add-applicant-form'
 import { resolveTentMateIds } from '@/lib/tent-mates'
 import { SETTINGS_SCHEMA, SETTING_GROUPS, MAINTENANCE_KEY } from '@/lib/settings'
 import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
@@ -69,6 +70,7 @@ export default function AdminPage() {
   const [resetPwUserId, setResetPwUserId] = useState<string | null>(null)
   const [resetPwValue, setResetPwValue] = useState('')
   const [resetPwLoading, setResetPwLoading] = useState(false)
+  const [showAddApplicant, setShowAddApplicant] = useState(false)
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
@@ -370,6 +372,17 @@ export default function AdminPage() {
               Dismiss
             </button>
           </Alert>
+        )}
+
+        {showAddApplicant && (
+          <AddApplicantForm
+            onClose={() => setShowAddApplicant(false)}
+            onCreated={(text) => {
+              setShowAddApplicant(false)
+              setMessage({ type: 'success', text })
+              fetchData()
+            }}
+          />
         )}
 
         {/* Data Connection Status */}
@@ -1185,6 +1198,9 @@ export default function AdminPage() {
                         </button>
                       ))}
                     </div>
+                    <Button size="sm" onClick={() => setShowAddApplicant(true)} title="Create a camper profile administratively">
+                      ➕ Add Applicant
+                    </Button>
                     <Button size="sm" variant="secondary" onClick={exportUsersCsv} title="Download the current list as a CSV">
                       ⬇ Export CSV
                     </Button>

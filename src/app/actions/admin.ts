@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
 import { parse as csvParse } from 'csv-parse/sync'
-import type { CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
+import type { CamperInsert, CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
 
 export type AdminActionResult = {
   success: boolean
@@ -338,6 +338,85 @@ export async function restoreShiftCategoryAction(
   const { overrides, exists } = await loadShiftOverrides()
   delete overrides[`_cat_deleted:${categoryKey}`]
   return saveShiftOverrides(overrides, exists)
+}
+
+/**
+ * Administratively create a camper: auth login + camper record + linked
+ * user_profile. Used by the "Add Applicant" flow so leadership can add someone
+ * who never filled out the public intake form. When `approve` is true the
+ * profile is approved immediately; otherwise it lands in the pending queue.
+ */
+export async function createApplicantAction(params: {
+  camper: CamperInsert
+  password?: string
+  approve?: boolean
+}): Promise<AdminActionResult> {
+  const { profile: adminProfile } = await requireAdmin()
+
+  const email = (params.camper.email || '').trim().toLowerCase()
+  const fullName = (params.camper.full_name || '').trim()
+  if (!email || !fullName) {
+    return { success: false, error: 'Full name and email are required' }
+  }
+
+  const password = params.password?.trim() || 'NYCDeli2026!'
+  if (password.length < 8) {
+    return { success: false, error: 'Password must be at least 8 characters' }
+  }
+
+  const adminClient = createServiceClient()
+
+  // 1. Auth login — reuse the existing account if the email is already taken.
+  let userId: string
+  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { must_change_password: true },
+  })
+
+  if (authError) {
+    const alreadyExists =
+      authError.message.includes('already been registered') ||
+      authError.message.includes('already exists')
+    if (!alreadyExists) return { success: false, error: authError.message }
+
+    const { data: listData } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
+    const existing = listData?.users?.find(u => u.email?.toLowerCase() === email)
+    if (!existing) return { success: false, error: 'An account with that email already exists' }
+    userId = existing.id
+  } else {
+    userId = authData.user.id
+  }
+
+  // 2. Camper record
+  const { data: camperData, error: camperError } = await adminClient
+    .from('campers')
+    .upsert({ ...params.camper, email, full_name: fullName } as never, { onConflict: 'email' })
+    .select('id')
+    .single()
+
+  if (camperError) return { success: false, error: camperError.message }
+  const camperId = (camperData as { id: string } | null)?.id ?? null
+
+  // 3. Link + set approval state on the profile
+  const profileUpdate: Record<string, unknown> = { camper_id: camperId }
+  if (params.approve) {
+    profileUpdate.role = 'user'
+    profileUpdate.approved_at = new Date().toISOString()
+    profileUpdate.approved_by = adminProfile.id
+    profileUpdate.denied_at = null
+    profileUpdate.denied_reason = null
+  }
+
+  const { error: profileError } = await adminClient
+    .from('user_profiles')
+    .update(profileUpdate as never)
+    .eq('id', userId)
+
+  if (profileError) return { success: false, error: profileError.message }
+
+  return { success: true, data: { userId, camperId, email, password } }
 }
 
 export async function adminResetPasswordAction(
