@@ -646,18 +646,33 @@ function useCorrugatedGeometry(w: number, h: number, ridges: number, depth: numb
 }
 
 // ─── Wheel helper ──────────────────────────────────────────────
-function Wheel({ position, radius }: { position: [number, number, number]; radius: number }) {
+// `facing` is the outboard direction (+1 = the +Z side of the vehicle) so the
+// hubcap lands on the side you can actually see; `dual` adds the second tyre of
+// a truck's rear axle.
+function Wheel({ position, radius, facing = 1, dual = false }: { position: [number, number, number]; radius: number; facing?: number; dual?: boolean }) {
+  const tube = radius * 0.34
+  const outer = dual ? facing * tube * 2.1 : 0
   return (
     <group position={position}>
-      {/* Tire */}
       <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-        <torusGeometry args={[radius, radius * 0.35, 8, 16]} />
-        <meshStandardMaterial color="#222222" roughness={0.9} />
+        <torusGeometry args={[radius, tube, 8, 16]} />
+        <meshStandardMaterial color="#1b1c1e" roughness={0.95} />
       </mesh>
-      {/* Hubcap */}
-      <mesh rotation={[0, Math.PI / 2, 0]}>
-        <circleGeometry args={[radius * 0.55, 12]} />
-        <meshStandardMaterial color="#888888" metalness={0.8} roughness={0.3} />
+      {dual && (
+        <mesh castShadow position={[0, 0, outer]} rotation={[0, 0, Math.PI / 2]}>
+          <torusGeometry args={[radius, tube, 8, 16]} />
+          <meshStandardMaterial color="#1b1c1e" roughness={0.95} />
+        </mesh>
+      )}
+      {/* Fills the torus hole so you can't see daylight through the wheel */}
+      <mesh position={[0, 0, outer / 2]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[radius * 0.72, radius * 0.72, Math.max(0.01, Math.abs(outer) + tube * 1.6), 12]} />
+        <meshStandardMaterial color="#232527" roughness={0.9} />
+      </mesh>
+      {/* Hubcap on the outboard face */}
+      <mesh position={[0, 0, outer + facing * tube * 0.95]} rotation={[0, facing > 0 ? 0 : Math.PI, 0]}>
+        <circleGeometry args={[radius * 0.5, 12]} />
+        <meshStandardMaterial color="#9aa0a6" metalness={0.85} roughness={0.3} />
       </mesh>
     </group>
   )
@@ -1456,6 +1471,12 @@ function isRVShelter(obj: FloorplanObjectRow): boolean {
   return /\brv\b|\brvs\b|motor\s?home|camper\s?van|campervan|winnebago|airstream|sprinter|travel\s?trailer|fifth\s?wheel|box\s?truck/.test(text)
 }
 
+// Containers and road trailers share the `pc_container` type; only the label
+// says which one is actually parked there.
+function isRoadTrailer(obj: FloorplanObjectRow): boolean {
+  return /trailer/i.test(`${obj.label ?? ''} ${obj.properties?.description ?? ''}`)
+}
+
 // ─── Tent (brand-aware dispatcher) ──────────────────────────
 function Tent3D({ obj, widthM, depthM, heightM, color }: { obj: FloorplanObjectRow; widthM: number; depthM: number; heightM: number; color: string }) {
   const entranceCount = obj.properties?.entrance_count ?? 1
@@ -1485,8 +1506,13 @@ function Tent3D({ obj, widthM, depthM, heightM, color }: { obj: FloorplanObjectR
 }
 
 // ─── Generator ──────────────────────────────────────────────
-function Generator3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+// Anything longer than a skid unit renders as the towable set the camp actually
+// runs (white enclosure over a black skirt on a tandem-axle trailer); small
+// entries like distro boxes keep the compact housing.
+function Generator3D({ widthM, depthM, heightM, color, towable }: { widthM: number; depthM: number; heightM: number; color: string; towable: boolean }) {
   const threeColor = hexToThreeColor(color)
+  if (towable) return <TowableGenerator3D widthM={widthM} depthM={depthM} heightM={heightM} accent={threeColor} />
+
   return (
     <group>
       {/* Main housing */}
@@ -1530,43 +1556,303 @@ function Generator3D({ widthM, depthM, heightM, color }: { widthM: number; depth
   )
 }
 
-// ─── Porta Potty ────────────────────────────────────────────
-function PortaPotty3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
-  const threeColor = hexToThreeColor(color)
+function TowableGenerator3D({ widthM, depthM, heightM, accent }: { widthM: number; depthM: number; heightM: number; accent: THREE.Color }) {
+  const highDetail = useHighDetail()
+  const bodyW = depthM * 0.62
+  const wheelR = Math.min(heightM * 0.2, bodyW * 0.24)
+  const deckY = wheelR * 1.5
+  const encL = widthM * 0.62
+  const encH = Math.max(heightM - deckY, heightM * 0.55)
+  const encX = -widthM * 0.12
+  const skirtH = encH * 0.3
+  const tongueL = widthM * 0.2
+
   return (
     <group>
-      {/* Main box */}
-      <mesh castShadow receiveShadow position={[0, heightM / 2, 0]}>
-        <boxGeometry args={[widthM, heightM, depthM]} />
-        <meshStandardMaterial color={threeColor} roughness={0.7} metalness={0.1} />
+      {/* Trailer frame + fenders */}
+      <mesh castShadow position={[encX, deckY - 0.02, 0]}>
+        <boxGeometry args={[encL * 1.06, 0.045, bodyW * 1.04]} />
+        <meshStandardMaterial color="#232629" metalness={0.6} roughness={0.5} />
       </mesh>
-      {/* Roof (slight overhang, darker) */}
-      <mesh castShadow position={[0, heightM + 0.01, 0]}>
-        <boxGeometry args={[widthM * 1.05, 0.02, depthM * 1.05]} />
-        <meshStandardMaterial color={threeColor.clone().multiplyScalar(0.6)} roughness={0.6} metalness={0.2} />
-      </mesh>
-      {/* Roof vent */}
-      <mesh position={[0, heightM + 0.035, 0]}>
-        <boxGeometry args={[widthM * 0.35, 0.03, depthM * 0.35]} />
-        <meshStandardMaterial color="#555555" roughness={0.5} metalness={0.5} />
-      </mesh>
-      {/* Door outline (front face) */}
-      <mesh position={[widthM / 2 + 0.004, heightM * 0.45, 0]}>
-        <planeGeometry args={[depthM * 0.7, heightM * 0.78]} />
-        <meshStandardMaterial color={threeColor.clone().multiplyScalar(0.75)} roughness={0.8} />
-      </mesh>
-      {/* Vent slats on door */}
-      {Array.from({ length: 4 }, (_, i) => (
-        <mesh key={i} position={[widthM / 2 + 0.006, heightM * 0.72 + i * heightM * 0.04, 0]}>
-          <boxGeometry args={[0.002, 0.005, depthM * 0.4]} />
-          <meshStandardMaterial color="#444444" metalness={0.5} roughness={0.5} />
+      {[-1, 1].map(s => (
+        <mesh key={`fender-${s}`} castShadow position={[encX + widthM * 0.05, deckY - 0.05, s * bodyW * 0.56]}>
+          <boxGeometry args={[wheelR * 5, 0.03, wheelR * 0.9]} />
+          <meshStandardMaterial color="#232629" metalness={0.5} roughness={0.6} />
         </mesh>
       ))}
-      {/* Door handle */}
-      <mesh position={[widthM / 2 + 0.01, heightM * 0.5, depthM * 0.18]}>
-        <sphereGeometry args={[0.015, 8, 8]} />
-        <meshStandardMaterial color="#888888" metalness={0.8} roughness={0.3} />
+
+      {/* Sound-attenuated enclosure: white shell over a dark skirt */}
+      <mesh castShadow receiveShadow position={[encX, deckY + skirtH + (encH - skirtH) / 2, 0]}>
+        <boxGeometry args={[encL, encH - skirtH, bodyW]} />
+        <meshStandardMaterial color="#e9eaec" roughness={0.45} metalness={0.15} envMapIntensity={0.7} />
       </mesh>
+      <mesh castShadow receiveShadow position={[encX, deckY + skirtH / 2, 0]}>
+        <boxGeometry args={[encL, skirtH, bodyW * 1.002]} />
+        <meshStandardMaterial color="#26282b" roughness={0.6} metalness={0.2} />
+      </mesh>
+      {/* Roof cap, slightly proud of the shell */}
+      <mesh castShadow position={[encX, deckY + encH, 0]}>
+        <boxGeometry args={[encL * 1.02, encH * 0.05, bodyW * 1.02]} />
+        <meshStandardMaterial color="#d6d8da" roughness={0.5} metalness={0.2} />
+      </mesh>
+      {/* Livery stripe at the white/black break */}
+      <mesh position={[encX, deckY + skirtH + encH * 0.012, 0]}>
+        <boxGeometry args={[encL * 1.004, encH * 0.025, bodyW * 1.004]} />
+        <meshStandardMaterial color={accent} roughness={0.5} metalness={0.2} />
+      </mesh>
+
+      {[-1, 1].map(s => (
+        <group key={`side-${s}`}>
+          {/* Access doors */}
+          {[-0.24, 0.1].map((f, i) => (
+            <mesh key={i} position={[encX + encL * f, deckY + skirtH + (encH - skirtH) * 0.5, s * (bodyW / 2 + 0.004)]}>
+              <boxGeometry args={[encL * 0.28, (encH - skirtH) * 0.74, 0.008]} />
+              <meshStandardMaterial color="#dcdee0" roughness={0.5} metalness={0.2} />
+            </mesh>
+          ))}
+          {/* Radiator louvres */}
+          {highDetail && Array.from({ length: 6 }, (_, i) => (
+            <mesh key={`lv${i}`} position={[encX + encL * 0.33, deckY + skirtH + (encH - skirtH) * (0.28 + i * 0.1), s * (bodyW / 2 + 0.006)]}>
+              <boxGeometry args={[encL * 0.18, (encH - skirtH) * 0.045, 0.006]} />
+              <meshStandardMaterial color="#4a4d51" roughness={0.7} metalness={0.4} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* Control panel on the tow end */}
+      <mesh position={[encX + encL / 2 + 0.006, deckY + skirtH + (encH - skirtH) * 0.55, 0]}>
+        <boxGeometry args={[0.012, (encH - skirtH) * 0.5, bodyW * 0.5]} />
+        <meshStandardMaterial color="#1f2124" roughness={0.45} metalness={0.4} />
+      </mesh>
+      {/* Exhaust stack */}
+      <mesh castShadow position={[encX - encL * 0.36, deckY + encH + encH * 0.13, bodyW * 0.28]}>
+        <cylinderGeometry args={[bodyW * 0.05, bodyW * 0.055, encH * 0.26, 10]} />
+        <meshStandardMaterial color="#3a3d40" metalness={0.7} roughness={0.45} />
+      </mesh>
+
+      {/* Tandem axles */}
+      {[-1, 1].map(s => (
+        <React.Fragment key={`ax-${s}`}>
+          <Wheel position={[encX + wheelR * 1.3, wheelR, s * (bodyW * 0.5)]} radius={wheelR} facing={s} />
+          <Wheel position={[encX - wheelR * 1.5, wheelR, s * (bodyW * 0.5)]} radius={wheelR} facing={s} />
+        </React.Fragment>
+      ))}
+
+      {/* Drawbar, coupler and jack */}
+      <mesh castShadow position={[encX + encL / 2 + tongueL / 2, deckY - 0.03, 0]}>
+        <boxGeometry args={[tongueL, 0.05, bodyW * 0.16]} />
+        <meshStandardMaterial color="#232629" metalness={0.6} roughness={0.5} />
+      </mesh>
+      <mesh castShadow position={[encX + encL / 2 + tongueL, deckY - 0.03, 0]}>
+        <boxGeometry args={[tongueL * 0.22, 0.075, bodyW * 0.22]} />
+        <meshStandardMaterial color="#1c1e20" metalness={0.7} roughness={0.4} />
+      </mesh>
+      <mesh castShadow position={[encX + encL / 2 + tongueL * 0.55, (deckY - 0.055) / 2, 0]}>
+        <cylinderGeometry args={[bodyW * 0.035, bodyW * 0.035, deckY - 0.055, 8]} />
+        <meshStandardMaterial color="#54585c" metalness={0.6} roughness={0.5} />
+      </mesh>
+    </group>
+  )
+}
+
+// ─── Swamp cooler (portable evaporative cooler) ─────────────
+// Hessaire-style: tall louvred cabinet, big axial fan behind a round grille,
+// water reservoir in the base, on casters.
+function SwampCooler3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+  const highDetail = useHighDetail()
+  const tank = hexToThreeColor(color)
+  const shell = new THREE.Color('#dcdee1')
+  const bodyW = widthM * 0.62
+  const bodyD = depthM * 0.62
+  const casterR = Math.min(bodyW, bodyD) * 0.07
+  const baseY = casterR * 2
+  const tankH = heightM * 0.3
+  const cabH = heightM - baseY - tankH
+  const cabY = baseY + tankH
+  const grilleR = Math.min(bodyD, cabH) * 0.42
+
+  return (
+    <group>
+      {/* Water reservoir */}
+      <mesh castShadow receiveShadow position={[0, baseY + tankH / 2, 0]}>
+        <boxGeometry args={[bodyW, tankH, bodyD]} />
+        <meshStandardMaterial color={tank} roughness={0.45} metalness={0.1} envMapIntensity={0.6} />
+      </mesh>
+      {/* Fill door on the tank */}
+      <mesh position={[bodyW / 2 + 0.004, baseY + tankH * 0.55, 0]}>
+        <boxGeometry args={[0.008, tankH * 0.45, bodyD * 0.45]} />
+        <meshStandardMaterial color={tank.clone().multiplyScalar(0.82)} roughness={0.5} />
+      </mesh>
+
+      {/* Cabinet */}
+      <RoundedBox
+        castShadow
+        receiveShadow
+        position={[0, cabY + cabH / 2, 0]}
+        args={[bodyW, cabH, bodyD]}
+        radius={Math.min(bodyW, bodyD) * 0.08}
+        smoothness={2}
+      >
+        <meshStandardMaterial color={shell} roughness={0.5} metalness={0.12} envMapIntensity={0.7} />
+      </RoundedBox>
+
+      {/* Evaporative pad louvres on both sides and the back */}
+      {[[-1, 0], [1, 0], [0, -1]].map(([sx, sz], p) => {
+        const faceX = sx * (bodyW / 2 + 0.004)
+        const faceZ = sz * (bodyD / 2 + 0.004)
+        const panelW = sx !== 0 ? bodyD * 0.78 : bodyW * 0.78
+        return (
+          <group key={p} position={[faceX, cabY + cabH * 0.52, faceZ]} rotation={[0, sx !== 0 ? Math.PI / 2 : 0, 0]}>
+            <mesh>
+              <boxGeometry args={[panelW, cabH * 0.72, 0.01]} />
+              <meshStandardMaterial color="#7d8a7a" roughness={0.95} metalness={0} envMapIntensity={0.3} />
+            </mesh>
+            {highDetail && Array.from({ length: 7 }, (_, i) => (
+              <mesh key={i} position={[0, cabH * (0.3 - i * 0.1), 0.008]}>
+                <boxGeometry args={[panelW * 0.96, cabH * 0.03, 0.008]} />
+                <meshStandardMaterial color={shell.clone().multiplyScalar(0.92)} roughness={0.55} metalness={0.1} />
+              </mesh>
+            ))}
+          </group>
+        )
+      })}
+
+      {/* Fan grille on the discharge face */}
+      <group position={[0, cabY + cabH * 0.55, bodyD / 2 + 0.006]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[grilleR * 1.12, grilleR * 1.12, 0.012, 20]} />
+          <meshStandardMaterial color="#22262a" roughness={0.6} metalness={0.3} />
+        </mesh>
+        {[0.45, 0.75, 1].map((f, i) => (
+          <mesh key={i}>
+            <torusGeometry args={[grilleR * f, grilleR * 0.035, 5, 20]} />
+            <meshStandardMaterial color="#b9bec3" metalness={0.7} roughness={0.35} />
+          </mesh>
+        ))}
+        {/* Fan hub and blades behind the grille */}
+        <mesh position={[0, 0, -0.014]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[grilleR * 0.2, grilleR * 0.2, 0.02, 10]} />
+          <meshStandardMaterial color="#33383d" roughness={0.5} metalness={0.4} />
+        </mesh>
+        {highDetail && Array.from({ length: 4 }, (_, i) => (
+          <mesh key={`bl${i}`} position={[0, 0, -0.018]} rotation={[0, 0, (i * Math.PI) / 2 + 0.4]}>
+            <boxGeometry args={[grilleR * 0.86, grilleR * 0.34, 0.006]} />
+            <meshStandardMaterial color="#5b6167" roughness={0.6} metalness={0.3} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Control panel and carry handle */}
+      <mesh position={[0, cabY + cabH + 0.004, -bodyD * 0.18]}>
+        <boxGeometry args={[bodyW * 0.5, 0.012, bodyD * 0.3]} />
+        <meshStandardMaterial color="#2b2f33" roughness={0.45} metalness={0.3} />
+      </mesh>
+      <mesh castShadow position={[0, cabY + cabH + 0.03, -bodyD * 0.36]}>
+        <boxGeometry args={[bodyW * 0.55, 0.014, 0.02]} />
+        <meshStandardMaterial color="#3c4247" roughness={0.5} metalness={0.35} />
+      </mesh>
+
+      {/* Casters */}
+      {[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz], i) => (
+        <mesh key={`cs${i}`} castShadow position={[sx * bodyW * 0.38, casterR, sz * bodyD * 0.38]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[casterR, casterR, casterR * 0.8, 8]} />
+          <meshStandardMaterial color="#2a2c2e" roughness={0.85} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// ─── Porta Potty ────────────────────────────────────────────
+function PortaPotty3D({ widthM, depthM, heightM, color: _color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+  const highDetail = useHighDetail()
+  const shell = new THREE.Color('#2f62b8')
+  const door = new THREE.Color('#3a72cc')
+  const bodyW = widthM * 0.72
+  const bodyD = depthM * 0.72
+  const skidH = heightM * 0.05
+  const cabH = heightM * 0.86
+  const roofH = heightM * 0.07
+
+  return (
+    <group>
+      {/* Skid base */}
+      <mesh castShadow receiveShadow position={[0, skidH / 2, 0]}>
+        <boxGeometry args={[bodyW * 1.04, skidH, bodyD * 1.04]} />
+        <meshStandardMaterial color="#54585d" roughness={0.85} metalness={0.05} />
+      </mesh>
+
+      {/* Cabin */}
+      <RoundedBox
+        castShadow
+        receiveShadow
+        position={[0, skidH + cabH / 2, 0]}
+        args={[bodyW, cabH, bodyD]}
+        radius={Math.min(bodyW, bodyD) * 0.07}
+        smoothness={2}
+      >
+        <meshStandardMaterial color={shell} roughness={0.42} metalness={0.05} envMapIntensity={0.8} />
+      </RoundedBox>
+
+      {/* Moulded vertical ribs down the sides and back */}
+      {highDetail && [[-1, 0], [1, 0], [0, -1]].map(([sx, sz], p) =>
+        Array.from({ length: 3 }, (_, i) => (
+          <mesh
+            key={`rib-${p}-${i}`}
+            position={[
+              sx !== 0 ? sx * (bodyW / 2 + 0.004) : (i - 1) * bodyW * 0.26,
+              skidH + cabH * 0.5,
+              sz !== 0 ? sz * (bodyD / 2 + 0.004) : (i - 1) * bodyD * 0.26,
+            ]}
+          >
+            <boxGeometry args={sx !== 0 ? [0.008, cabH * 0.86, bodyD * 0.1] : [bodyW * 0.1, cabH * 0.86, 0.008]} />
+            <meshStandardMaterial color={shell.clone().multiplyScalar(0.88)} roughness={0.45} />
+          </mesh>
+        ))
+      )}
+
+      {/* Translucent peaked roof */}
+      <mesh castShadow position={[0, skidH + cabH + roofH * 0.18, 0]}>
+        <boxGeometry args={[bodyW * 1.06, roofH * 0.4, bodyD * 1.06]} />
+        <meshStandardMaterial color="#e7e9ec" roughness={0.5} metalness={0.05} />
+      </mesh>
+      <mesh castShadow position={[0, skidH + cabH + roofH * 0.38, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[Math.max(bodyW, bodyD) * 0.76, roofH * 0.9, 4]} />
+        <meshStandardMaterial color="#f0f2f4" roughness={0.55} metalness={0.05} />
+      </mesh>
+
+      {/* Vent stack up the back corner */}
+      <mesh castShadow position={[-bodyW * 0.34, skidH + cabH * 0.75, -bodyD * 0.42]}>
+        <cylinderGeometry args={[bodyW * 0.05, bodyW * 0.05, cabH * 0.7 + roofH * 1.6, 8]} />
+        <meshStandardMaterial color="#7d8288" roughness={0.6} metalness={0.3} />
+      </mesh>
+
+      {/* Door: recessed arched panel with a latch */}
+      <group position={[bodyW / 2 + 0.005, skidH, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <mesh>
+          <boxGeometry args={[bodyD * 0.78, cabH * 0.9, 0.01]} />
+          <meshStandardMaterial color={door} roughness={0.42} metalness={0.05} />
+        </mesh>
+        <mesh position={[0, cabH * 0.06, 0.008]}>
+          <boxGeometry args={[bodyD * 0.6, cabH * 0.58, 0.008]} />
+          <meshStandardMaterial color={door.clone().multiplyScalar(0.9)} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, cabH * 0.35, 0.008]}>
+          <circleGeometry args={[bodyD * 0.3, 16, 0, Math.PI]} />
+          <meshStandardMaterial color={door.clone().multiplyScalar(0.9)} roughness={0.5} />
+        </mesh>
+        <mesh position={[bodyD * 0.3, cabH * 0.05, 0.014]}>
+          <boxGeometry args={[0.018, cabH * 0.1, 0.018]} />
+          <meshStandardMaterial color="#c9ced3" metalness={0.7} roughness={0.35} />
+        </mesh>
+        {highDetail && (
+          <mesh position={[bodyD * 0.3, cabH * 0.2, 0.014]}>
+            <circleGeometry args={[0.014, 10]} />
+            <meshStandardMaterial color="#22c55e" roughness={0.6} />
+          </mesh>
+        )}
+      </group>
     </group>
   )
 }
@@ -1659,57 +1945,381 @@ function Grill3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: n
 }
 
 // ─── Refrigerated Truck ─────────────────────────────────────
+// Cabover (Isuzu N-series) pulling a reefer box with the condenser unit nosed
+// over the cab. Long axis runs along X with the cab at +X.
 function ReeferTruck3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
-  const threeColor = hexToThreeColor(color)
-  const boxLen = widthM * 0.68
-  const cabLen = widthM - boxLen
-  const wheelR = Math.min(depthM * 0.1, heightM * 0.08)
-  const boxH = heightM * 0.9
+  const cab = hexToThreeColor(color).lerp(new THREE.Color('#f2f3f4'), 0.55)
+  const highDetail = useHighDetail()
+  const bodyW = depthM * 0.74
+  const wheelR = Math.min(heightM * 0.16, bodyW * 0.24)
+  const frameY = wheelR * 1.35
+  const cabL = widthM * 0.24
+  const boxL = widthM * 0.74
+  const boxX = -widthM / 2 + boxL / 2
+  const cabX = widthM / 2 - cabL / 2
+  const boxH = heightM - frameY
+  const cabH = heightM * 0.5
 
   return (
     <group>
-      {/* Refrigerated box body */}
-      <mesh castShadow receiveShadow position={[-widthM / 2 + boxLen / 2, boxH / 2, 0]}>
-        <boxGeometry args={[boxLen, boxH, depthM]} />
-        <meshStandardMaterial color="#eeeeee" roughness={0.5} metalness={0.15} />
+      {/* Chassis rails */}
+      <mesh castShadow position={[0, frameY - 0.03, 0]}>
+        <boxGeometry args={[widthM * 0.96, 0.06, bodyW * 0.72]} />
+        <meshStandardMaterial color="#2b2e31" metalness={0.6} roughness={0.5} />
       </mesh>
-      {/* Reefer unit on front of box */}
-      <mesh castShadow position={[-widthM / 2 + 0.02, boxH * 0.7, 0]}>
-        <boxGeometry args={[0.06, boxH * 0.4, depthM * 0.7]} />
-        <meshStandardMaterial color="#cccccc" roughness={0.4} metalness={0.4} />
+
+      {/* Reefer box */}
+      <mesh castShadow receiveShadow position={[boxX, frameY + boxH / 2, 0]}>
+        <boxGeometry args={[boxL, boxH, bodyW]} />
+        <meshStandardMaterial color="#f4f5f6" roughness={0.42} metalness={0.12} envMapIntensity={0.8} />
       </mesh>
-      {/* Reefer vent grille */}
-      {Array.from({ length: 3 }, (_, i) => (
-        <mesh key={i} position={[-widthM / 2 - 0.005, boxH * 0.6 + i * 0.04, 0]}>
-          <boxGeometry args={[0.002, 0.01, depthM * 0.5]} />
-          <meshStandardMaterial color="#999999" metalness={0.6} />
+      {/* Riveted panel seams down the sides */}
+      {highDetail && [-1, 1].map(s =>
+        Array.from({ length: 7 }, (_, i) => (
+          <mesh key={`seam-${s}-${i}`} position={[boxX - boxL / 2 + boxL * ((i + 0.5) / 7), frameY + boxH / 2, s * (bodyW / 2 + 0.004)]}>
+            <boxGeometry args={[0.012, boxH * 0.94, 0.008]} />
+            <meshStandardMaterial color="#dcdee0" roughness={0.5} metalness={0.25} />
+          </mesh>
+        ))
+      )}
+      {/* Aluminium scuff rails */}
+      {[-1, 1].map(s => (
+        <React.Fragment key={`rail-${s}`}>
+          <mesh position={[boxX, frameY + 0.02, s * (bodyW / 2 + 0.006)]}>
+            <boxGeometry args={[boxL, boxH * 0.06, 0.012]} />
+            <meshStandardMaterial color="#aeb3b8" metalness={0.75} roughness={0.35} />
+          </mesh>
+          <mesh position={[boxX, frameY + boxH - boxH * 0.03, s * (bodyW / 2 + 0.006)]}>
+            <boxGeometry args={[boxL, boxH * 0.05, 0.012]} />
+            <meshStandardMaterial color="#aeb3b8" metalness={0.75} roughness={0.35} />
+          </mesh>
+        </React.Fragment>
+      ))}
+
+      {/* Thermo King unit, hung on the box face and nosed out over the cab */}
+      <group position={[boxX + boxL / 2 + bodyW * 0.11, frameY + boxH * 0.78, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[bodyW * 0.34, boxH * 0.42, bodyW * 0.88]} />
+          <meshStandardMaterial color="#f0f1f2" roughness={0.4} metalness={0.2} />
+        </mesh>
+        <mesh position={[bodyW * 0.176, -boxH * 0.03, 0]}>
+          <boxGeometry args={[0.014, boxH * 0.18, bodyW * 0.74]} />
+          <meshStandardMaterial color="#1d1f21" roughness={0.5} metalness={0.3} />
+        </mesh>
+        {highDetail && Array.from({ length: 3 }, (_, i) => (
+          <mesh key={i} position={[bodyW * 0.182, boxH * (0.02 - i * 0.05), 0]}>
+            <boxGeometry args={[0.008, boxH * 0.02, bodyW * 0.66]} />
+            <meshStandardMaterial color="#8d9298" metalness={0.6} roughness={0.4} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Cab */}
+      <mesh castShadow receiveShadow position={[cabX, frameY + cabH / 2, 0]}>
+        <boxGeometry args={[cabL, cabH, bodyW * 0.98]} />
+        <meshStandardMaterial color={cab} roughness={0.35} metalness={0.25} envMapIntensity={0.9} />
+      </mesh>
+      {/* Windshield wrapping the front of the cab */}
+      <mesh position={[cabX + cabL / 2 + 0.005, frameY + cabH * 0.68, 0]}>
+        <boxGeometry args={[0.01, cabH * 0.42, bodyW * 0.84]} />
+        <meshStandardMaterial color="#8fb6cc" metalness={0.35} roughness={0.08} envMapIntensity={1.4} />
+      </mesh>
+      {/* Side windows + doors */}
+      {[-1, 1].map(s => (
+        <React.Fragment key={`cabside-${s}`}>
+          <mesh position={[cabX + cabL * 0.06, frameY + cabH * 0.68, s * (bodyW * 0.49 + 0.004)]}>
+            <boxGeometry args={[cabL * 0.55, cabH * 0.34, 0.008]} />
+            <meshStandardMaterial color="#8fb6cc" metalness={0.35} roughness={0.08} envMapIntensity={1.4} />
+          </mesh>
+          <mesh position={[cabX + cabL * 0.06, frameY + cabH * 0.3, s * (bodyW * 0.49 + 0.004)]}>
+            <boxGeometry args={[cabL * 0.6, cabH * 0.34, 0.006]} />
+            <meshStandardMaterial color={cab.clone().multiplyScalar(0.94)} roughness={0.4} metalness={0.25} />
+          </mesh>
+          {/* Mirror on a stalk */}
+          <mesh castShadow position={[cabX + cabL * 0.42, frameY + cabH * 0.78, s * (bodyW * 0.6)]}>
+            <boxGeometry args={[0.014, cabH * 0.26, 0.03]} />
+            <meshStandardMaterial color="#2f3336" roughness={0.5} metalness={0.4} />
+          </mesh>
+        </React.Fragment>
+      ))}
+      {/* Grille, bumper and headlights */}
+      <mesh position={[cabX + cabL / 2 + 0.006, frameY + cabH * 0.26, 0]}>
+        <boxGeometry args={[0.012, cabH * 0.22, bodyW * 0.62]} />
+        <meshStandardMaterial color="#3a3e42" roughness={0.55} metalness={0.4} />
+      </mesh>
+      <mesh castShadow position={[cabX + cabL / 2 + 0.01, frameY - 0.01, 0]}>
+        <boxGeometry args={[0.03, cabH * 0.12, bodyW * 0.94]} />
+        <meshStandardMaterial color="#d7d9db" roughness={0.4} metalness={0.4} />
+      </mesh>
+      {[-1, 1].map(s => (
+        <mesh key={`hl-${s}`} position={[cabX + cabL / 2 + 0.012, frameY + cabH * 0.16, s * bodyW * 0.34]}>
+          <boxGeometry args={[0.01, cabH * 0.11, bodyW * 0.16]} />
+          <meshStandardMaterial color="#f4f2e4" emissive="#ffeec4" emissiveIntensity={0.25} roughness={0.2} />
         </mesh>
       ))}
-      {/* Cab */}
-      <mesh castShadow receiveShadow position={[widthM / 2 - cabLen / 2, heightM * 0.38, 0]}>
-        <boxGeometry args={[cabLen, heightM * 0.7, depthM * 0.9]} />
-        <meshStandardMaterial color={threeColor} roughness={0.5} metalness={0.2} />
+      {/* Cab roof marker lights */}
+      {highDetail && [-2, -1, 0, 1, 2].map(i => (
+        <mesh key={`mk${i}`} position={[cabX + cabL * 0.42, frameY + cabH + 0.008, i * bodyW * 0.14]}>
+          <boxGeometry args={[0.02, 0.014, 0.024]} />
+          <meshStandardMaterial color="#e8a33d" emissive="#c9761a" emissiveIntensity={0.35} roughness={0.4} />
+        </mesh>
+      ))}
+
+      {/* Rear roll-up door with a pull strap */}
+      <mesh position={[boxX - boxL / 2 - 0.006, frameY + boxH * 0.5, 0]}>
+        <boxGeometry args={[0.012, boxH * 0.88, bodyW * 0.9]} />
+        <meshStandardMaterial color="#e2e4e6" roughness={0.55} metalness={0.2} />
       </mesh>
-      {/* Windshield */}
-      <mesh position={[widthM / 2 + 0.004, heightM * 0.52, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[depthM * 0.65, heightM * 0.35]} />
-        <meshStandardMaterial color="#87CEEB" metalness={0.4} roughness={0.05} transparent opacity={0.6} />
+      {highDetail && Array.from({ length: 6 }, (_, i) => (
+        <mesh key={`slat${i}`} position={[boxX - boxL / 2 - 0.014, frameY + boxH * (0.14 + i * 0.14), 0]}>
+          <boxGeometry args={[0.008, boxH * 0.02, bodyW * 0.88]} />
+          <meshStandardMaterial color="#c9ccd0" roughness={0.6} metalness={0.25} />
+        </mesh>
+      ))}
+      {/* Rear bumper and tail lights */}
+      <mesh castShadow position={[boxX - boxL / 2 - 0.02, frameY * 0.45, 0]}>
+        <boxGeometry args={[0.04, 0.05, bodyW * 0.92]} />
+        <meshStandardMaterial color="#33373a" metalness={0.6} roughness={0.5} />
       </mesh>
-      {/* Wheels */}
-      <Wheel position={[-widthM * 0.3, wheelR, depthM / 2 + 0.005]} radius={wheelR} />
-      <Wheel position={[-widthM * 0.3, wheelR, -depthM / 2 - 0.005]} radius={wheelR} />
-      <Wheel position={[widthM * 0.35, wheelR, depthM / 2 + 0.005]} radius={wheelR} />
-      <Wheel position={[widthM * 0.35, wheelR, -depthM / 2 - 0.005]} radius={wheelR} />
-      {/* Roll-up door at back of box */}
-      <mesh position={[-widthM / 2 + boxLen + 0.004, boxH * 0.48, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[depthM * 0.85, boxH * 0.88]} />
-        <meshStandardMaterial color="#dddddd" roughness={0.6} metalness={0.2} />
+      {[-1, 1].map(s => (
+        <mesh key={`tl-${s}`} position={[boxX - boxL / 2 - 0.03, frameY * 0.75, s * bodyW * 0.38]}>
+          <boxGeometry args={[0.01, boxH * 0.06, bodyW * 0.12]} />
+          <meshStandardMaterial color="#c02828" emissive="#8f1414" emissiveIntensity={0.3} roughness={0.4} />
+        </mesh>
+      ))}
+
+      {/* Steer axle single, drive axle dual */}
+      {[-1, 1].map(s => (
+        <React.Fragment key={`axle-${s}`}>
+          <Wheel position={[cabX - cabL * 0.05, wheelR, s * (bodyW * 0.44)]} radius={wheelR} facing={s} />
+          <Wheel position={[boxX - boxL * 0.3, wheelR, s * (bodyW * 0.4)]} radius={wheelR} facing={s} dual />
+        </React.Fragment>
+      ))}
+      {/* Fuel tank slung under the rails */}
+      <mesh castShadow position={[cabX - cabL * 1.1, frameY - 0.045, bodyW * 0.36]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[wheelR * 0.38, wheelR * 0.38, widthM * 0.1, 10]} />
+        <meshStandardMaterial color="#b8bcc0" metalness={0.75} roughness={0.35} />
       </mesh>
-      {/* Door handle */}
-      <mesh position={[-widthM / 2 + boxLen + 0.015, boxH * 0.35, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.008, 0.008, 0.05, 6]} />
-        <meshStandardMaterial color="#666666" metalness={0.8} roughness={0.3} />
+    </group>
+  )
+}
+
+// ─── Semi trailer (bike trailer, dry van) ───────────────────
+// 53 ft van body on a tandem bogie: swing doors and ICC bumper at −X, kingpin
+// and landing gear at +X.
+function SemiTrailer3D({ widthM, depthM, heightM, color }: { widthM: number; depthM: number; heightM: number; color: string }) {
+  const highDetail = useHighDetail()
+  const accent = hexToThreeColor(color)
+  const bodyW = depthM * 0.76
+  const wheelR = Math.min(heightM * 0.15, bodyW * 0.22)
+  const deckY = wheelR * 1.7
+  const boxH = heightM - deckY
+  const boxL = widthM * 0.97
+
+  return (
+    <group>
+      {/* Van body */}
+      <mesh castShadow receiveShadow position={[0, deckY + boxH / 2, 0]}>
+        <boxGeometry args={[boxL, boxH, bodyW]} />
+        <meshStandardMaterial color="#f2f3f5" roughness={0.45} metalness={0.12} envMapIntensity={0.8} />
       </mesh>
+      {/* Roof bow, slightly crowned */}
+      <mesh castShadow position={[0, deckY + boxH + boxH * 0.012, 0]}>
+        <boxGeometry args={[boxL * 0.995, boxH * 0.03, bodyW * 0.99]} />
+        <meshStandardMaterial color="#dfe1e4" roughness={0.5} metalness={0.15} />
+      </mesh>
+      {/* Side posts */}
+      {highDetail && [-1, 1].map(s =>
+        Array.from({ length: 12 }, (_, i) => (
+          <mesh key={`post-${s}-${i}`} position={[-boxL / 2 + boxL * ((i + 0.5) / 12), deckY + boxH / 2, s * (bodyW / 2 + 0.004)]}>
+            <boxGeometry args={[0.012, boxH * 0.92, 0.008]} />
+            <meshStandardMaterial color="#dcdee1" roughness={0.5} metalness={0.2} />
+          </mesh>
+        ))
+      )}
+      {/* Rub rail and lower skirt */}
+      {[-1, 1].map(s => (
+        <mesh key={`rub-${s}`} position={[0, deckY + boxH * 0.04, s * (bodyW / 2 + 0.007)]}>
+          <boxGeometry args={[boxL, boxH * 0.05, 0.014]} />
+          <meshStandardMaterial color="#a9aeb3" metalness={0.7} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Chassis rail under the body */}
+      <mesh castShadow position={[0, deckY - 0.03, 0]}>
+        <boxGeometry args={[boxL * 0.98, 0.055, bodyW * 0.66]} />
+        <meshStandardMaterial color="#2c3033" metalness={0.6} roughness={0.5} />
+      </mesh>
+
+      {/* Rear swing doors */}
+      {[-1, 1].map(s => (
+        <group key={`door-${s}`} position={[-boxL / 2 - 0.008, deckY + boxH * 0.5, s * bodyW * 0.25]}>
+          <mesh>
+            <boxGeometry args={[0.016, boxH * 0.9, bodyW * 0.47]} />
+            <meshStandardMaterial color="#e8eaec" roughness={0.5} metalness={0.15} />
+          </mesh>
+          {/* Locking rods */}
+          {[0.3, 0.75].map((f, i) => (
+            <mesh key={i} position={[-0.012, 0, s * bodyW * 0.47 * (f - 0.5)]}>
+              <cylinderGeometry args={[bodyW * 0.018, bodyW * 0.018, boxH * 0.84, 6]} />
+              <meshStandardMaterial color="#43484c" metalness={0.8} roughness={0.3} />
+            </mesh>
+          ))}
+          {/* Hinges on the outboard edge */}
+          {highDetail && [-1, 0, 1].map(i => (
+            <mesh key={`hg${i}`} position={[-0.008, i * boxH * 0.34, s * bodyW * 0.22]}>
+              <boxGeometry args={[0.014, boxH * 0.06, 0.026]} />
+              <meshStandardMaterial color="#3c4145" metalness={0.7} roughness={0.4} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {/* Conspicuity tape across the rear sill */}
+      <mesh position={[-boxL / 2 - 0.02, deckY + boxH * 0.03, 0]}>
+        <boxGeometry args={[0.01, boxH * 0.045, bodyW * 0.95]} />
+        <meshStandardMaterial color={accent} roughness={0.5} />
+      </mesh>
+      {/* ICC bumper on drop posts */}
+      <mesh castShadow position={[-boxL / 2 - 0.02, deckY * 0.32, 0]}>
+        <boxGeometry args={[0.05, 0.05, bodyW * 0.9]} />
+        <meshStandardMaterial color="#33383c" metalness={0.6} roughness={0.5} />
+      </mesh>
+      {[-1, 1].map(s => (
+        <mesh key={`icc-${s}`} position={[-boxL / 2 - 0.02, deckY * 0.66, s * bodyW * 0.3]}>
+          <boxGeometry args={[0.035, deckY * 0.7, 0.035]} />
+          <meshStandardMaterial color="#33383c" metalness={0.6} roughness={0.5} />
+        </mesh>
+      ))}
+      {/* Tail lights */}
+      {[-1, 1].map(s => (
+        <mesh key={`tl-${s}`} position={[-boxL / 2 - 0.03, deckY * 0.5, s * bodyW * 0.4]}>
+          <boxGeometry args={[0.012, boxH * 0.055, bodyW * 0.1]} />
+          <meshStandardMaterial color="#bf2a2a" emissive="#8c1616" emissiveIntensity={0.3} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Mud flaps behind the bogie */}
+      {highDetail && [-1, 1].map(s => (
+        <mesh key={`flap-${s}`} position={[-boxL * 0.34, wheelR * 0.75, s * bodyW * 0.44]}>
+          <boxGeometry args={[0.008, wheelR * 1.5, bodyW * 0.2]} />
+          <meshStandardMaterial color="#1e2022" roughness={0.95} />
+        </mesh>
+      ))}
+
+      {/* Tandem bogie */}
+      {[-1, 1].map(s => (
+        <React.Fragment key={`bogie-${s}`}>
+          <Wheel position={[-boxL * 0.28, wheelR, s * (bodyW * 0.4)]} radius={wheelR} facing={s} dual />
+          <Wheel position={[-boxL * 0.28 + wheelR * 2.6, wheelR, s * (bodyW * 0.4)]} radius={wheelR} facing={s} dual />
+        </React.Fragment>
+      ))}
+
+      {/* Landing gear */}
+      {[-1, 1].map(s => (
+        <group key={`lg-${s}`} position={[boxL * 0.26, 0, s * bodyW * 0.32]}>
+          <mesh castShadow position={[0, deckY * 0.55, 0]}>
+            <boxGeometry args={[0.04, deckY * 1.1, 0.04]} />
+            <meshStandardMaterial color="#3a3f43" metalness={0.6} roughness={0.5} />
+          </mesh>
+          <mesh castShadow position={[0, 0.02, 0]}>
+            <boxGeometry args={[0.09, 0.04, 0.07]} />
+            <meshStandardMaterial color="#2c3033" metalness={0.6} roughness={0.5} />
+          </mesh>
+        </group>
+      ))}
+      {/* Kingpin plate at the nose */}
+      <mesh position={[boxL * 0.42, deckY - 0.06, 0]}>
+        <boxGeometry args={[boxL * 0.14, 0.03, bodyW * 0.6]} />
+        <meshStandardMaterial color="#43484c" metalness={0.7} roughness={0.4} />
+      </mesh>
+    </group>
+  )
+}
+
+// ─── Canvas pole tent (chill tents / common areas) ──────────
+// Hipped ridge roof over low canvas walls, guyed off at the eaves. Always
+// canvas coloured — these are the camp's big shade tents, not painted kit.
+function useHipRidgeRoofGeometry(len: number, wid: number, rise: number) {
+  const geo = useMemo(() => {
+    const hl = len / 2
+    const hw = wid / 2
+    const inset = len * 0.18
+    const rl: V3 = [-hl + inset, rise, 0]
+    const rr: V3 = [hl - inset, rise, 0]
+    const a: V3 = [-hl, 0, -hw]
+    const b: V3 = [hl, 0, -hw]
+    const c: V3 = [hl, 0, hw]
+    const d: V3 = [-hl, 0, hw]
+    const base: V3[][] = [
+      [a, rr, rl], [a, b, rr],
+      [c, rl, rr], [c, d, rl],
+      [d, a, rl], [b, c, rr],
+    ]
+    return buildIndexedGeometry(sagSubdivide(base, rise * 0.07))
+  }, [len, wid, rise])
+  useEffect(() => () => { geo.dispose() }, [geo])
+  return geo
+}
+
+function PoleTent3D({ widthM, depthM, heightM }: { widthM: number; depthM: number; heightM: number }) {
+  const highDetail = useHighDetail()
+  // Model along X, then swing a quarter turn if the footprint runs the other way.
+  const alongZ = depthM > widthM
+  const len = alongZ ? depthM : widthM
+  const wid = alongZ ? widthM : depthM
+  const wallH = heightM * 0.42
+  const rise = heightM - wallH
+  const roof = useHipRidgeRoofGeometry(len, wid, rise)
+  const canvas = new THREE.Color('#cbbe9b')
+  const windows = Math.max(2, Math.round(len / (wid * 0.55)))
+
+  return (
+    <group rotation={[0, alongZ ? Math.PI / 2 : 0, 0]}>
+      {/* Canvas walls */}
+      <mesh castShadow receiveShadow position={[0, wallH / 2, 0]}>
+        <boxGeometry args={[len, wallH, wid]} />
+        <FabricMaterial color={canvas} roughness={0.98} bumpScale={0.035} envMapIntensity={0.3} />
+      </mesh>
+      {/* Hipped ridge roof */}
+      <mesh castShadow receiveShadow geometry={roof} position={[0, wallH, 0]}>
+        <FabricMaterial color={canvas.clone().multiplyScalar(1.04)} side={THREE.DoubleSide} roughness={0.98} bumpScale={0.045} envMapIntensity={0.3} />
+      </mesh>
+      {/* Eave webbing */}
+      {[-1, 1].map(s => (
+        <mesh key={`eave-${s}`} position={[0, wallH, s * (wid / 2 + 0.006)]}>
+          <boxGeometry args={[len * 1.01, wallH * 0.09, 0.012]} />
+          <FabricMaterial color={canvas.clone().multiplyScalar(0.86)} roughness={1} envMapIntensity={0.2} />
+        </mesh>
+      ))}
+
+      {/* Screened windows down both long walls */}
+      {highDetail && [-1, 1].map(s =>
+        Array.from({ length: windows }, (_, i) => (
+          <group key={`win-${s}-${i}`} position={[-len / 2 + len * ((i + 0.5) / windows), wallH * 0.6, s * (wid / 2 + 0.005)]}>
+            <mesh>
+              <boxGeometry args={[wid * 0.3, wallH * 0.42, 0.008]} />
+              <meshStandardMaterial color="#5d5f57" roughness={1} metalness={0} envMapIntensity={0.15} />
+            </mesh>
+            <mesh position={[0, 0, 0.006]}>
+              <boxGeometry args={[wid * 0.34, wallH * 0.48, 0.006]} />
+              <FabricMaterial color={canvas.clone().multiplyScalar(0.9)} roughness={1} envMapIntensity={0.2} />
+            </mesh>
+          </group>
+        ))
+      )}
+
+      {/* Open doorway in the end wall */}
+      <group rotation={[0, Math.PI / 2, 0]}>
+        <TentDoor width={wid * 0.42} height={wallH * 0.92} faceDepth={len / 2 + 0.004} arch={false} frameColor={canvas.clone().multiplyScalar(0.88)} />
+      </group>
+
+      {/* Ridge finials at both gable ends */}
+      {[-1, 1].map(s => (
+        <mesh key={`pole-${s}`} castShadow position={[s * (len / 2 - len * 0.18), wallH + rise + rise * 0.03, 0]}>
+          <cylinderGeometry args={[wid * 0.008, wid * 0.008, rise * 0.07, 6]} />
+          <meshStandardMaterial color="#a99a80" roughness={0.85} metalness={0.1} />
+        </mesh>
+      ))}
+
+      <GuyLines widthM={len} depthM={wid} anchorY={wallH * 0.94} spread={0.16} />
     </group>
   )
 }
@@ -2319,11 +2929,26 @@ function ProceduralObject({
     case 'vehicle':
       return <Vehicle3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'pc_container':
-      return <Container3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
+      // The bike trailer is a road trailer parked in camp, not a shipping box.
+      return isRoadTrailer(obj)
+        ? <SemiTrailer3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
+        : <Container3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'tent':
       return <Tent3D obj={obj} widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
+    case 'common_area':
+      return <PoleTent3D widthM={widthM} depthM={depthM} heightM={heightM} />
     case 'generator':
-      return <Generator3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
+      return (
+        <Generator3D
+          widthM={widthM}
+          depthM={depthM}
+          heightM={heightM}
+          color={color}
+          towable={Math.max(obj.width_ft, obj.height_ft) >= 12}
+        />
+      )
+    case 'swamp_cooler':
+      return <SwampCooler3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'porta_potty':
       return <PortaPotty3D widthM={widthM} depthM={depthM} heightM={heightM} color={color} />
     case 'kitchen':
