@@ -53,6 +53,15 @@ function makeRng(seed: number) {
   }
 }
 
+function hashSeed(str: string): number {
+  let h = 2166136261
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
 let _fabricTex: THREE.Texture | null = null
 function getFabricTexture(): THREE.Texture | undefined {
   if (typeof document === 'undefined') return undefined
@@ -85,7 +94,7 @@ let _playaTex: THREE.Texture | null = null
 function getPlayaTexture(): THREE.Texture | null {
   if (typeof document === 'undefined') return null
   if (_playaTex) return _playaTex
-  const S = 512
+  const S = 1024
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = S
   const ctx = canvas.getContext('2d')!
@@ -106,14 +115,15 @@ function getPlayaTexture(): THREE.Texture | null {
     }
   }
 
-  // Tonal mottling — compacted vs. loose dust.
-  for (let i = 0; i < 60; i++) {
+  // Tonal mottling — compacted vs. loose dust. Kept faint: the playa is a pale
+  // flat sheet, and heavy blotching reads as clouds painted on the ground.
+  for (let i = 0; i < 70; i++) {
     const x = rnd() * S
     const y = rnd() * S
-    const r = 25 + rnd() * 70
+    const r = 60 + rnd() * 150
     const light = rnd() > 0.5
     const grad = ctx.createRadialGradient(x, y, 0, x, y, r)
-    grad.addColorStop(0, light ? 'rgba(255,247,225,0.30)' : 'rgba(148,126,90,0.22)')
+    grad.addColorStop(0, light ? 'rgba(255,247,225,0.11)' : 'rgba(148,126,90,0.09)')
     grad.addColorStop(1, 'rgba(0,0,0,0)')
     tiled(() => {
       ctx.fillStyle = grad
@@ -125,7 +135,7 @@ function getPlayaTexture(): THREE.Texture | null {
 
   // Cracked-playa polygon network: link each seed to its nearest neighbours.
   const pts: Array<[number, number]> = []
-  for (let i = 0; i < 110; i++) pts.push([rnd() * S, rnd() * S])
+  for (let i = 0; i < 220; i++) pts.push([rnd() * S, rnd() * S])
   ctx.lineCap = 'round'
   for (const p of pts) {
     const near = pts
@@ -134,22 +144,22 @@ function getPlayaTexture(): THREE.Texture | null {
       .sort((a, b) => a.d - b.d)
       .slice(0, 3)
     for (const { q, d } of near) {
-      if (d > S * 0.16) continue
-      const cx = (p[0] + q[0]) / 2 + (rnd() - 0.5) * 8
-      const cy = (p[1] + q[1]) / 2 + (rnd() - 0.5) * 8
+      if (d > S * 0.11) continue
+      const cx = (p[0] + q[0]) / 2 + (rnd() - 0.5) * 16
+      const cy = (p[1] + q[1]) / 2 + (rnd() - 0.5) * 16
       tiled(() => {
         ctx.strokeStyle = 'rgba(116,96,66,0.34)'
-        ctx.lineWidth = 1.1
+        ctx.lineWidth = 2.2
         ctx.beginPath()
         ctx.moveTo(p[0], p[1])
         ctx.quadraticCurveTo(cx, cy, q[0], q[1])
         ctx.stroke()
         // Sun-lit lip on one side of the crack gives it depth.
         ctx.strokeStyle = 'rgba(255,250,236,0.20)'
-        ctx.lineWidth = 0.7
+        ctx.lineWidth = 1.4
         ctx.beginPath()
-        ctx.moveTo(p[0] + 1.2, p[1] + 1.2)
-        ctx.quadraticCurveTo(cx + 1.2, cy + 1.2, q[0] + 1.2, q[1] + 1.2)
+        ctx.moveTo(p[0] + 2.4, p[1] + 2.4)
+        ctx.quadraticCurveTo(cx + 2.4, cy + 2.4, q[0] + 2.4, q[1] + 2.4)
         ctx.stroke()
       })
     }
@@ -173,12 +183,81 @@ function getPlayaTexture(): THREE.Texture | null {
   return tex
 }
 
-// Equirectangular sky used only as an IBL source — this is what stops metal,
-// mylar and fabric from shading flat/blocky. `dim` scales its energy so the
-// image-based ambient doesn't wash out the direct sun.
-function makeSkyTexture(dim: number): THREE.Texture {
-  const W = 256
-  const H = 128
+// Bike and vehicle ruts. Deliberately *not* tiled — ruts drawn into the
+// repeating playa tile turn into an obvious lattice — so this is one
+// single-use decal laid over the camp, faded out at its own edges.
+let _trackTex: THREE.Texture | null = null
+function getTrackTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null
+  if (_trackTex) return _trackTex
+  const S = 1024
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = S
+  const ctx = canvas.getContext('2d')!
+  const rnd = makeRng(31771)
+
+  ctx.lineCap = 'round'
+  const stroke = (pts: number[], w: number, a: number) => {
+    ctx.strokeStyle = `rgba(243,235,213,${a})`
+    ctx.lineWidth = w
+    ctx.beginPath()
+    ctx.moveTo(pts[0], pts[1])
+    ctx.bezierCurveTo(pts[2], pts[3], pts[4], pts[5], pts[6], pts[7])
+    ctx.stroke()
+  }
+
+  for (let i = 0; i < 10; i++) {
+    // Enter and leave through different edges so nothing dead-ends mid-frame.
+    const edge = (rnd() * 4) | 0
+    const t0 = rnd() * S
+    const t1 = rnd() * S
+    const a: [number, number] = edge === 0 ? [t0, 0] : edge === 1 ? [S, t0] : edge === 2 ? [t0, S] : [0, t0]
+    const b: [number, number] = edge === 0 ? [t1, S] : edge === 1 ? [0, t1] : edge === 2 ? [t1, 0] : [S, t1]
+    const c1: [number, number] = [a[0] + (rnd() - 0.5) * S * 0.8, a[1] + (rnd() - 0.5) * S * 0.8]
+    const c2: [number, number] = [b[0] + (rnd() - 0.5) * S * 0.8, b[1] + (rnd() - 0.5) * S * 0.8]
+    const path = [a[0], a[1], c1[0], c1[1], c2[0], c2[1], b[0], b[1]]
+    stroke(path, 15, 0.06)
+    stroke(path, 5, 0.11)
+    if (rnd() > 0.55) {
+      // Second rut, one axle width over.
+      const off = 14 + rnd() * 10
+      stroke(path.map((v, k) => (k % 2 === 0 ? v + off : v - off)), 5, 0.1)
+    }
+  }
+
+  // Feather the decal so its square boundary never shows on the playa.
+  ctx.globalCompositeOperation = 'destination-out'
+  const fade = ctx.createRadialGradient(S / 2, S / 2, S * 0.28, S / 2, S / 2, S * 0.5)
+  fade.addColorStop(0, 'rgba(0,0,0,0)')
+  fade.addColorStop(1, 'rgba(0,0,0,1)')
+  ctx.fillStyle = fade
+  ctx.fillRect(0, 0, S, S)
+  ctx.globalCompositeOperation = 'source-over'
+
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  _trackTex = tex
+  return tex
+}
+
+// Equirectangular sky, used both as the IBL source — this is what stops metal,
+// mylar and fabric from shading flat/blocky — and as the visible dome. `dim`
+// scales its energy so the image-based ambient doesn't wash out the direct sun.
+// Sun azimuth here matches the directional light so highlights and cast shadows
+// agree with where the sun visibly sits.
+const SUN_U = 0.59
+const SUN_V = 0.2
+
+// Same angle the sun is painted at, so highlights and cast shadows line up with
+// the visible sun instead of contradicting it.
+const SUN_DIR = new THREE.Vector3(
+  -Math.cos(SUN_U * Math.PI * 2) * Math.sin(SUN_V * Math.PI),
+  Math.cos(SUN_V * Math.PI),
+  Math.sin(SUN_U * Math.PI * 2) * Math.sin(SUN_V * Math.PI)
+).normalize()
+
+function makeSkyTexture(dim: number, W = 256, H = 128): THREE.Texture {
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
@@ -192,14 +271,47 @@ function makeSkyTexture(dim: number): THREE.Texture {
   grad.addColorStop(1.0, '#b09b6f')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
-  const sx = W * 0.72
-  const sy = H * 0.2
+
+  // Thin high cirrus — breaks up the banded gradient and shows up faintly in
+  // the reflections of anything shiny.
+  const rnd = makeRng(51224)
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 26; i++) {
+    const cy = H * (0.06 + rnd() * 0.3)
+    const cx = rnd() * W
+    const rx = W * (0.05 + rnd() * 0.13)
+    const ry = H * (0.006 + rnd() * 0.018)
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx)
+    g.addColorStop(0, `rgba(255,255,255,${0.10 + rnd() * 0.14})`)
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = g
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.scale(1, ry / rx)
+    ctx.beginPath()
+    ctx.arc(0, 0, rx, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+  ctx.restore()
+
+  const sx = W * SUN_U
+  const sy = H * SUN_V
   const sun = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55)
   sun.addColorStop(0, 'rgba(255,253,240,1)')
   sun.addColorStop(0.12, 'rgba(255,240,205,0.8)')
   sun.addColorStop(1, 'rgba(255,232,190,0)')
   ctx.fillStyle = sun
   ctx.fillRect(0, 0, W, H)
+
+  // Dust suspended near the deck — the horizon is never a clean line out there.
+  const haze = ctx.createLinearGradient(0, H * 0.4, 0, H * 0.56)
+  haze.addColorStop(0, 'rgba(226,213,180,0)')
+  haze.addColorStop(1, 'rgba(226,213,180,0.6)')
+  ctx.fillStyle = haze
+  ctx.fillRect(0, H * 0.4, W, H * 0.17)
+
   if (dim < 1) {
     ctx.fillStyle = `rgba(0,0,0,${1 - dim})`
     ctx.fillRect(0, 0, W, H)
@@ -208,6 +320,114 @@ function makeSkyTexture(dim: number): THREE.Texture {
   tex.mapping = THREE.EquirectangularReflectionMapping
   tex.colorSpace = THREE.SRGBColorSpace
   return tex
+}
+
+// Full-brightness sky for the visible dome (the IBL copy is dimmed, so the two
+// can't be shared).
+let _skyDomeTex: THREE.Texture | null = null
+function getSkyDomeTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null
+  if (!_skyDomeTex) _skyDomeTex = makeSkyTexture(1, 1024, 512)
+  return _skyDomeTex
+}
+
+// Two silhouetted ranges on a seamless strip. Frequencies are whole numbers so
+// the ridge line wraps without a seam, and the bases fade into the dust so the
+// mountains sit *in* the haze rather than being pasted on top of it.
+let _mountainTex: THREE.Texture | null = null
+function getMountainTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null
+  if (_mountainTex) return _mountainTex
+  const W = 2048
+  const H = 256
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  const rnd = makeRng(80416)
+
+  const ranges = [
+    { base: 0.15, amp: 0.34, freqs: [2, 4, 7, 13, 23], top: 'rgba(139,149,171,0.78)', bot: 'rgba(200,192,172,0.10)' },
+    { base: 0.09, amp: 0.44, freqs: [1, 3, 5, 11, 19], top: 'rgba(104,112,133,0.92)', bot: 'rgba(192,182,160,0.14)' },
+  ]
+
+  for (const r of ranges) {
+    const phases = r.freqs.map(() => rnd() * Math.PI * 2)
+    const amps = r.freqs.map((_, i) => (r.amp * Math.pow(0.56, i)) / 1.5)
+    ctx.beginPath()
+    ctx.moveTo(0, H)
+    for (let x = 0; x <= W; x++) {
+      const u = x / W
+      let h = r.base
+      for (let i = 0; i < r.freqs.length; i++) {
+        // 1 − |sin| gives cusped summits instead of rolling dunes. Whole-number
+        // frequencies keep the strip seamless where it wraps.
+        h += amps[i] * (1 - Math.abs(Math.sin(Math.PI * r.freqs[i] * u + phases[i])))
+      }
+      ctx.lineTo(x, H * (1 - h))
+    }
+    ctx.lineTo(W, H)
+    ctx.closePath()
+    const g = ctx.createLinearGradient(0, H * (1 - (r.base + r.amp)), 0, H)
+    g.addColorStop(0, r.top)
+    g.addColorStop(1, r.bot)
+    ctx.fillStyle = g
+    ctx.fill()
+  }
+
+  // Dust bank washing over the foot of the range.
+  const dust = ctx.createLinearGradient(0, H * 0.74, 0, H)
+  dust.addColorStop(0, 'rgba(228,215,182,0)')
+  dust.addColorStop(1, 'rgba(228,215,182,0.6)')
+  ctx.fillStyle = dust
+  ctx.fillRect(0, H * 0.74, W, H * 0.26)
+
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = THREE.RepeatWrapping
+  tex.wrapT = THREE.ClampToEdgeWrapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  _mountainTex = tex
+  return tex
+}
+
+// ─── Horizon: sky dome + distant ranges ────────────────────────
+// Two extra draw calls, no textures fetched over the network. Both opt out of
+// fog and tone mapping so the backdrop stays exactly as authored while the
+// scene in front of it keeps its filmic response.
+function Horizon({ radius }: { radius: number }) {
+  const sky = useMemo(() => getSkyDomeTexture(), [])
+  const mountains = useMemo(() => getMountainTexture(), [])
+  const ridgeR = radius / 2.4
+  const ridgeH = ridgeR * 0.17
+
+  return (
+    <group renderOrder={-1}>
+      <mesh frustumCulled={false}>
+        <sphereGeometry args={[radius, 48, 24]} />
+        <meshBasicMaterial
+          map={sky ?? undefined}
+          side={THREE.BackSide}
+          depthWrite={false}
+          fog={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {mountains && (
+        <mesh position={[0, ridgeH / 2 - ridgeR * 0.004, 0]}>
+          <cylinderGeometry args={[ridgeR, ridgeR, ridgeH, 128, 1, true]} />
+          <meshBasicMaterial
+            map={mountains}
+            side={THREE.BackSide}
+            transparent
+            depthWrite={false}
+            fog={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+    </group>
+  )
 }
 
 // Pre-filters the procedural sky into an environment map once per mount.
@@ -2253,13 +2473,22 @@ function ProceduralObject({
   }
 
   // ─── Default generic box fallback ─────────────────────────
+  // Chamfered rather than a hard cube — the eased edge catches a highlight and
+  // reads as a built object instead of a placeholder block.
+  const bevel = Math.min(widthM, depthM, heightM) * 0.06
   return (
     <group>
       {/* Main body */}
-      <mesh castShadow receiveShadow position={[0, heightM / 2, 0]}>
-        <boxGeometry args={[widthM, heightM, depthM]} />
-        <meshStandardMaterial color={threeColor} roughness={0.8} metalness={0.1} />
-      </mesh>
+      <RoundedBox
+        castShadow
+        receiveShadow
+        position={[0, heightM / 2, 0]}
+        args={[widthM, heightM, depthM]}
+        radius={Math.max(0.01, bevel)}
+        smoothness={2}
+      >
+        <meshStandardMaterial color={threeColor} roughness={0.72} metalness={0.12} envMapIntensity={0.5} />
+      </RoundedBox>
 
       {/* Roof shapes */}
       {roofShape === 'pyramid' && (
@@ -2337,6 +2566,13 @@ function ProceduralObject({
   )
 }
 
+// Things that get dragged into place by hand and never end up perfectly square
+// to the grid. Fixed infrastructure (shade, containers, kitchen) is left exact.
+const HAND_PLACED_TYPES = new Set([
+  'tent', 'rv', 'vehicle', 'table', 'bike_parking', 'storage', 'porta_potty',
+  'fire_pit', 'water_station', 'art_car', 'grill', 'stairs_ladder',
+])
+
 // ─── Individual Map Object ─────────────────────────────────────
 function MapObject3D({
   obj,
@@ -2376,6 +2612,17 @@ function MapObject3D({
   const hasModel = !!obj.properties?.meshy_model_url
   const modelUrl = obj.properties?.meshy_model_url as string | undefined
 
+  // Deterministic per-object variation — a couple of degrees of yaw and a hair
+  // of tint keeps a row of identical tents from reading as stamped copies.
+  const variation = useMemo(() => {
+    if (!HAND_PLACED_TYPES.has(obj.object_type)) return { yaw: 0, color: obj.color }
+    const rnd = makeRng(hashSeed(obj.id))
+    const yaw = (rnd() - 0.5) * 0.06
+    const tint = 0.93 + rnd() * 0.14
+    const color = `#${hexToThreeColor(obj.color).multiplyScalar(tint).getHexString()}`
+    return { yaw, color }
+  }, [obj.id, obj.object_type, obj.color])
+
   // Pulse animation for hovered/selected
   useFrame((_, delta) => {
     if (!groupRef.current) return
@@ -2394,7 +2641,7 @@ function MapObject3D({
     <group
       ref={groupRef}
       position={[posX, 0, posZ]}
-      rotation={[0, -(obj.rotation * Math.PI) / 180, 0]}
+      rotation={[0, -(obj.rotation * Math.PI) / 180 + variation.yaw, 0]}
       onClick={(e) => { e.stopPropagation(); onSelect(obj) }}
       onPointerEnter={(e) => { e.stopPropagation(); onHover(obj.id); document.body.style.cursor = 'pointer' }}
       onPointerLeave={() => { onHover(null); document.body.style.cursor = 'auto' }}
@@ -2414,7 +2661,7 @@ function MapObject3D({
           widthM={widthM}
           depthM={depthM}
           heightM={heightM}
-          color={obj.color}
+          color={variation.color}
           roofShape={roofShape}
           shadePosts={shadePosts}
         />
@@ -2431,7 +2678,7 @@ function MapObject3D({
             widthM={widthM}
             depthM={depthM}
             heightM={heightM}
-            color={obj.color}
+            color={variation.color}
             roofShape={roofShape}
             shadePosts={shadePosts}
           />
@@ -2507,7 +2754,7 @@ function BoundaryGrid({ widthM, depthM, gridSize }: { widthM: number; depthM: nu
 }
 
 // ─── Ground Plane ──────────────────────────────────────────────
-function GroundPlane({ widthM, depthM, gridSize }: { widthM: number; depthM: number; gridSize: number }) {
+function GroundPlane({ widthM, depthM, gridSize, farM }: { widthM: number; depthM: number; gridSize: number; farM: number }) {
   const gl = useThree(s => s.gl)
 
   // One cracked-playa tile, reused at two densities: coarse for the open desert,
@@ -2519,29 +2766,90 @@ function GroundPlane({ widthM, depthM, gridSize }: { widthM: number; depthM: num
     const maxAniso = gl.capabilities.getMaxAnisotropy()
     const tileM = 7
     base.anisotropy = maxAniso
-    base.repeat.set((widthM * 3) / tileM, (depthM * 3) / tileM)
+    base.repeat.set((farM * 2) / tileM, (farM * 2) / tileM)
     const i = base.clone()
     i.anisotropy = maxAniso
     i.repeat.set(widthM / (tileM * 0.5), depthM / (tileM * 0.5))
     return { outer: base, inner: i }
-  }, [gl, widthM, depthM])
+  }, [gl, widthM, depthM, farM])
+
+  const tracks = useMemo(() => getTrackTexture(), [])
 
   return (
     <group>
-      {/* Open playa */}
+      {/* Open playa, carried out past the mountains so the desert reads as
+          continuous instead of ending on a visible edge */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[widthM * 3, depthM * 3]} />
-        <meshStandardMaterial map={outer ?? undefined} color="#e8d5a3" roughness={1} metalness={0} envMapIntensity={0.35} />
+        <planeGeometry args={[farM * 2, farM * 2]} />
+        <meshStandardMaterial
+          map={outer ?? undefined}
+          bumpMap={outer ?? undefined}
+          bumpScale={0.18}
+          roughnessMap={outer ?? undefined}
+          color="#e8d5a3"
+          roughness={0.95}
+          metalness={0}
+          envMapIntensity={0.35}
+        />
       </mesh>
 
       {/* Camp footprint — dust compacted a shade darker by traffic */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
         <planeGeometry args={[widthM, depthM]} />
-        <meshStandardMaterial map={inner ?? undefined} color="#dcc99a" roughness={1} metalness={0} envMapIntensity={0.3} />
+        <meshStandardMaterial
+          map={inner ?? undefined}
+          bumpMap={inner ?? undefined}
+          bumpScale={0.24}
+          roughnessMap={inner ?? undefined}
+          color="#dcc99a"
+          roughness={0.93}
+          metalness={0}
+          envMapIntensity={0.3}
+        />
       </mesh>
+
+      {/* Traffic worn across camp */}
+      {tracks && (
+        <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.009, 0]}>
+          <planeGeometry args={[Math.max(widthM, depthM) * 2.4, Math.max(widthM, depthM) * 2.4]} />
+          <meshStandardMaterial map={tracks} transparent depthWrite={false} roughness={1} metalness={0} />
+        </mesh>
+      )}
 
       <BoundaryGrid widthM={widthM} depthM={depthM} gridSize={gridSize} />
     </group>
+  )
+}
+
+// ─── Sun ───────────────────────────────────────────────────────
+function SunLight({ span }: { span: number }) {
+  const ref = useRef<THREE.DirectionalLight>(null)
+
+  // Three won't rebuild the shadow frustum from the props alone, so without
+  // this the sun keeps its stock ±5 unit box and anything outside the middle of
+  // camp silently stops casting.
+  useEffect(() => {
+    ref.current?.shadow.camera.updateProjectionMatrix()
+  }, [span])
+
+  const d = span * 1.6
+  return (
+    <directionalLight
+      ref={ref}
+      color="#fff3dd"
+      position={[SUN_DIR.x * d, SUN_DIR.y * d, SUN_DIR.z * d]}
+      intensity={2.1}
+      castShadow
+      shadow-mapSize-width={2048}
+      shadow-mapSize-height={2048}
+      shadow-bias={-0.0004}
+      shadow-normalBias={0.02}
+      shadow-camera-far={span * 4}
+      shadow-camera-left={-span * 0.8}
+      shadow-camera-right={span * 0.8}
+      shadow-camera-top={span * 0.8}
+      shadow-camera-bottom={-span * 0.8}
+    />
   )
 }
 
@@ -2603,16 +2911,22 @@ export function CampMap3D({
   const shadePostsByObj = useMemo(() => computeShadePosts(objects), [objects])
 
   const span = Math.max(widthM, depthM)
+
+  // Backdrop shells, ordered so nothing pokes through: ranges sit inside the
+  // playa edge, and the sky dome encloses the plane's corners.
+  const horizonR = Math.min(span * 4, 260)
+  const groundFar = horizonR * 1.5
+  const domeR = groundFar * 1.6
   // Very dense camps drop the micro-detail pass to keep draw calls bounded.
   const highDetail = visibleObjects.length <= 110
 
   return (
     <div className="w-full h-full">
       <Canvas
-        shadows="soft"
+        shadows="percentage"
         dpr={[1, 1.75]}
         performance={{ min: 0.5 }}
-        camera={{ fov: 45, near: 0.1, far: 1000 }}
+        camera={{ fov: 45, near: 0.1, far: domeR * 2.5 }}
         gl={{
           antialias: true,
           powerPreference: 'high-performance',
@@ -2642,26 +2956,15 @@ export function CampMap3D({
         <SceneEnvironment intensity={0.55} />
         <ambientLight intensity={0.12} />
         <hemisphereLight color="#bcd9ef" groundColor="#c9b184" intensity={0.4} />
-        <directionalLight
-          color="#fff3dd"
-          position={[widthM * 0.55, widthM * 0.85, -depthM * 0.35]}
-          intensity={2.1}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-bias={-0.0004}
-          shadow-normalBias={0.02}
-          shadow-camera-far={widthM * 4}
-          shadow-camera-left={-widthM}
-          shadow-camera-right={widthM}
-          shadow-camera-top={depthM}
-          shadow-camera-bottom={-depthM}
-        />
+        <SunLight span={span} />
         {/* Cool sky bounce so shadowed faces aren't dead flat */}
         <directionalLight color="#cfe0f0" position={[-widthM * 0.6, widthM * 0.4, depthM * 0.5]} intensity={0.35} />
 
+        {/* Sky dome + distant ranges */}
+        <Horizon radius={domeR} />
+
         {/* Ground */}
-        <GroundPlane widthM={widthM} depthM={depthM} gridSize={gridSizeM} />
+        <GroundPlane widthM={widthM} depthM={depthM} gridSize={gridSizeM} farM={groundFar} />
 
         {/* Soft occlusion where objects meet the playa. Captured over the first
             couple of seconds then frozen — no per-frame scene re-render. */}
