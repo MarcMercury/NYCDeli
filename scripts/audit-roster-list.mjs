@@ -61,6 +61,7 @@ kenofalltrades@gmail.com	Kenneth Huffman
 cellokim98@gmail.com	Kimberley Kistler
 kifbellholland@gmail.com	Kirill Belyatov
 kirillsafonow@gmail.com	Kirill Safonov
+kristinaeschmidt@gmail.com	Kristina Schmidt
 laurencrudele43@gmail.com	Lauren Crudele
 lina.feldsherova@gmail.com	Lina Feldsherova
 milanyaxo@gmail.com	Liudmila Paymukhina
@@ -106,15 +107,26 @@ const { data: profiles, error: pErr } = await supabase
   .select('id, email, role, camper_id, approved_at, denied_at, last_sign_in_at')
 if (pErr) throw pErr
 
+// A profile row is not proof of a usable login — check auth.users too.
+const authUsers = []
+for (let page = 1; ; page++) {
+  const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
+  if (error) throw error
+  authUsers.push(...data.users)
+  if (data.users.length < 1000) break
+}
+
 const camperByEmail = new Map(campers.map((c) => [(c.email || '').trim().toLowerCase(), c]))
 const profileByEmail = new Map(profiles.map((p) => [(p.email || '').trim().toLowerCase(), p]))
+const authByEmail = new Map(authUsers.map((u) => [(u.email || '').trim().toLowerCase(), u]))
 const expectedEmails = new Set(expected.map((e) => e.email))
 
 const norm = (s) => (s || '').toLowerCase().replace(/[^a-z]/g, '')
 
 console.log(`Expected list: ${expected.length}`)
 console.log(`campers rows:  ${campers.length}`)
-console.log(`user_profiles: ${profiles.length}\n`)
+console.log(`user_profiles: ${profiles.length}`)
+console.log(`auth.users:    ${authUsers.length}\n`)
 
 const missingCamper = []
 const missingProfile = []
@@ -158,6 +170,13 @@ console.log('\n=== 6. Profiles not linked to a camper row (camper_id null) ===')
 profiles
   .filter((p) => !p.camper_id)
   .forEach((p) => console.log(`  ${p.email}\trole=${p.role}`))
+
+console.log('\n=== 8. profile/auth.users mismatches ===')
+const orphanProfiles = profiles.filter((p) => !authByEmail.has((p.email || '').trim().toLowerCase()))
+const orphanAuth = authUsers.filter((u) => !profileByEmail.has((u.email || '').trim().toLowerCase()))
+orphanProfiles.forEach((p) => console.log(`  profile with NO auth user: ${p.email}`))
+orphanAuth.forEach((u) => console.log(`  auth user with NO profile: ${u.email}`))
+if (!orphanProfiles.length && !orphanAuth.length) console.log('  (none)')
 
 console.log('\n=== 7. Listed campers whose account role is NOT user/admin/builder ===')
 for (const e of expected) {
