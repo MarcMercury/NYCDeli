@@ -75,8 +75,9 @@ function entranceDir(o: FloorplanObjectRow): string | null {
   return d ? (DIR_LABEL[d] ?? d) : null
 }
 
-// Four staked corners in feet from datum, rotated about the object's center.
-function cornersOf(o: FloorplanObjectRow): Record<Corner, { x: number; y: number }> {
+// Four staked corners in feet from the SW datum, rotated about the object's
+// center. e = feet east of the west edge, n = feet north of the south edge.
+function cornersOf(o: FloorplanObjectRow, lotLength: number): Record<Corner, { e: number; n: number }> {
   const cx = o.x + o.width_ft / 2
   const cy = o.y + o.height_ft / 2
   const rad = ((o.rotation || 0) * Math.PI) / 180
@@ -88,12 +89,15 @@ function cornersOf(o: FloorplanObjectRow): Record<Corner, { x: number; y: number
     SW: [o.x, o.y + o.height_ft],
     SE: [o.x + o.width_ft, o.y + o.height_ft],
   }
-  const out = {} as Record<Corner, { x: number; y: number }>
+  const out = {} as Record<Corner, { e: number; n: number }>
   ;(Object.keys(raw) as Corner[]).forEach(k => {
     const [px, py] = raw[k]
     const dx = px - cx
     const dy = py - cy
-    out[k] = { x: Math.round(cx + dx * cos - dy * sin), y: Math.round(cy + dx * sin + dy * cos) }
+    out[k] = {
+      e: Math.round(cx + dx * cos - dy * sin),
+      n: Math.round(lotLength - (cy + dx * sin + dy * cos)),
+    }
   })
   return out
 }
@@ -226,7 +230,9 @@ export default function StakingPlanPage() {
       ...o,
       ref: i + 1,
       flagged: isLargeDelivered(o),
-      gridCell: `${colLetter(o.x / grid)}${Math.floor(o.y / grid) + 1}`,
+      // Grid cell of the object's SW corner — column A→ from the west edge,
+      // row 1↑ from the south edge, so A1 is the SW corner of the lot.
+      gridCell: `${colLetter(o.x / grid)}${Math.floor((L - o.y - o.height_ft) / grid) + 1}`,
     }))
 
   // 4-corner detail for every selected object, largest footprint first.
@@ -366,11 +372,12 @@ export default function StakingPlanPage() {
         <section>
           <SectionTitle n={1} title="Grid Schematic" />
           <p className="text-xs mb-2">
-            Datum <strong>★</strong> is the <strong>top-left corner</strong> of the lot and reads
-            <strong> 0 × 0</strong>. Every corner is measured from it as
-            <strong> Vertical × Horizontal</strong> — <strong>Vertical first</strong> (feet down from the top),
-            <strong> then Horizontal</strong> (feet in from the left). Example: an object whose top-left corner is
-            2&apos; down and 5&apos; right reads <strong>2 × 5</strong>. Squares are {grid}&apos; × {grid}&apos;.
+            Datum <strong>★</strong> is the <strong>south-west (bottom-left) corner</strong> of the lot and reads
+            <strong> 0 × 0</strong>. Grid square <strong>A1</strong> sits on that datum — columns run
+            <strong> A→ east</strong> and rows run <strong>1↑ north</strong>. Every corner is measured from the datum as
+            <strong> North × East</strong> — <strong>North first</strong> (feet up from the south edge),
+            <strong> then East</strong> (feet in from the west edge). Example: an object whose south-west corner is
+            2&apos; north and 5&apos; east reads <strong>2 × 5</strong>. Squares are {grid}&apos; × {grid}&apos;.
             Items marked <span className="text-red-600 font-bold">▲</span> are large / delivered — corner-flag these
             before anything else lands. <strong>Individual tents are not shown here</strong> — see the separate{' '}
             <a href="/admin/tent-map" className="underline font-bold">Tent Location Map</a>.
@@ -392,9 +399,9 @@ export default function StakingPlanPage() {
                   stroke="#d1d5db" strokeWidth={0.4} />
               ))}
 
-              {/* Column letters (top) + row numbers (left) */}
+              {/* Column letters (bottom, A→ east) + row numbers (left, 1↑ north) */}
               {Array.from({ length: cols }, (_, c) => (
-                <text key={`cl${c}`} x={c * grid + grid / 2} y={-6}
+                <text key={`cl${c}`} x={c * grid + grid / 2} y={L + 9}
                   fontSize={6} textAnchor="middle" fill="#6b7280" fontWeight="bold">
                   {colLetter(c)}
                 </text>
@@ -402,7 +409,7 @@ export default function StakingPlanPage() {
               {Array.from({ length: rows }, (_, r) => (
                 <text key={`rl${r}`} x={-8} y={r * grid + grid / 2 + 2}
                   fontSize={6} textAnchor="middle" fill="#6b7280" fontWeight="bold">
-                  {r + 1}
+                  {rows - r}
                 </text>
               ))}
 
@@ -469,11 +476,11 @@ export default function StakingPlanPage() {
                 )
               })}
 
-              {/* Datum marker */}
+              {/* Datum marker — SW corner */}
               <g>
-                <circle cx={0} cy={0} r={4} fill="#facc15" stroke="#000" strokeWidth={0.8} />
-                <text x={0} y={2.2} fontSize={5} textAnchor="middle" fontWeight="bold">★</text>
-                <text x={6} y={9} fontSize={5} fontWeight="bold">DATUM (0,0)</text>
+                <circle cx={0} cy={L} r={4} fill="#facc15" stroke="#000" strokeWidth={0.8} />
+                <text x={0} y={L + 2.2} fontSize={5} textAnchor="middle" fontWeight="bold">★</text>
+                <text x={6} y={L - 5} fontSize={5} fontWeight="bold">DATUM SW (0,0)</text>
               </g>
             </svg>
           </div>
@@ -484,10 +491,10 @@ export default function StakingPlanPage() {
           <SectionTitle n={2} title="4-Corner Measurement Plan" />
           <p className="text-xs mb-3">
             One block per selected object, largest footprint first. Every corner is written as
-            <strong> Vertical × Horizontal</strong> measured from the top-left datum (0 × 0):
-            <strong> Vertical</strong> = feet down from the top, <strong>Horizontal</strong> = feet in from the left.
-            Mark the <strong>NW (top-left) corner first</strong>, then measure the object&apos;s length down and
-            width across to set the other three. Items marked <span className="text-red-600 font-bold">▲</span> are
+            <strong> North × East</strong> measured from the south-west datum (0 × 0):
+            <strong> North</strong> = feet up from the south edge, <strong>East</strong> = feet in from the west edge.
+            Mark the <strong>SW (bottom-left) corner first</strong>, then measure the object&apos;s length north and
+            width east to set the other three. Items marked <span className="text-red-600 font-bold">▲</span> are
             large / delivered — flag all four corners <strong>before</strong> the truck / trailer arrives. The{' '}
             <span className="text-red-600 font-bold">red corners</span> are on the entrance side.
           </p>
@@ -498,7 +505,7 @@ export default function StakingPlanPage() {
           ) : (
             <div className="space-y-4">
               {cornerPlan.map(o => (
-                <ItemFlagBlock key={o.id} o={o} />
+                <ItemFlagBlock key={o.id} o={o} lotLength={L} />
               ))}
             </div>
           )}
@@ -508,16 +515,17 @@ export default function StakingPlanPage() {
         <section className="break-before">
           <SectionTitle n={3} title="Staking Coordinate Table (tents excluded)" />
           <p className="text-xs mb-2">
-            Each object&apos;s <strong>NW (top-left) corner</strong>, written as
-            <strong> Vertical × Horizontal</strong> from the datum. <strong>V ↓</strong> = feet down from the top,
-            <strong> H →</strong> = feet in from the left. Mark the NW corner, then measure the length down and the
-            width across to set the remaining three corners. Individual tents are on the separate Tent Location Map.
+            Each object&apos;s <strong>SW (bottom-left) corner</strong>, written as
+            <strong> North × East</strong> from the south-west datum. <strong>N ↑</strong> = feet up from the south
+            edge, <strong> E →</strong> = feet in from the west edge. Mark the SW corner, then measure the length
+            north and the width east to set the remaining three corners. Individual tents are on the separate Tent
+            Location Map.
           </p>
           <table className="w-full text-xs border-2 border-black border-collapse">
             <thead>
               <tr className="bg-black text-white">
-                <Th>#</Th><Th>Label</Th><Th>Type</Th><Th>Size V×H</Th>
-                <Th>V ↓ (down)</Th><Th>H → (right)</Th><Th>Rot</Th><Th>Grid</Th><Th>Flag</Th>
+                <Th>#</Th><Th>Label</Th><Th>Type</Th><Th>Size N–S × E–W</Th>
+                <Th>N ↑ (north)</Th><Th>E → (east)</Th><Th>Rot</Th><Th>Grid</Th><Th>Flag</Th>
               </tr>
             </thead>
             <tbody>
@@ -527,7 +535,7 @@ export default function StakingPlanPage() {
                   <Td>{o.label || typeLabel(o.object_type)}</Td>
                   <Td>{typeLabel(o.object_type)}</Td>
                   <Td>{o.height_ft}&apos; × {o.width_ft}&apos;</Td>
-                  <Td className="font-bold">{o.y}&apos;</Td>
+                  <Td className="font-bold">{L - o.y - o.height_ft}&apos;</Td>
                   <Td className="font-bold">{o.x}&apos;</Td>
                   <Td>{o.rotation ? `${o.rotation}°` : '—'}</Td>
                   <Td>{o.gridCell}</Td>
@@ -546,25 +554,26 @@ export default function StakingPlanPage() {
           <SectionTitle n={4} title="Field Procedure" />
           <ol className="text-sm space-y-2 list-decimal pl-5">
             <li>
-              <strong>Establish the datum corner.</strong> Identify the real top-left corner of the lot
-              (nearest the frontage/road marked ★ on the schematic). Drive a rebar stake — this is
+              <strong>Establish the datum corner.</strong> Identify the real south-west (bottom-left) corner of the
+              lot (marked ★ on the schematic). Drive a rebar stake — this is
               point <strong>0 × 0</strong>. Record its BRC address in the header box.
             </li>
             <li>
-              <strong>Run the two baselines.</strong> From the datum, pull a {W}&apos; tape across the top
-              (horizontal) edge and a {L}&apos; tape down the left (vertical) edge. Stake the other two lot
+              <strong>Run the two baselines.</strong> From the datum, pull a {W}&apos; tape east along the south
+              edge and a {L}&apos; tape north up the west edge. Stake the other two lot
               corners and verify the diagonals are equal (square the rectangle).
             </li>
             <li>
               <strong>Lay the grid.</strong> Mark {grid}&apos; increments along both baselines and run string
-              lines to create the {cols} × {rows} grid. Label columns A→ and rows 1↓ to match this plan.
+              lines to create the {cols} × {rows} grid. Label columns A→ east and rows 1↑ north so square
+              <strong> A1</strong> is the datum corner, matching this plan.
             </li>
             <li>
-              <strong>Set each object from its NW corner.</strong> Work the Section&nbsp;2 corner plan, largest
-              first. For each object read <strong>Vertical × Horizontal</strong>: measure that many feet
-              <strong> down</strong> from the top, then that many feet <strong>across</strong> from the left, and
-              flag the NW corner. From there measure the object&apos;s length down and width across to flag the other
-              three corners. Mark the <span className="text-red-600 font-bold">entrance side</span> so the crew
+              <strong>Set each object from its SW corner.</strong> Work the Section&nbsp;2 corner plan, largest
+              first. For each object read <strong>North × East</strong>: measure that many feet
+              <strong> north</strong> from the south baseline, then that many feet <strong>east</strong> from the west
+              baseline, and flag the SW corner. From there measure the object&apos;s length north and width east to flag
+              the other three corners. Mark the <span className="text-red-600 font-bold">entrance side</span> so the crew
               drops delivered items facing the right way — set those <span className="text-red-600 font-bold">▲</span>
               items before trucks arrive.
             </li>
@@ -615,8 +624,8 @@ function FieldBox({ label }: { label: string }) {
 }
 
 // One item's four-corner flag layout, drawn to mirror its real footprint.
-function ItemFlagBlock({ o }: { o: Placed }) {
-  const c = cornersOf(o)
+function ItemFlagBlock({ o, lotLength }: { o: Placed; lotLength: number }) {
+  const c = cornersOf(o, lotLength)
   const dir = entranceDir(o)
   const door = o.properties?.door_direction
   const name = o.label || typeLabel(o.object_type)
@@ -625,7 +634,7 @@ function ItemFlagBlock({ o }: { o: Placed }) {
       <div className="flex items-center justify-between bg-black text-white px-3 py-1.5">
         <div className="font-black uppercase text-sm">#{o.ref} · {name}</div>
         <div className="text-xs">
-          {o.height_ft}&apos; × {o.width_ft}&apos; (V×H) · grid {o.gridCell}{o.rotation ? ` · rotated ${o.rotation}°` : ''}
+          {o.height_ft}&apos; × {o.width_ft}&apos; (N–S × E–W) · grid {o.gridCell}{o.rotation ? ` · rotated ${o.rotation}°` : ''}
         </div>
       </div>
       <div className="px-3 py-1 text-xs border-b border-black flex items-center justify-between gap-4">
@@ -636,7 +645,7 @@ function ItemFlagBlock({ o }: { o: Placed }) {
         <span className="text-gray-500">Corners flagged ☐ &nbsp; Item placed ☐</span>
       </div>
       <div className="grid grid-cols-2">
-        {(['NW', 'NE', 'SW', 'SE'] as const).map(k => (
+        {(['SW', 'SE', 'NW', 'NE'] as const).map(k => (
           <FlagCell key={k} corner={k} pt={c[k]} name={name} entrance={cornerOnEntrance(k, door)} />
         ))}
       </div>
@@ -651,7 +660,7 @@ function FlagCell({
   entrance,
 }: {
   corner: Corner
-  pt: { x: number; y: number }
+  pt: { e: number; n: number }
   name: string
   entrance: boolean
 }) {
@@ -661,8 +670,8 @@ function FlagCell({
         <span className="font-black text-sm">{corner} corner</span>
         {entrance && <span className="text-red-600 font-bold text-[10px]">◄ ENTRANCE</span>}
       </div>
-      <div className="text-lg font-black leading-tight">{pt.y}&apos; × {pt.x}&apos;</div>
-      <div className="text-[10px] text-gray-600">V {pt.y}&apos; down · H {pt.x}&apos; right</div>
+      <div className="text-lg font-black leading-tight">{pt.n}&apos; × {pt.e}&apos;</div>
+      <div className="text-[10px] text-gray-600">N {pt.n}&apos; north · E {pt.e}&apos; east</div>
       <div className="text-[10px] text-gray-600">Write on flag: “{name} — {corner}”</div>
     </div>
   )
