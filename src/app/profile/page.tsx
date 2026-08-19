@@ -14,6 +14,12 @@ import { shelterTypes, arrivalMethods, powerTypes, shiftTypes, skillTags } from 
 import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole, KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 import type { Tab } from '@/components/ui/tabs'
 import PackingListTab from '@/components/packing-list-tab'
+import {
+  ARRIVAL_FAQ_CONTENT,
+  ARRIVAL_FAQ_IMAGE,
+  ARRIVAL_CHECKLIST_IMAGE,
+  ARRIVAL_IMAGE_DIMENSIONS,
+} from '@/lib/arrival-faq'
 import { getCamperShifts } from '@/lib/kitchen-schedule-2026'
 
 interface EnrichedAssignment extends ScheduleAssignment {
@@ -29,17 +35,22 @@ const profileTabs: Tab[] = [
   { id: 'arrival', label: 'Playa Arrival Details' },
 ]
 
+const arrivalFaqHtml = ARRIVAL_FAQ_CONTENT
+  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  .replace(/^(\d+)\.\s/gm, '<strong>$1.</strong> ')
+  .trim()
+
 const arrivalGuides = [
   {
     id: 'faq',
     title: 'Playa Arrival FAQ',
-    src: '/Images/playa-arrival-faq.png',
+    src: ARRIVAL_FAQ_IMAGE,
     alt: 'NYC Deli Camp Playa Arrival FAQ',
   },
   {
     id: 'checklist',
     title: 'Playa Arrival Checklist',
-    src: '/Images/playa-arrival-checklist.png',
+    src: ARRIVAL_CHECKLIST_IMAGE,
     alt: 'NYC Deli Camp Playa Arrival Checklist',
   },
 ]
@@ -1087,8 +1098,22 @@ export default function ProfilePage() {
       <TabPanel tabId="arrival" activeTab={activeTab}>
         <div className="space-y-4">
           <Alert variant="warning">
-            Cell service on playa is unreliable — screenshot or download these before you leave for Black Rock City.
+            Cell service on playa is unreliable — read this before you leave, and screenshot or print the checklist.
           </Alert>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Playa Arrival FAQ</CardTitle>
+              <CardDescription>Read this before you arrive at camp.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div
+                className="prose prose-sm max-w-none text-gray-700 whitespace-pre-line [&_strong]:text-black"
+                dangerouslySetInnerHTML={{ __html: arrivalFaqHtml }}
+              />
+            </CardContent>
+          </Card>
+
           {arrivalGuides.map(guide => (
             <Card key={guide.id}>
               <CardHeader>
@@ -1100,8 +1125,8 @@ export default function ProfilePage() {
                   <Image
                     src={guide.src}
                     alt={guide.alt}
-                    width={1103}
-                    height={1426}
+                    width={ARRIVAL_IMAGE_DIMENSIONS.width}
+                    height={ARRIVAL_IMAGE_DIMENSIONS.height}
                     className="w-full h-auto"
                     sizes="(max-width: 1024px) 100vw, 900px"
                   />
@@ -1109,6 +1134,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
           ))}
+
           <p className="text-sm text-gray-500">
             More arrival info lives in the{' '}
             <a href="/resources#playa-arrival-faq" className="font-bold text-black underline">Camp Guide</a>.

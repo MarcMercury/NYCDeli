@@ -3,6 +3,12 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import {
+  ARRIVAL_FAQ_CONTENT,
+  ARRIVAL_FAQ_IMAGE,
+  ARRIVAL_CHECKLIST_IMAGE,
+  ARRIVAL_IMAGE_DIMENSIONS,
+} from '@/lib/arrival-faq'
 import type { ResourceEditRow } from '@/types/database'
 import BrcDirectory from '@/components/brc-directory'
 import WhatsOn from '@/components/whats-on'
@@ -301,6 +307,14 @@ Thank you everyone for paying camp fees promptly. This lets Brian pay vendors ea
 • Always lock your bike — bike theft is real on playa
 • Add lights (front + back) for night visibility — it's required in BRC
 • If you miss the rental deadline, DM Brian — he has a side-deal with Dust Rentals to ensure nobody is left behind`,
+  },
+  {
+    title: 'NYC Deli RATS — Camp Wind Prep Plan',
+    slug: 'camp-wind-prep-plan',
+    category: 'camp-info',
+    tags: ['wind', 'weather', 'storm', 'prep', 'rats', 'safety', 'shade', 'tent', 'plan'],
+    content: 'NYC Deli\'s camp-wide plan for preparing for and riding out high-wind events on playa — roles, staging, tie-downs, and what to do when the wind picks up. Read it before you arrive and skim it again during Build.',
+    link: 'https://docs.google.com/document/d/1ljOM9MhWBa2ApiPq2xeqHvmCHZP-5S03lXFJ7Y3nCiA/edit?tab=t.0',
   },
 
   /* ---- Amenities ---- */
@@ -1715,17 +1729,17 @@ Giant wooden crates (e.g. 5'×8'×4') you can pack gear into, then assemble and 
     title: 'Playa Arrival FAQ',
     slug: 'playa-arrival-faq',
     category: 'camp-info',
-    tags: ['arrival', 'faq', 'gate', 'check-in', 'first day', 'playa'],
-    content: 'Everything you need to know for the day you roll through Gate and into NYC Deli Camp. Save this to your phone — cell service is unreliable on playa.',
-    image: { src: '/Images/playa-arrival-faq.png', alt: 'NYC Deli Camp Playa Arrival FAQ', width: 1103, height: 1426 },
+    tags: ['arrival', 'faq', 'gate', 'check-in', 'first day', 'playa', 'tool town', 'bins', 'tent placement'],
+    content: ARRIVAL_FAQ_CONTENT,
+    image: { src: ARRIVAL_FAQ_IMAGE, alt: 'NYC Deli Camp Playa Arrival FAQ', ...ARRIVAL_IMAGE_DIMENSIONS },
   },
   {
     title: 'Playa Arrival Checklist',
     slug: 'playa-arrival-checklist',
     category: 'camp-info',
     tags: ['arrival', 'checklist', 'gate', 'check-in', 'first day', 'playa'],
-    content: 'Step-by-step checklist to run through when you arrive at camp. Save this to your phone — cell service is unreliable on playa.',
-    image: { src: '/Images/playa-arrival-checklist.png', alt: 'NYC Deli Camp Playa Arrival Checklist', width: 1103, height: 1426 },
+    content: 'Step-by-step checklist to run through when you arrive at camp. Print it out or save it to your phone — cell service is unreliable on playa.',
+    image: { src: ARRIVAL_CHECKLIST_IMAGE, alt: 'NYC Deli Camp Playa Arrival Checklist', ...ARRIVAL_IMAGE_DIMENSIONS },
   },
 ]
 
