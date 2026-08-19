@@ -25,6 +25,22 @@ const profileTabs: Tab[] = [
   { id: 'details', label: 'Camper Details' },
   { id: 'packing-list', label: 'My Packing List' },
   { id: 'my-schedule', label: 'My Schedule' },
+  { id: 'arrival', label: 'Playa Arrival Details' },
+]
+
+const arrivalGuides = [
+  {
+    id: 'faq',
+    title: 'Playa Arrival FAQ',
+    src: '/Images/playa-arrival-faq.png',
+    alt: 'NYC Deli Camp Playa Arrival FAQ',
+  },
+  {
+    id: 'checklist',
+    title: 'Playa Arrival Checklist',
+    src: '/Images/playa-arrival-checklist.png',
+    alt: 'NYC Deli Camp Playa Arrival Checklist',
+  },
 ]
 
 export default function ProfilePage() {
@@ -1086,6 +1102,39 @@ export default function ProfilePage() {
             </Card>
           </div>
         )}
+      </TabPanel>
+
+      {/* ───── TAB 5: Playa Arrival Details ───── */}
+      <TabPanel tabId="arrival" activeTab={activeTab}>
+        <div className="space-y-4">
+          <Alert variant="warning">
+            Cell service on playa is unreliable — screenshot or download these before you leave for Black Rock City.
+          </Alert>
+          {arrivalGuides.map(guide => (
+            <Card key={guide.id}>
+              <CardHeader>
+                <CardTitle>{guide.title}</CardTitle>
+                <CardDescription>Tap the image to open it full size.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <a href={guide.src} target="_blank" rel="noopener noreferrer" className="block border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                  <Image
+                    src={guide.src}
+                    alt={guide.alt}
+                    width={1103}
+                    height={1426}
+                    className="w-full h-auto"
+                    sizes="(max-width: 1024px) 100vw, 900px"
+                  />
+                </a>
+              </CardContent>
+            </Card>
+          ))}
+          <p className="text-sm text-gray-500">
+            More arrival info lives in the{' '}
+            <a href="/resources#playa-arrival-faq" className="font-bold text-black underline">Camp Guide</a>.
+          </p>
+        </div>
       </TabPanel>
     </div>
   )

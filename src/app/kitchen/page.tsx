@@ -24,6 +24,11 @@ import {
   createDraft,
   seedDefaultOfferings,
 } from '@/lib/shift-draft'
+import {
+  SCHEDULE_DAYS,
+  SCHEDULE_SECTIONS,
+  SCHEDULE_NAME_TO_CAMPER,
+} from '@/lib/kitchen-schedule-2026'
 
 type Tab = { id: string; label: string; icon?: React.ReactNode }
 
@@ -272,7 +277,7 @@ export default function KitchenPage() {
   const [offerings, setOfferings] = useState<ShiftOfferingRow[]>([])
   const [myRankings, setMyRankings] = useState<ShiftDraftRankingRow[]>([])
   const [myAssignments, setMyAssignments] = useState<ShiftDraftAssignmentRow[]>([])
-  const [currentUser, setCurrentUser] = useState<{ id: string; camperId: string | null }>({ id: '', camperId: null })
+  const [currentUser, setCurrentUser] = useState<{ id: string; camperId: string | null; fullName: string | null }>({ id: '', camperId: null, fullName: null })
   const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [savingOffering, setSavingOffering] = useState<string | null>(null)
   const [openingRanking, setOpeningRanking] = useState(false)
@@ -349,10 +354,10 @@ export default function KitchenPage() {
       if (user) {
         const { data: camper } = await supabase
           .from('campers')
-          .select('id')
+          .select('id, full_name')
           .eq('email', user.email!)
-          .single() as unknown as { data: { id: string } | null }
-        setCurrentUser({ id: user.id, camperId: camper?.id || null })
+          .single() as unknown as { data: { id: string; full_name: string } | null }
+        setCurrentUser({ id: user.id, camperId: camper?.id || null, fullName: camper?.full_name || null })
         
         // Check if user is admin
         const { data: profile } = await supabase
@@ -1207,11 +1212,131 @@ export default function KitchenPage() {
 
         {/* Full Schedule Tab — visible to every camper */}
         <TabPanel tabId="full-schedule" activeTab={activeTab}>
-          <FullScheduleTable shifts={shifts} highlightCamperId={currentUser.camperId} />
+          <div className="space-y-6">
+            <PublishedScheduleGrid myFullName={currentUser.fullName} />
+            {shifts.some(s => (s.assignments?.length ?? 0) > 0) && (
+              <FullScheduleTable shifts={shifts} highlightCamperId={currentUser.camperId} />
+            )}
+          </div>
         </TabPanel>
 
 
       </div>
+    </div>
+  )
+}
+
+/* ── Published 2026 shift calendar (source: Shifts + NYC Deli + BM 26.xlsx) ── */
+function PublishedScheduleGrid({ myFullName }: { myFullName: string | null }) {
+  const isMe = (name: string | null) =>
+    !!name && !!myFullName && SCHEDULE_NAME_TO_CAMPER[name] === myFullName
+
+  const myShifts = SCHEDULE_SECTIONS.flatMap(section =>
+    section.rows.flatMap(row =>
+      row.days.flatMap((name, i) =>
+        isMe(name)
+          ? [{ key: `${section.title}-${row.role}-${i}`, day: SCHEDULE_DAYS[i], section: section.title, role: row.role, time: row.time }]
+          : []
+      )
+    )
+  )
+
+  return (
+    <div className="space-y-6">
+      {myFullName && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Shifts</CardTitle>
+            <CardDescription>
+              {myShifts.length > 0
+                ? `${myShifts.length} shift${myShifts.length === 1 ? '' : 's'} on the published calendar.`
+                : 'You are not on the published calendar yet.'}
+            </CardDescription>
+          </CardHeader>
+          {myShifts.length > 0 && (
+            <CardContent>
+              <ul className="space-y-2">
+                {myShifts.map(s => (
+                  <li key={s.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-gray-200 pb-2 last:border-0">
+                    <span className="font-black uppercase tracking-wider text-sm">
+                      {s.day.weekday} {s.day.label}
+                    </span>
+                    <span className="font-medium">{s.role}</span>
+                    <span className="text-sm text-gray-500">{s.time}</span>
+                    <span className="text-xs uppercase tracking-wider text-gray-400">{s.section}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Full Schedule — Burning Man 2026</CardTitle>
+          <CardDescription>
+            Every shift, every day. Yours are highlighted. Empty cells are unfilled positions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 pb-4 text-xs text-gray-500">
+            <span><Badge variant="warning" className="text-[9px] mr-1">2×</Badge> counts as two shifts</span>
+            <span><Badge variant="info" className="text-[9px] mr-1">EXP</Badge> kitchen experience required</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b-2 border-black">
+                  <th className="sticky left-0 z-10 bg-white text-left p-3 font-bold uppercase tracking-wider min-w-[220px]">
+                    Role
+                  </th>
+                  {SCHEDULE_DAYS.map(d => (
+                    <th key={d.date} className="text-left p-3 font-bold uppercase tracking-wider whitespace-nowrap">
+                      {d.weekday}
+                      <span className="block text-[11px] font-medium text-gray-500">{d.label}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              {SCHEDULE_SECTIONS.map(section => (
+                <tbody key={section.title}>
+                  <tr className="bg-gray-100">
+                    <td colSpan={SCHEDULE_DAYS.length + 1} className="p-2 px-3 border-y border-gray-300">
+                      <span className="font-black uppercase tracking-wider">{section.title}</span>
+                      {section.time && <span className="ml-2 text-xs text-gray-600">{section.time}</span>}
+                      {section.note && <span className="ml-2 text-xs text-gray-500">{section.note}</span>}
+                    </td>
+                  </tr>
+                  {section.rows.map((row, ri) => (
+                    <tr key={`${section.title}-${ri}`} className="border-b border-gray-200">
+                      <td className="sticky left-0 z-10 bg-white p-3 align-top">
+                        <span className="font-medium">{row.role}</span>
+                        {row.countsDouble && <Badge variant="warning" className="text-[9px] ml-1">2×</Badge>}
+                        {row.requiresExp && <Badge variant="info" className="text-[9px] ml-1">EXP</Badge>}
+                        <span className="block text-xs text-gray-500">{row.time}</span>
+                        {row.note && <span className="block text-[11px] text-gray-400">{row.note}</span>}
+                      </td>
+                      {row.days.map((name, di) => (
+                        <td
+                          key={SCHEDULE_DAYS[di].date}
+                          className={cn(
+                            'p-3 whitespace-nowrap',
+                            name ? 'font-medium' : 'text-gray-300',
+                            isMe(name) && 'bg-yellow-100 font-black'
+                          )}
+                        >
+                          {name ?? '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -1276,9 +1401,9 @@ function FullScheduleTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Full Schedule</CardTitle>
+        <CardTitle>Live Assignments</CardTitle>
         <CardDescription>
-          Everyone&apos;s shifts at a glance. Yours are highlighted.
+          Assignments published from the shift draft. Yours are highlighted.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { ResourceEditRow } from '@/types/database'
 import BrcDirectory from '@/components/brc-directory'
@@ -27,6 +28,7 @@ interface Resource {
   content: string
   tags: string[]
   link?: string
+  image?: { src: string; alt: string; width: number; height: number }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1707,6 +1709,24 @@ Giant wooden crates (e.g. 5'×8'×4') you can pack gear into, then assemble and 
     content: 'If your camp doesn\'t have gray water infrastructure, you\'ll need to manage it yourself. The evapotron is a popular option — lots of DIY designs available.',
     link: 'https://sites.google.com/site/evapotrons/graywater-experience-and-advice',
   },
+
+  /* ---- Playa Arrival ---- */
+  {
+    title: 'Playa Arrival FAQ',
+    slug: 'playa-arrival-faq',
+    category: 'camp-info',
+    tags: ['arrival', 'faq', 'gate', 'check-in', 'first day', 'playa'],
+    content: 'Everything you need to know for the day you roll through Gate and into NYC Deli Camp. Save this to your phone — cell service is unreliable on playa.',
+    image: { src: '/Images/playa-arrival-faq.png', alt: 'NYC Deli Camp Playa Arrival FAQ', width: 1103, height: 1426 },
+  },
+  {
+    title: 'Playa Arrival Checklist',
+    slug: 'playa-arrival-checklist',
+    category: 'camp-info',
+    tags: ['arrival', 'checklist', 'gate', 'check-in', 'first day', 'playa'],
+    content: 'Step-by-step checklist to run through when you arrive at camp. Save this to your phone — cell service is unreliable on playa.',
+    image: { src: '/Images/playa-arrival-checklist.png', alt: 'NYC Deli Camp Playa Arrival Checklist', width: 1103, height: 1426 },
+  },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -2149,6 +2169,28 @@ export default function ResourcesPage() {
                                 .trim(),
                             }}
                           />
+                          {resource.image && (
+                            <div className="mt-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-white">
+                              <Image
+                                src={resource.image.src}
+                                alt={resource.image.alt}
+                                width={resource.image.width}
+                                height={resource.image.height}
+                                className="w-full h-auto"
+                                sizes="(max-width: 1024px) 100vw, 900px"
+                              />
+                            </div>
+                          )}
+                          {resource.image && (
+                            <a
+                              href={resource.image.src}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 border-black bg-white hover:bg-gray-100 transition-colors shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
+                            >
+                              🔍 Open Full Size
+                            </a>
+                          )}
                           {resource.link && (
                             <a
                               href={resource.link}
