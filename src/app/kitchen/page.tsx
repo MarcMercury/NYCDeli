@@ -28,6 +28,7 @@ import {
   SCHEDULE_DAYS,
   SCHEDULE_SECTIONS,
   SCHEDULE_NAME_TO_CAMPER,
+  getCamperShifts,
 } from '@/lib/kitchen-schedule-2026'
 
 type Tab = { id: string; label: string; icon?: React.ReactNode }
@@ -1231,15 +1232,7 @@ function PublishedScheduleGrid({ myFullName }: { myFullName: string | null }) {
   const isMe = (name: string | null) =>
     !!name && !!myFullName && SCHEDULE_NAME_TO_CAMPER[name] === myFullName
 
-  const myShifts = SCHEDULE_SECTIONS.flatMap(section =>
-    section.rows.flatMap(row =>
-      row.days.flatMap((name, i) =>
-        isMe(name)
-          ? [{ key: `${section.title}-${row.role}-${i}`, day: SCHEDULE_DAYS[i], section: section.title, role: row.role, time: row.time }]
-          : []
-      )
-    )
-  )
+  const myShifts = getCamperShifts(myFullName)
 
   return (
     <div className="space-y-6">

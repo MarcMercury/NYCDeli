@@ -14,6 +14,7 @@ import { shelterTypes, arrivalMethods, powerTypes, shiftTypes, skillTags } from 
 import type { UserProfileRow, CamperRow, CamperPhotoRow, UserRole, KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 import type { Tab } from '@/components/ui/tabs'
 import PackingListTab from '@/components/packing-list-tab'
+import { getCamperShifts } from '@/lib/kitchen-schedule-2026'
 
 interface EnrichedAssignment extends ScheduleAssignment {
   shift?: KitchenShift & { role?: KitchenRole }
@@ -1077,30 +1078,8 @@ export default function ProfilePage() {
             <a href="/intake" className="font-bold text-black underline">registration</a>{' '}
             to see your schedule.
           </Alert>
-        ) : myAssignments.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-gray-500">
-                No shifts assigned yet. Either you haven&apos;t been scheduled, or the schedule hasn&apos;t been released yet.
-              </p>
-            </CardContent>
-          </Card>
         ) : (
-          <div className="space-y-4">
-            <Card variant="warning">
-              <CardContent className="py-4">
-                <p className="font-bold text-center">
-                  You have {myAssignments.length} shift{myAssignments.length !== 1 ? 's' : ''} assigned.
-                  {' '}Don&apos;t miss them.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <ScheduleTable assignments={myAssignments} highlightCamperId={camper.id} />
-              </CardContent>
-            </Card>
-          </div>
+          <MyScheduleTab camper={camper} assignments={myAssignments} />
         )}
       </TabPanel>
 
@@ -1136,6 +1115,101 @@ export default function ProfilePage() {
           </p>
         </div>
       </TabPanel>
+    </div>
+  )
+}
+
+/* ── My Schedule tab — published 2026 calendar, filtered to this camper ── */
+function MyScheduleTab({
+  camper,
+  assignments,
+}: {
+  camper: CamperRow
+  assignments: EnrichedAssignment[]
+}) {
+  const myShifts = getCamperShifts(camper.full_name)
+
+  if (myShifts.length === 0 && assignments.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-gray-500">
+            No shifts assigned yet. Either you haven&apos;t been scheduled, or the schedule hasn&apos;t been released yet.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {myShifts.length > 0 && (
+        <>
+          <Card variant="warning">
+            <CardContent className="py-4">
+              <p className="font-bold text-center">
+                You have {myShifts.length} shift{myShifts.length !== 1 ? 's' : ''} on the schedule.
+                {' '}Don&apos;t miss them.
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>My Shifts — Burning Man 2026</CardTitle>
+              <CardDescription>
+                Cell service on playa is unreliable — screenshot this before you leave.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-black">
+                      <th className="text-left p-3 font-bold uppercase tracking-wider">Day</th>
+                      <th className="text-left p-3 font-bold uppercase tracking-wider">Shift / Role</th>
+                      <th className="text-left p-3 font-bold uppercase tracking-wider">Time</th>
+                      <th className="text-left p-3 font-bold uppercase tracking-wider">Section</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myShifts.map(s => (
+                      <tr key={s.key} className="border-b border-gray-200">
+                        <td className="p-3 whitespace-nowrap font-black uppercase tracking-wider">
+                          {s.day.weekday} {s.day.label}
+                        </td>
+                        <td className="p-3 font-medium">
+                          {s.role}
+                          {s.countsDouble && <Badge variant="warning" className="text-[9px] ml-1">2×</Badge>}
+                          {s.requiresExp && <Badge variant="info" className="text-[9px] ml-1">EXP</Badge>}
+                          {s.note && <span className="block text-[11px] text-gray-400">{s.note}</span>}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">{s.time}</td>
+                        <td className="p-3 text-xs uppercase tracking-wider text-gray-500">{s.section}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <p className="text-sm text-gray-500">
+                See everyone&apos;s shifts on the{' '}
+                <a href="/kitchen" className="font-bold text-black underline">Kitchen full schedule</a>.
+              </p>
+            </CardFooter>
+          </Card>
+        </>
+      )}
+      {assignments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Live Assignments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScheduleTable assignments={assignments} highlightCamperId={camper.id} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

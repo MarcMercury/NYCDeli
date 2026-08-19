@@ -309,3 +309,38 @@ export const SCHEDULE_NAME_TO_CAMPER: Record<string, string | null> = {
   "Yi": "YI YANG",
   "Yvonne": "Yuyang Hong",
 }
+
+export interface CamperShift {
+  key: string
+  day: ScheduleDay
+  section: string
+  role: string
+  time: string
+  countsDouble?: boolean
+  requiresExp?: boolean
+  note?: string
+}
+
+/** Every published shift for one camper, in chronological order. */
+export function getCamperShifts(fullName: string | null | undefined): CamperShift[] {
+  if (!fullName) return []
+  const shifts = SCHEDULE_SECTIONS.flatMap(section =>
+    section.rows.flatMap(row =>
+      row.days.flatMap((name, i) =>
+        name && SCHEDULE_NAME_TO_CAMPER[name] === fullName
+          ? [{
+              key: `${section.title}|${row.role}|${row.time}|${SCHEDULE_DAYS[i].date}`,
+              day: SCHEDULE_DAYS[i],
+              section: section.title,
+              role: row.role,
+              time: row.time,
+              countsDouble: row.countsDouble,
+              requiresExp: row.requiresExp,
+              note: row.note,
+            }]
+          : []
+      )
+    )
+  )
+  return shifts.sort((a, b) => a.day.date.localeCompare(b.day.date) || a.time.localeCompare(b.time))
+}

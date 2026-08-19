@@ -23,7 +23,7 @@ const SHARE_COLS = [
   'sharing_tent_with_5',
 ]
 
-const { data: campers, error } = await supabase
+const { data: allCampers, error } = await supabase
   .from('campers')
   .select(
     `id, full_name, playa_name, email, shelter_type, shelter_width_ft, shelter_length_ft, ${SHARE_COLS.join(', ')}`
@@ -40,6 +40,10 @@ for (const p of profiles ?? []) {
   if (!p.camper_id) continue
   status.set(p.camper_id, p.denied_at ? 'denied' : p.role)
 }
+
+// Pending campers are excluded entirely — from rows AND from others' tentmate lists.
+const campers = allCampers.filter((c) => status.get(c.id) !== 'pending')
+const excluded = allCampers.length - campers.length
 
 const byId = new Map(campers.map((c) => [c.id, c]))
 
@@ -126,4 +130,5 @@ writeFileSync(out, csv, 'utf8')
 
 const solo = rows.filter((r) => r[5] === '1').length
 console.log(`Wrote ${rows.length} campers, ${groups.size} tent groups (${solo} solo), max ${maxMates} tentmate columns`)
+console.log(`Excluded ${excluded} pending campers`)
 console.log(`→ public/Files/tent-sharing-chart.csv`)
