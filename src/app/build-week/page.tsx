@@ -1425,35 +1425,35 @@ export default function BuildWeekPage() {
             <div className="px-3 py-3 space-y-3 text-xs leading-relaxed">
               <div>
                 <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
-                  🏠 Housing — 3 Fernley AirBnBs (2-night minimum)
+                  � The build-week finish line
                 </div>
                 <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
-                  <li>Houses booked <span className="font-semibold">Sun 8/23 4pm → Tue 8/25 10am</span>.</li>
-                  <li>All builders must be in a Build House by <span className="font-semibold">Build Monday night</span>.</li>
-                  <li>
-                    Wishlist:{' '}
-                    <a
-                      href="https://www.airbnb.com/wishlists/invite/f1daef94-aefc-471e-9ae1-bcdc10d58991?s=67&unique_share_id=6580efa4-1a72-4028-b808-bb74d3eda2cc"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      Fernley AirBnBs ↗
-                    </a>
-                  </li>
+                  <li><span className="font-semibold">Tuesday — we have shelter.</span> Main shade + builder tents + chill structures.</li>
+                  <li><span className="font-semibold">Wednesday — we have spaces.</span> Chill + kitchen shade + shower + kitchen staging + lights.</li>
+                  <li><span className="font-semibold">Thursday — we have a functioning camp.</span> Power + water + kitchen + shower + cooling, all tested.</li>
+                  <li><span className="font-semibold">Friday — we have a home.</span> Fix + clean + organize + furnish + decorate.</li>
                 </ul>
               </div>
 
               <div>
                 <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
-                  ✈️ Arrival — fly into Reno on Build Sunday if you can
+                  ✈️ Arrival — Reno, Build Sunday 8/23
                 </div>
                 <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
-                  <li>Builders arrive between <span className="font-semibold">Build Sunday and Build Monday</span>.</li>
-                  <li>Earlier Sunday flights = extra time for shopping, vehicle prep, and easier RNO→Fernley shuttle.</li>
-                  <li>Try to cluster on shared flights so the 15-passenger van can shuttle groups.</li>
-                  <li>Flight + availability poll is going out — fill it in even if you already have tickets.</li>
-                  <li>Small survey team goes <span className="font-semibold">on-playa Build Monday</span>; everyone else <span className="font-semibold">Build Tuesday AM</span>.</li>
+                  <li>Builders land at <span className="font-semibold">RNO</span> and check into their respective hotels. Confirm every arrival date/time in advance.</li>
+                  <li>Sunday is <span className="font-semibold">not a build day</span> — shopping, vehicle prep, loading. Nothing rolls to playa Monday that was not prepped Sunday.</li>
+                  <li>Vehicles: 15-passenger van, &ldquo;Dua Lipa&rdquo; dually, &ldquo;Treats&rdquo; reefer.</li>
+                </ul>
+              </div>
+
+              <div>
+                <div className="font-bold uppercase tracking-wider text-[10px] text-gray-500 mb-1">
+                  🚐 Build Monday 8/24 — the split
+                </div>
+                <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
+                  <li><span className="font-semibold">Playa team</span> departs Reno after breakfast: placement, survey/flagging, NYC container bins, major deliveries.</li>
+                  <li><span className="font-semibold">Reno crew</span> stays back for remaining shopping, vehicle prep and food.</li>
+                  <li>Full crew (~12) caravans to playa <span className="font-semibold">Build Tuesday AM</span>. Boston trailer arrives Build Thursday.</li>
                 </ul>
               </div>
 
@@ -1462,7 +1462,7 @@ export default function BuildWeekPage() {
                   🍽️ Food — camp feeds builders through Build Friday night
                 </div>
                 <ul className="list-disc pl-4 space-y-0.5 text-gray-700">
-                  <li><span className="font-semibold">Sun → Wed AM:</span> Fernley takeout + home breakfasts at the AirBnBs.</li>
+                  <li><span className="font-semibold">Sun → Wed AM:</span> Reno takeout + builder-prepped breakfasts.</li>
                   <li><span className="font-semibold">Wed PM → Fri night:</span> catered by Swing City (HUBS sister camp) — full kitchen, all dietary preferences.</li>
                 </ul>
               </div>
