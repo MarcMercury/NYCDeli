@@ -144,9 +144,15 @@ async function requestIsAdmin(request: NextRequest): Promise<boolean> {
 let featureCache: { value: Record<string, boolean> | null; at: number } = { value: null, at: 0 }
 const FEATURE_TTL_MS = 30_000
 
+// Stages where STAGE_META.opsActive is true. Duplicated from src/lib/events.ts
+// on purpose: that module pulls in the browser Supabase client, which has no
+// business running in middleware.
+const OPS_ACTIVE_STAGES = ['prep', 'finalization', 'build', 'live', 'post_event']
+
 /**
- * Mirrors fetchOpsEvent() in src/lib/active-event.ts: flagship, then the
- * soonest event still running, then the most recent event of all.
+ * Mirrors chooseOpsEvent() in src/lib/active-event.ts: the flagship, then the
+ * soonest event whose stage has operations switched on, then the most recently
+ * started event.
  */
 async function currentEventFeatures(request: NextRequest): Promise<Record<string, boolean> | null> {
   const now = Date.now()
@@ -157,19 +163,22 @@ async function currentEventFeatures(request: NextRequest): Promise<Record<string
     const { data } = await supabase
       .from('events')
       .select('features, is_flagship, stage, start_date')
-      .order('is_flagship', { ascending: false })
-      .order('start_date', { ascending: false, nullsFirst: false })
 
     const rows = (data as { features: Record<string, boolean>; is_flagship: boolean; stage: string; start_date: string | null }[] | null) ?? []
+    const today = new Date().toISOString().slice(0, 10)
+
     const running = rows
-      .filter(r => r.stage !== 'closed' && r.start_date)
-      .sort((a, b) => a.start_date!.localeCompare(b.start_date!))
+      .filter(r => OPS_ACTIVE_STAGES.includes(r.stage))
+      .sort((a, b) => (a.start_date ?? '9999').localeCompare(b.start_date ?? '9999'))
+    const started = rows
+      .filter(r => r.start_date && r.start_date <= today)
+      .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
 
     const chosen =
-      rows.find(r => r.is_flagship) ??
+      running.find(r => r.is_flagship) ??
       running[0] ??
-      rows.find(r => r.stage !== 'closed') ??
-      rows[0] ??
+      started[0] ??
+      rows.find(r => r.is_flagship) ??
       null
 
     featureCache = { value: chosen?.features ?? null, at: now }

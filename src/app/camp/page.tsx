@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getOpsEvent, isInformationStage } from '@/lib/active-event'
-import { eventDateLabel, hasFeature, stageMeta } from '@/lib/events'
+import { eventDateLabel, fetchPublicEvents, hasFeature, stageMeta } from '@/lib/events'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { EventFeatureKey, EventRow, EventStage, UserRole } from '@/types/database'
@@ -83,6 +83,7 @@ const TILES: OpsTile[] = [
  */
 export default function CampPage() {
   const [event, setEvent] = useState<EventRow | null>(null)
+  const [upcoming, setUpcoming] = useState<EventRow[]>([])
   const [role, setRole] = useState<UserRole | null>(null)
   const [loaded, setLoaded] = useState(false)
 
@@ -90,13 +91,20 @@ export default function CampPage() {
     const supabase = createClient()
     Promise.all([
       getOpsEvent(),
+      fetchPublicEvents(),
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (!session?.user) return null
         const { data } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single()
         return (data as { role: UserRole } | null)?.role ?? null
       }),
-    ]).then(([opsEvent, userRole]) => {
+    ]).then(([opsEvent, publicEvents, userRole]) => {
+      const today = new Date().toISOString().slice(0, 10)
       setEvent(opsEvent)
+      setUpcoming(
+        publicEvents
+          .filter(e => e.id !== opsEvent?.id && e.stage !== 'closed' && (!e.start_date || e.start_date >= today))
+          .sort((a, b) => (a.start_date ?? '9999').localeCompare(b.start_date ?? '9999'))
+      )
       setRole(userRole)
       setLoaded(true)
     })
@@ -123,7 +131,8 @@ export default function CampPage() {
       {offseason ? (
         <>
           <p className="text-gray-600 mt-1">
-            Nothing is running right now. Camp operations switch on when the next event does.
+            No camp operations are running. Map, kitchen, shifts and packing lists switch on for an
+            event once it reaches prep — not while it is still being planned.
           </p>
           <Card className="mt-6">
             <CardContent className="py-8 text-center space-y-4">
@@ -141,6 +150,34 @@ export default function CampPage() {
               </div>
             </CardContent>
           </Card>
+
+          {upcoming.length > 0 && (
+            <>
+              <h2 className="text-xl font-black uppercase tracking-wide mt-8">In the works</h2>
+              <div className="grid sm:grid-cols-2 gap-4 mt-3">
+                {upcoming.map(next => {
+                  const nextMeta = stageMeta(next.stage)
+                  return (
+                    <Link
+                      key={next.id}
+                      href={`/events/${next.slug}`}
+                      className="border-2 border-black bg-white hover:bg-yellow-50 p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-colors"
+                    >
+                      <span className={cn('inline-block px-2 py-0.5 text-xs font-bold uppercase border-2', nextMeta.className)}>
+                        {nextMeta.icon} {nextMeta.label}
+                      </span>
+                      <span className="block font-black uppercase tracking-wide mt-2">{next.name}</span>
+                      <span className="block text-sm font-bold text-gray-700">
+                        {eventDateLabel(next)}
+                        {next.location_name && ` · ${next.location_name}`}
+                      </span>
+                      <span className="block text-sm text-gray-600 mt-1">{nextMeta.description}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>

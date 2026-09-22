@@ -17,33 +17,39 @@ function db(client?: DeliSupabase): DeliSupabase {
   return client ?? (createClient() as DeliSupabase)
 }
 
+/** An event only owns the operational tooling once its stage switches ops on. */
+export function isOpsActive(event: Pick<EventRow, 'stage'> | null): boolean {
+  return !!event && stageMeta(event.stage).opsActive
+}
+
 /**
- * Resolution order: the flagship event, then the soonest event that is still
- * running, then the most recent event of all. The final fallback matters —
- * after Burning Man 2026 is archived the camp map and kitchen schedule should
- * still render its history rather than going blank.
+ * Resolution order: the flagship event, then the soonest event, both only if
+ * their stage has operations switched on — an announced-but-not-open event
+ * (Event Development) must not take over the map, kitchen and roster. Failing
+ * that, the most recently started event, so after an event is archived its
+ * history still renders rather than going blank.
  */
+export function chooseOpsEvent(events: EventRow[]): EventRow | null {
+  const running = events
+    .filter(isOpsActive)
+    .sort((a, b) => (a.start_date ?? '9999').localeCompare(b.start_date ?? '9999'))
+
+  const started = events
+    .filter(e => e.start_date && e.start_date <= new Date().toISOString().slice(0, 10))
+    .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
+
+  return (
+    running.find(e => e.is_flagship) ??
+    running[0] ??
+    started[0] ??
+    events.find(e => e.is_flagship) ??
+    null
+  )
+}
+
 export async function fetchOpsEvent(client?: DeliSupabase): Promise<EventRow | null> {
-  const supabase = db(client)
-
-  const { data: flagship } = await supabase.from('events').select('*').eq('is_flagship', true).maybeSingle()
-  if (flagship) return flagship as EventRow
-
-  const { data: live } = await supabase
-    .from('events')
-    .select('*')
-    .neq('stage', 'closed')
-    .order('start_date', { ascending: true, nullsFirst: false })
-    .limit(1)
-  const soonest = ((live as EventRow[] | null) ?? [])[0]
-  if (soonest) return soonest
-
-  const { data: latest } = await supabase
-    .from('events')
-    .select('*')
-    .order('start_date', { ascending: false, nullsFirst: false })
-    .limit(1)
-  return ((latest as EventRow[] | null) ?? [])[0] ?? null
+  const { data } = await db(client).from('events').select('*')
+  return chooseOpsEvent((data as EventRow[] | null) ?? [])
 }
 
 /** The event a brand-new application should attach to, if any. */
@@ -59,7 +65,7 @@ export async function fetchApplicationTargetEvent(client?: DeliSupabase): Promis
 
 /** True when nothing is actively running — the org sits in the Information stage. */
 export function isInformationStage(event: EventRow | null): boolean {
-  return !event || stageMeta(event.stage).readOnly
+  return !isOpsActive(event)
 }
 
 /** A moment the home page counts down to. */
