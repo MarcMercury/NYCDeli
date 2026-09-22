@@ -19,10 +19,11 @@ interface NavItem {
 }
 
 /**
- * Five destinations, maximum. Everything the camp does answers one of them:
+ * Six destinations, maximum. Everything the camp does answers one of them:
  * what's happening (Events), what we're running right now (Camp), who we are
- * (Rats), how any of it works (Resources). Personal account surfaces live in
- * the account menu on the right rather than the main row.
+ * (Rats), what we're kicking around (Ideas), how any of it works (Resources).
+ * Personal account surfaces live in the account menu on the right rather than
+ * the main row.
  */
 const publicNavItems: NavItem[] = [
   { href: '/', label: 'Home', icon: '🥪' },
@@ -36,6 +37,7 @@ const memberNavItems: NavItem[] = [
   { href: '/events', label: 'Events', icon: '📅' },
   { href: '/camp', label: 'Camp', icon: '🏕️', eventOnly: true },
   { href: '/campers', label: 'Rats', icon: '🐀' },
+  { href: '/ideas', label: 'Ideas', icon: '💡' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
@@ -45,7 +47,6 @@ const accountLinks: { href: string; label: string; icon: string; adminOnly?: boo
   { href: '/profile', label: 'Your Profile', icon: '👤' },
   { href: '/profile?tab=my-schedule', label: 'Your Schedule', icon: '⏰' },
   { href: '/profile?tab=packing-list', label: 'Packing List', icon: '🎒' },
-  { href: '/ideas', label: 'Ideas & Questions', icon: '💡' },
   { href: '/admin', label: 'Admin', icon: '⚙️', adminOnly: true },
 ]
 
