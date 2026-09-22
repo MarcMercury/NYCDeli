@@ -10,10 +10,14 @@ import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, 
 import type { EventRow, PersonHistory, PersonRow, PersonSelfUpdate } from '@/types/database'
 
 /**
- * The member portal. Deliberately independent of any active event: an account
- * keeps working — contact info, history, upcoming activity — between events.
+ * The member's permanent NYC Deli record, shown as a tab inside Profile.
+ * Deliberately independent of any active event: contact info, history and
+ * upcoming activity keep working between events.
+ *
+ * Edits here mirror onto the camper row and profile bio (see
+ * updateMyPersonAction) so the same facts don't drift between screens.
  */
-export default function MyDeliPage() {
+export function MyDeliPanel({ onPersonSaved }: { onPersonSaved?: () => void }) {
   const [person, setPerson] = useState<PersonRow | null>(null)
   const [history, setHistory] = useState<PersonHistory | null>(null)
   const [openEvents, setOpenEvents] = useState<EventRow[]>([])
@@ -48,15 +52,11 @@ export default function MyDeliPage() {
   }, [load])
 
   if (loading) {
-    return <p className="max-w-4xl mx-auto px-4 py-10 font-bold uppercase tracking-wider text-gray-500">Loading…</p>
+    return <p className="font-bold uppercase tracking-wider text-gray-500">Loading…</p>
   }
 
   if (error || !person) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        <Alert variant="error">{error ?? 'Could not load your profile.'}</Alert>
-      </div>
-    )
+    return <Alert variant="error">{error ?? 'Could not load your profile.'}</Alert>
   }
 
   const summary = history ? summarizeHistory(history) : null
@@ -65,9 +65,9 @@ export default function MyDeliPage() {
   )
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-black uppercase tracking-wider">My NYC Deli</h1>
+        <h2 className="text-2xl font-black uppercase tracking-wider">My NYC Deli</h2>
         <p className="text-gray-600 mt-1">
           Your permanent account with the camp — it stays with you between events.
         </p>
@@ -81,7 +81,13 @@ export default function MyDeliPage() {
         </div>
       )}
 
-      <PersonForm person={person} onSaved={setPerson} />
+      <PersonForm
+        person={person}
+        onSaved={next => {
+          setPerson(next)
+          onPersonSaved?.()
+        }}
+      />
 
       <Card>
         <CardHeader>

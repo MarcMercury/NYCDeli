@@ -3,8 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin, requireAuth } from '@/lib/auth'
-import { resolvePersonForUser } from '@/lib/person-resolver'
-import type { PersonInsert, PersonRow, PersonSelfUpdate, PersonStatus, PersonUpdate } from '@/types/database'
+import { mirrorCamperToPerson, mirrorPersonToCampers, resolvePersonForUser } from '@/lib/person-resolver'
+import type {
+  CamperRow,
+  PersonInsert,
+  PersonRow,
+  PersonSelfUpdate,
+  PersonStatus,
+  PersonUpdate,
+} from '@/types/database'
 
 export type PeopleActionResult<T = undefined> =
   | { success: true; data?: T }
@@ -47,9 +54,43 @@ export async function updateMyPersonAction(patch: PersonSelfUpdate): Promise<Peo
     .single()
   if (error) return fail(error.message)
 
+  // Keep the camper row(s) and the profile bio in step with the edit.
+  await mirrorPersonToCampers(supabase, data as PersonRow)
+
   revalidatePath('/profile')
-  revalidatePath('/my-deli')
   return { success: true, data: data as PersonRow }
+}
+
+/**
+ * The reverse: called after the profile page saves camper details or a bio, so
+ * the permanent record reflects whichever screen the member happened to use.
+ */
+export async function syncMyPersonFromCamperAction(): Promise<PeopleActionResult<PersonRow>> {
+  const user = await requireAuth()
+  const supabase = await createClient()
+
+  const person = await resolvePersonForUser(supabase, user.id)
+  if (!person) return fail('Could not load your NYC Deli profile.')
+
+  const { data: camperData } = await supabase
+    .from('campers')
+    .select('*')
+    .eq('person_id', person.id)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+  const camper = ((camperData as CamperRow[] | null) ?? [])[0] ?? null
+
+  const { data: profileData } = await supabase
+    .from('user_profiles')
+    .select('bio')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  await mirrorCamperToPerson(supabase, person.id, camper, (profileData as { bio: string | null } | null)?.bio)
+
+  const { data } = await supabase.from('people').select('*').eq('id', person.id).maybeSingle()
+  revalidatePath('/profile')
+  return { success: true, data: (data as PersonRow | null) ?? person }
 }
 
 // ---------------------------------------------------------------------------

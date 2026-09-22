@@ -7,6 +7,7 @@ import {
   Tabs, TabPanel, ProgressBar
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { getOpsEvent, isInformationStage } from '@/lib/active-event'
 import ElectricalLoadTab from './electrical-load-tab'
 import LayoutSyncTab from './layout-sync-tab'
 import MeetingAgendasTab from './meeting-agendas-tab'
@@ -143,6 +144,17 @@ export default function BuildWeekPage() {
   }, [searchParams])
 
   const [stages, setStages] = useState<BuildStageWithGoals[]>([])
+  // Roster, schedule, inventory and electrical describe one specific build.
+  // In the offseason only the shade guide — which is general how-to — survives.
+  const [offseason, setOffseason] = useState(false)
+
+  useEffect(() => {
+    getOpsEvent().then(event => {
+      if (!isInformationStage(event)) return
+      setOffseason(true)
+      setActiveTabState('shade')
+    })
+  }, [])
   const [resources, setResources] = useState<BuildResource[]>([])
   const [_procedures, setProcedures] = useState<BuildProcedure[]>([])
   const [builders, setBuilders] = useState<Camper[]>([])
@@ -526,24 +538,28 @@ export default function BuildWeekPage() {
         {/* ── Header ── */}
         <div>
           <h1 className="text-2xl font-black uppercase tracking-wider">Build Week</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Aug 24 – 29, 2026</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {offseason ? 'No build scheduled — the shade guide stays available year round.' : 'Aug 24 – 29, 2026'}
+          </p>
         </div>
 
         {/* ── Progress summary — one glanceable strip ── */}
-        <div className="border-2 border-black bg-white p-3">
-          <div className="flex items-center justify-between text-sm mb-1.5">
-            <span className="font-bold">{doneAll}/{totalAll} tasks</span>
-            <div className="flex gap-3 text-xs text-gray-400">
-              {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
-              {inventory.length > 0 && <span>{verifiedCount}/{inventory.length} verified</span>}
-              <span>{builders.length} builders</span>
+        {!offseason && (
+          <div className="border-2 border-black bg-white p-3">
+            <div className="flex items-center justify-between text-sm mb-1.5">
+              <span className="font-bold">{doneAll}/{totalAll} tasks</span>
+              <div className="flex gap-3 text-xs text-gray-400">
+                {needCount > 0 && <span className="text-red-500">{needCount} needed</span>}
+                {inventory.length > 0 && <span>{verifiedCount}/{inventory.length} verified</span>}
+                <span>{builders.length} builders</span>
+              </div>
             </div>
+            <ProgressBar value={overallProgress} />
           </div>
-          <ProgressBar value={overallProgress} />
-        </div>
+        )}
 
         {/* ── Tabs ── */}
-        <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        <Tabs tabs={offseason ? tabs.filter(t => t.id === 'shade') : tabs} activeTab={activeTab} onChange={setActiveTab} />
 
         {/* ═══════════  ROSTER  ═══════════ */}
         <TabPanel tabId="roster" activeTab={activeTab}>

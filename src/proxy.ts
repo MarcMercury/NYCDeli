@@ -14,8 +14,8 @@ const adminRoutes = ['/admin']
 
 // Routes where pending users must be redirected (need profile query)
 // Routes that require *some* signed-in account but no particular role.
-// /my-deli is deliberately absent from roleCheckRoutes: a pending applicant
-// still owns their NYC Deli account and must be able to maintain it.
+// Pending applicants stay out of /profile; they maintain their account from
+// the /pending page instead, which embeds the same My NYC Deli panel.
 const roleCheckRoutes = [
   '/campers', '/ideas', '/kitchen', '/layout', '/layout-view',
   '/map', '/now', '/profile', '/resources', '/schedule', '/shift-draft',

@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { getOpsEvent } from '@/lib/active-event'
+import { getOpsEvent, isInformationStage } from '@/lib/active-event'
 import { hasFeature } from '@/lib/events'
 import { signOut } from '@/app/actions/auth'
 import type { EventFeatureKey, EventRow, UserRole } from '@/types/database'
@@ -19,14 +19,21 @@ const publicNavItems = [
 ]
 
 // `feature` items disappear when the current event doesn't use that module.
-const baseNavItems: { href: string; label: string; icon: string; feature?: EventFeatureKey }[] = [
+// `eventOnly` items disappear in the offseason — they describe one event's
+// operations, and every event is different.
+const baseNavItems: {
+  href: string
+  label: string
+  icon: string
+  feature?: EventFeatureKey
+  eventOnly?: boolean
+}[] = [
   { href: '/', label: 'Home', icon: '🥪' },
   { href: '/events', label: 'Events', icon: '📅' },
   { href: '/calendar', label: 'Calendar', icon: '🗓️' },
   { href: '/campers', label: 'Campers', icon: '🐀', feature: 'directory' },
-  { href: '/my-deli', label: 'My Deli', icon: '👤' },
-  { href: '/profile', label: 'Profile', icon: '🎒' },
-  { href: '/map', label: 'Camp Map', icon: '🏕️', feature: 'layout' },
+  { href: '/profile', label: 'Profile', icon: '👤' },
+  { href: '/map', label: 'Camp Map', icon: '🏕️', feature: 'layout', eventOnly: true },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳', feature: 'kitchen' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
@@ -81,19 +88,23 @@ export function Navigation() {
 
   const navItems = (() => {
     if (!isLoggedIn) return publicNavItems
-    // Pending applicants keep their account surfaces (home, events, calendar,
-    // and their own profile) while the rest of the camp stays gated.
+    // Pending applicants keep their account surfaces; /pending carries the
+    // same My NYC Deli panel the rest of the camp gets under Profile.
     if (userRole === 'pending') {
-      return [...publicNavItems.slice(0, 3), { href: '/my-deli', label: 'My Deli', icon: '👤' }]
+      return [...publicNavItems.slice(0, 3), { href: '/pending', label: 'My Deli', icon: '👤' }]
     }
 
+    const offseason = isInformationStage(opsEvent)
     const items = [...baseNavItems]
     if (userRole === 'builder' || userRole === 'admin') items.push(buildWeekNavItem)
 
+    const visible = items.filter(item => {
+      if (item.eventOnly && offseason) return false
+      return !item.feature || hasFeature(opsEvent, item.feature)
+    })
+
     // Once the team is onsite, the stripped-down view leads.
-    const onsite = opsEvent ? ['build', 'live'].includes(opsEvent.stage) : false
-    const visible = items.filter(item => !item.feature || hasFeature(opsEvent, item.feature))
-    if (onsite) visible.splice(1, 0, nowNavItem)
+    if (opsEvent && ['build', 'live'].includes(opsEvent.stage)) visible.splice(1, 0, nowNavItem)
 
     if (userRole === 'admin') visible.push(adminNavItem)
     return visible

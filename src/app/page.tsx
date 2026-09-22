@@ -1,75 +1,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { CountdownTimer } from '@/components/countdown-timer'
+import { CriticalDates } from '@/components/critical-dates'
 import { FeatureUnavailableNotice } from '@/components/feature-unavailable-notice'
+import { ModuleGrid } from '@/components/module-grid'
 import { NextUp } from '@/components/next-up'
-
-const modules = [
-  {
-    href: '/intake',
-    icon: '📝',
-    title: 'Register',
-    description: 'Start here. 9-step intake covering identity, arrival, shelter, infrastructure, participation, skills, build week, safety, and bio.',
-    status: 'Required',
-    statusColor: 'text-red-400',
-  },
-  {
-    href: '/profile',
-    icon: '👤',
-    title: 'Your Profile',
-    description: 'Four-tab hub: bio & photo uploads, camper details, your personal shift schedule, and the full team schedule.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/campers',
-    icon: '🐀',
-    title: 'Campers Directory',
-    description: 'Search by name, playa name, or email. View photos, bios, shelter info, and build week / kitchen participation.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/map',
-    icon: '🏕️',
-    title: 'Camp Map',
-    description: 'Interactive 2D & 3D camp map — explore tents, kitchen, shade, and zones with pan, zoom, and search.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/layout-view',
-    icon: '🗺️',
-    title: 'Camp Layout',
-    description: 'Zoomable 2D grid view with layer toggles for tents, shade, kitchen, and zones — color-coded by shelter type.',
-    status: 'View Only',
-    statusColor: 'text-blue-400',
-  },
-  {
-    href: '/kitchen',
-    icon: '🍳',
-    title: 'Kitchen Shifts',
-    description: 'Sign-up sheet, role definitions, shift coverage, and scheduling across deli, prep, grill, assembly, runners, and more.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/schedule',
-    icon: '📅',
-    title: 'Your Schedule',
-    description: 'All Shifts and My Schedule tabs with email lookup, status badges, and date/time sorting. Show up.',
-    status: 'Active',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/build-week',
-    icon: '🔨',
-    title: 'Build Week',
-    description: 'Four tabs: phased tasks with progress tracking, resource management, issue log, and builder coordination info.',
-    status: 'Upcoming',
-    statusColor: 'text-yellow-400',
-  },
-]
 
 const amenities = [
   { icon: '💧', text: 'Potable water at multiple fill-up points' },
@@ -709,78 +644,9 @@ export default function HomePage() {
 
       <div className="nyc-tag-stripe" />
 
-      {/* Modules Grid — Brick wall with poster cards */}
-      <section className="relative py-16 px-4 nyc-brick-wall nyc-grime">
-        <div className="relative z-10 max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
-            Camp System Modules
-          </h2>
-          <p className="text-center text-gray-300 mb-12">
-            The tooling the Rats run on. Each event switches on only the modules it actually
-            needs — a re-entry party doesn&apos;t need an electrical load calculator.
-          </p>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {modules.map((module, i) => (
-              <Link key={module.href} href={module.href} className="group">
-                <div
-                  className="h-full bg-black/80 border border-white/10 p-6 nyc-poster"
-                  style={{ transform: `rotate(${i % 2 === 0 ? '-0.5' : '0.5'}deg)` }}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-4xl">{module.icon}</span>
-                    <span className={`text-xs font-black uppercase ${module.statusColor}`}>
-                      {module.status}
-                    </span>
-                  </div>
-                  <h3 className="mt-4 text-lg font-black text-white">{module.title}</h3>
-                  <p className="text-sm text-gray-400 mt-1">{module.description}</p>
-                  <span className="inline-block mt-4 text-sm font-bold text-[#fccc0a] group-hover:text-[#ffd93d]">
-                    Go to {module.title} &rarr;
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ModuleGrid />
 
-      {/* Important Dates — Subway schedule board */}
-      <section className="bg-[#0a0a0a] py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center text-[#fccc0a] mb-2 nyc-neon-subtle">
-            Critical Dates
-          </h2>
-          <p className="text-center text-gray-400 mb-12 text-sm uppercase tracking-widest">
-            Burning Man 2026
-          </p>
-          
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 max-w-5xl mx-auto">
-            {[
-              { date: 'May 1', label: 'Camp Fees Due', desc: 'First payment', line: 'nyc-line-yellow' },
-              { date: 'Jul 1', label: 'Refund Deadline', desc: 'No refunds after this', line: 'nyc-line-red' },
-              { date: 'Aug 24', label: 'Build Week Starts', desc: 'Early arrivals only', line: 'nyc-line-green' },
-              { date: 'Aug 30', label: 'Burn Starts', desc: 'Gates open', line: 'nyc-line-orange' },
-              { date: 'Sep 7', label: 'Exodus Monday', desc: 'Stay through 2pm', line: 'nyc-line-purple' },
-            ].map((item) => (
-              <div key={item.label} className="text-center">
-                <div className={`w-8 h-8 rounded-full ${item.line} mx-auto mb-3 flex items-center justify-center`}>
-                  <div className="w-4 h-4 rounded-full bg-[#0a0a0a]" />
-                </div>
-                <div className="text-3xl font-black text-white mb-2">
-                  {item.date}
-                </div>
-                <div className="font-black uppercase tracking-[0.15em] text-sm mb-1 text-gray-300">
-                  {item.label}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {item.desc}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <CriticalDates />
 
       <div className="nyc-tag-stripe" />
 

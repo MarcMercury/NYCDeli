@@ -9,7 +9,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { resolveTentMateIds } from '@/lib/tent-mates'
-import { withOpsScope } from '@/lib/active-event'
+import { withOpsScope, getOpsEvent, isInformationStage } from '@/lib/active-event'
 import type { UserProfileRow, CamperRow, CamperPhotoRow } from '@/types/database'
 
 interface CamperDirectory {
@@ -24,6 +24,11 @@ export default function CampersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCamper, setSelectedCamper] = useState<CamperDirectory | null>(null)
   const [campersById, setCampersById] = useState<Map<string, CamperRow>>(new Map())
+  const [offseason, setOffseason] = useState(false)
+
+  useEffect(() => {
+    getOpsEvent().then(event => setOffseason(isInformationStage(event)))
+  }, [])
 
   const fetchDirectory = useCallback(async () => {
     const supabase = createClient()
@@ -97,9 +102,9 @@ export default function CampersPage() {
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-48 bg-gray-200 rounded"></div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="h-36 bg-gray-200 rounded"></div>
             ))}
           </div>
         </div>
@@ -249,54 +254,53 @@ export default function CampersPage() {
       )}
 
       {/* Directory Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
         {filtered.map(entry => (
           <button
             key={entry.profile.id}
             onClick={() => setSelectedCamper(entry)}
             className={cn(
-              'text-left border-2 border-black p-4 transition-all hover:bg-yellow-50 hover:border-yellow-400',
+              'text-left border-2 border-black p-2 transition-all hover:bg-yellow-50 hover:border-yellow-400',
               selectedCamper?.profile.id === entry.profile.id && 'bg-yellow-50 border-yellow-400'
             )}
           >
             {/* Avatar / First Photo */}
-            <div className="w-full aspect-square bg-gray-100 border border-gray-200 mb-3 overflow-hidden flex items-center justify-center">
+            <div className="w-full aspect-square bg-gray-100 border border-gray-200 mb-2 overflow-hidden flex items-center justify-center">
               {entry.photos.length > 0 ? (
                 <Image
                   src={getPhotoUrl(entry.photos[0].storage_path)}
                   alt={entry.camper?.full_name || 'Camper'}
                   className="w-full h-full object-cover"
-                  width={200}
-                  height={200}
+                  width={160}
+                  height={160}
                   unoptimized
                 />
               ) : (
-                <span className="text-4xl">🐀</span>
+                <span className="text-2xl">🐀</span>
               )}
             </div>
 
-            <h3 className="font-bold text-sm truncate">
+            <h3 className="font-bold text-xs leading-tight truncate">
               {entry.camper?.full_name || entry.profile.email}
             </h3>
             {entry.camper?.playa_name && (
-              <p className="text-xs text-yellow-700 font-bold truncate">
+              <p className="text-[11px] text-yellow-700 font-bold truncate">
                 &quot;{entry.camper.playa_name}&quot;
               </p>
             )}
-            {entry.profile.bio && (
-              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{entry.profile.bio}</p>
-            )}
-            <div className="flex gap-1 mt-2 flex-wrap">
-              {entry.profile.role === 'admin' && <Badge variant="info">Admin</Badge>}
-              {entry.camper?.build_week_attending && <Badge variant="default">Builder</Badge>}
-              {entry.camper && (() => {
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {entry.profile.role === 'admin' && <Badge variant="info" className="px-1.5 py-0 text-[10px]">Admin</Badge>}
+              {entry.camper?.build_week_attending && <Badge variant="default" className="px-1.5 py-0 text-[10px]">Builder</Badge>}
+              {/* Tent sharing belongs to a specific event — once it's archived
+                  the tag is history, so it stays on the detail view only. */}
+              {!offseason && entry.camper && (() => {
                 const mates = resolveTentMateIds(entry.camper.id, [...campersById.values()])
                   .map(id => campersById.get(id))
                   .filter((c): c is CamperRow => !!c)
                 if (mates.length === 0) return null
                 const label = mates.map(m => m.playa_name || m.full_name).join(', ')
                 return (
-                  <Badge variant="info">
+                  <Badge variant="info" className="px-1.5 py-0 text-[10px]">
                     🏕️ w/ {label}
                   </Badge>
                 )

@@ -125,7 +125,7 @@ export default function EventDetailPage() {
       {event.stage === 'closed' && (
         <Alert variant="info" title="Archived event" className="mt-6">
           This event is closed. Its records are preserved — check your{' '}
-          <Link href="/my-deli" className="underline font-bold">NYC Deli profile</Link> for your participation history.
+          <Link href="/profile" className="underline font-bold">NYC Deli profile</Link> for your participation history.
         </Alert>
       )}
 
@@ -379,7 +379,7 @@ function ApplyCard({
 
         <div className="text-sm text-gray-700 border-2 border-black p-3 bg-gray-50">
           Applying as <strong>{person.full_name}</strong> ({person.email}).{' '}
-          <Link href="/my-deli" className="underline font-bold">Update your info</Link>
+          <Link href="/profile" className="underline font-bold">Update your info</Link>
         </div>
 
         {fields.map(field => (

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { withOpsScope } from '@/lib/active-event'
+import { syncMyPersonFromCamperAction } from '@/app/actions/people'
+import { MyDeliPanel } from '@/components/my-deli-panel'
 import { changePassword } from '@/app/actions/auth'
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
@@ -30,6 +32,7 @@ interface EnrichedAssignment extends ScheduleAssignment {
 
 const profileTabs: Tab[] = [
   { id: 'about', label: 'About Me & Photos' },
+  { id: 'my-deli', label: 'My NYC Deli' },
   { id: 'details', label: 'Camper Details' },
   { id: 'packing-list', label: 'My Packing List' },
   { id: 'my-schedule', label: 'My Schedule' },
@@ -206,6 +209,8 @@ export default function ProfilePage() {
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
+      // The bio also lives on the permanent people record.
+      await syncMyPersonFromCamperAction()
       setMessage({ type: 'success', text: 'Bio saved!' })
     }
     setSaving(false)
@@ -325,6 +330,9 @@ export default function ProfilePage() {
       if (error) {
         setMessage({ type: 'error', text: error.message })
       } else {
+        // Shared facts (name, phone, emergency contact...) live on the
+        // permanent people record too.
+        await syncMyPersonFromCamperAction()
         setMessage({ type: 'success', text: 'Camper details saved!' })
         // Update local state directly instead of re-fetching everything
         setCamper({ ...camper, ...updates } as CamperRow)
@@ -461,6 +469,13 @@ export default function ProfilePage() {
       )}
 
       <Tabs tabs={canViewDetails ? profileTabs : profileTabs.filter(t => t.id !== 'details')} activeTab={activeTab} onChange={setActiveTab} className="mb-0" />
+
+      {/* ───── My NYC Deli: the permanent account, independent of any event ───── */}
+      <TabPanel tabId="my-deli" activeTab={activeTab}>
+        <div className="py-6">
+          <MyDeliPanel onPersonSaved={fetchProfile} />
+        </div>
+      </TabPanel>
 
       {/* ───── TAB 1: About Me & Photos (publicly viewable) ───── */}
       <TabPanel tabId="about" activeTab={activeTab}>

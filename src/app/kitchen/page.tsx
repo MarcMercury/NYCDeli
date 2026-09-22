@@ -7,7 +7,7 @@ import {
   Badge, Tabs, TabPanel, Alert, Button, Input
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { withOpsScope } from '@/lib/active-event'
+import { getOpsEvent, isInformationStage, withOpsScope } from '@/lib/active-event'
 import { cn, formatDate, formatTime } from '@/lib/utils'
 import type {
   KitchenRole, KitchenShift, ScheduleAssignment, Camper,
@@ -271,6 +271,17 @@ function consolidatePositions(positions: ShiftPosition[]): ConsolidatedPosition[
 
 export default function KitchenPage() {
   const [activeTab, setActiveTab] = useState('roles')
+  // Sign-ups and the published schedule belong to a specific event; the role
+  // definitions are how the camp works and stay useful year round.
+  const [offseason, setOffseason] = useState(false)
+
+  useEffect(() => {
+    getOpsEvent().then(event => {
+      const off = isInformationStage(event)
+      setOffseason(off)
+      if (off) setActiveTab('roles')
+    })
+  }, [])
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -599,14 +610,21 @@ export default function KitchenPage() {
         </div>
 
         {/* Hero Message */}
-        <Alert variant="warning" className="mb-8">
-          <strong>The Deal:</strong> You signed up for kitchen participation. We remember. 
-          Here&apos;s how it works and what we expect. Miss your shift, and there will be consequences. 
-          Mostly judgment. Lots of judgment.
-        </Alert>
+        {offseason ? (
+          <Alert variant="info" className="mb-8">
+            <strong>Between events.</strong> These are the kitchen roles and what each one is
+            responsible for. Sign-ups and the shift schedule come back when the next event does.
+          </Alert>
+        ) : (
+          <Alert variant="warning" className="mb-8">
+            <strong>The Deal:</strong> You signed up for kitchen participation. We remember. 
+            Here&apos;s how it works and what we expect. Miss your shift, and there will be consequences. 
+            Mostly judgment. Lots of judgment.
+          </Alert>
+        )}
 
         {/* Admin Controls */}
-        {isAdmin && (
+        {isAdmin && !offseason && (
           <div className="mb-6">
             <Card className={cn("border-2", adminEditing ? "border-yellow-500 bg-yellow-50" : "border-gray-300")}>
               <CardContent className="py-3 flex flex-wrap items-center justify-between gap-3">
@@ -640,7 +658,15 @@ export default function KitchenPage() {
         )}
 
         {/* Tabs (Sign-Up Sheet & Draft hidden from 'user' role) */}
-        <Tabs tabs={canSeeDraft ? tabs : tabs.filter(t => t.id !== 'signup')} activeTab={activeTab} onChange={setActiveTab} />
+        <Tabs
+          tabs={
+            offseason
+              ? tabs.filter(t => t.id === 'roles')
+              : canSeeDraft ? tabs : tabs.filter(t => t.id !== 'signup')
+          }
+          activeTab={activeTab}
+          onChange={setActiveTab}
+        />
 
         {/* Roles & Descriptions Tab */}
         <TabPanel tabId="roles" activeTab={activeTab}>

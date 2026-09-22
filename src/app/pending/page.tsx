@@ -1,9 +1,10 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
+import { MyDeliPanel } from '@/components/my-deli-panel'
 
 export default function PendingPage() {
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-md text-center">
+    <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
+      <Card className="text-center">
         <CardHeader>
           <CardTitle className="text-2xl font-black uppercase tracking-wider">
             ⏳ Hold Tight, Rat
@@ -27,6 +28,9 @@ export default function PendingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* An account is yours whether or not you're in an event yet. */}
+      <MyDeliPanel />
     </div>
   )
 }
