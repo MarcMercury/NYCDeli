@@ -429,7 +429,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-black text-white mb-1">Event Week Camper</h3>
               <p className="text-sm text-gray-400 mb-4">Arriving for the event</p>
-              <div className="text-3xl font-black text-[#fccc0a] mb-1 nyc-neon-subtle">Typically Around $900</div>
+              <div className="text-4xl font-black text-[#fccc0a] mb-1 nyc-neon-subtle">Typically Around $900</div>
               <p className="text-xs text-gray-400 mb-4">(inflation&apos;s a bitch)</p>
               <ul className="text-sm space-y-2 text-gray-300">
                 <li>All camp amenities included</li>
