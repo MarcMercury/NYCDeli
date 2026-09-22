@@ -331,6 +331,99 @@ export function eventDateLabel(event: Pick<EventRow, 'start_date' | 'end_date'>)
 }
 
 // ---------------------------------------------------------------------------
+// Links & imagery
+// ---------------------------------------------------------------------------
+
+/**
+ * Both live in `events.config`, which is free-form JSON an admin can write, so
+ * everything here parses defensively and every URL is checked before it can
+ * become an href or an <img src>. A bad row drops out; it never throws and it
+ * never renders a `javascript:` link.
+ */
+
+export interface EventLink {
+  label: string
+  url: string
+  group: string
+}
+
+export interface EventImage {
+  /** Path under /public, e.g. /Images/events/foo.webp */
+  path: string
+  alt: string
+  caption?: string
+  credit?: string
+  /** Where the image was published. */
+  sourceUrl?: string
+  /** Where clicking it should go. */
+  link?: string
+}
+
+function externalUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  try {
+    const parsed = new URL(value.trim())
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : null
+  } catch {
+    return null
+  }
+}
+
+/** Only our own /public assets — a remote src would need next.config allow-listing. */
+function localImagePath(value: unknown): string | null {
+  return typeof value === 'string' && /^\/[\w./-]+\.(webp|png|jpe?g|avif|gif)$/i.test(value) ? value : null
+}
+
+function configArray(event: Pick<EventRow, 'config'>, key: string): Record<string, unknown>[] {
+  const value = (event.config as Record<string, unknown> | null)?.[key]
+  if (!Array.isArray(value)) return []
+  return value.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+}
+
+export function eventLinks(event: Pick<EventRow, 'config'>): EventLink[] {
+  return configArray(event, 'links').flatMap(entry => {
+    const url = externalUrl(entry.url)
+    const label = typeof entry.label === 'string' ? entry.label.trim() : ''
+    if (!url || !label) return []
+    return [{ label, url, group: typeof entry.group === 'string' && entry.group ? entry.group : 'Links' }]
+  })
+}
+
+/** Links grouped in first-seen order, which is the order they were authored in. */
+export function groupedEventLinks(event: Pick<EventRow, 'config'>): { group: string; links: EventLink[] }[] {
+  const groups: { group: string; links: EventLink[] }[] = []
+  for (const link of eventLinks(event)) {
+    const existing = groups.find(g => g.group === link.group)
+    if (existing) existing.links.push(link)
+    else groups.push({ group: link.group, links: [link] })
+  }
+  return groups
+}
+
+export function eventImages(event: Pick<EventRow, 'config'>): EventImage[] {
+  return configArray(event, 'images').flatMap(entry => {
+    const path = localImagePath(entry.path)
+    if (!path) return []
+    return [{
+      path,
+      alt: typeof entry.alt === 'string' ? entry.alt : '',
+      caption: typeof entry.caption === 'string' ? entry.caption : undefined,
+      credit: typeof entry.credit === 'string' ? entry.credit : undefined,
+      sourceUrl: externalUrl(entry.source_url) ?? undefined,
+      link: externalUrl(entry.link) ?? undefined,
+    }]
+  })
+}
+
+/** The cover image, falling back to the first gallery image. */
+export function eventCover(event: Pick<EventRow, 'config' | 'cover_image_path'>): EventImage | null {
+  const images = eventImages(event)
+  const path = localImagePath(event.cover_image_path)
+  if (!path) return images[0] ?? null
+  return images.find(image => image.path === path) ?? { path, alt: '' }
+}
+
+// ---------------------------------------------------------------------------
 // Data access
 // ---------------------------------------------------------------------------
 

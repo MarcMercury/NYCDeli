@@ -4,7 +4,6 @@ import { CountdownTimer } from '@/components/countdown-timer'
 import { CriticalDates } from '@/components/critical-dates'
 import { FeatureUnavailableNotice } from '@/components/feature-unavailable-notice'
 import { HeroCtas, JoinSection } from '@/components/home-cta'
-import { ModuleGrid } from '@/components/module-grid'
 import { NextUp } from '@/components/next-up'
 
 const amenities = [
@@ -346,15 +345,10 @@ export default function HomePage() {
       {/* Camp Overview — Brick wall */}
       <section className="relative py-16 px-4 nyc-brick-wall nyc-grime">
         <div className="relative z-10 max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-12 text-[#fccc0a] nyc-stencil">
             About the Burn Camp
           </h2>
-          <p className="text-center text-gray-300 mb-12 max-w-2xl mx-auto">
-            Camp NYC Deli at Burning Man 2026 will be a ~70 person camp: 70% veteran burners and 
-            30% brand new burners. This is by design — to create space on-playa for new burners 
-            in a friendly, veteran-majority camp.
-          </p>
-          
+
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="text-center p-6 bg-black/70 border border-white/10 backdrop-blur-sm nyc-poster">
               <div className="text-5xl font-black text-[#fccc0a] mb-2 nyc-neon-subtle">~70</div>
@@ -650,8 +644,6 @@ export default function HomePage() {
       </section>
 
       <div className="nyc-tag-stripe" />
-
-      <ModuleGrid />
 
       <CriticalDates />
 

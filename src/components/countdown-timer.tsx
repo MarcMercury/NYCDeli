@@ -97,7 +97,7 @@ function CountdownDisplay({ clocks }: { clocks: { key: string; label: string; ic
         }} />
       </div>
 
-      <div className="relative z-10 py-4 md:py-5 px-4">
+      <div className="relative z-10 py-2 md:py-2.5 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-center gap-4 md:gap-10 flex-wrap md:flex-nowrap">
             {clocks.map(clock => (

@@ -16,6 +16,7 @@ import {
 import { fetchPersonByUserId, fetchPersonHistory, summarizeHistory } from '@/lib/people'
 import { applyToEventAction, submitEventFeedbackAction } from '@/app/actions/events'
 import { EventPhotoAlbums } from '@/components/event-photo-albums'
+import { EventCover, EventGallery, EventLinks } from '@/components/event-media'
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type {
@@ -85,6 +86,8 @@ export default function EventDetailPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link href="/events" className="text-sm font-bold uppercase tracking-wider underline">← All events</Link>
 
+      <EventCover event={event} className="mt-4" />
+
       <div className="mt-4 flex items-center gap-2 flex-wrap">
         <span className={cn('px-2 py-0.5 text-xs font-bold uppercase border-2', meta.className)}>
           {meta.icon} {meta.label}
@@ -122,6 +125,9 @@ export default function EventDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <EventGallery event={event} />
+      <EventLinks event={event} />
 
       <EventPhotoAlbums eventId={event.id} />
 

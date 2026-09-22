@@ -11,6 +11,7 @@ import {
   stageMeta,
 } from '@/lib/events'
 import { CampCalendar } from '@/components/camp-calendar'
+import { EventThumbnail } from '@/components/event-media'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { EventRow } from '@/types/database'
@@ -120,7 +121,8 @@ export function EventCard({ event }: { event: EventRow }) {
   const open = isAcceptingApplications(event)
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col overflow-hidden">
+      <EventThumbnail event={event} />
       <CardContent className="py-5 flex-1">
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <span className={cn('px-2 py-0.5 text-xs font-bold uppercase border-2', meta.className)}>
