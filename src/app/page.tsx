@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { CountdownTimer } from '@/components/countdown-timer'
+import { NextUp } from '@/components/next-up'
 
 const modules = [
   {
@@ -157,6 +158,9 @@ export default function HomePage() {
 
       {/* Rainbow tag stripe divider */}
       <div className="nyc-tag-stripe" />
+
+      {/* Current events + camp calendar (org-level, not tied to one burn) */}
+      <NextUp />
 
       {/* Our Mission — Concrete wall with grime */}
       <section className="relative nyc-grime nyc-concrete-wall py-14">

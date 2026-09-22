@@ -11,13 +11,18 @@ import type { UserRole } from '@/types/database'
 
 const publicNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
+  { href: '/events', label: 'Events', icon: '📅' },
+  { href: '/calendar', label: 'Calendar', icon: '🗓️' },
   { href: '/intake', label: 'Register', icon: '📝' },
 ]
 
 const baseNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
+  { href: '/events', label: 'Events', icon: '📅' },
+  { href: '/calendar', label: 'Calendar', icon: '🗓️' },
   { href: '/campers', label: 'Campers', icon: '🐀' },
-  { href: '/profile', label: 'Profile', icon: '👤' },
+  { href: '/my-deli', label: 'My Deli', icon: '👤' },
+  { href: '/profile', label: 'Profile', icon: '🎒' },
   { href: '/map', label: 'Camp Map', icon: '🏕️' },
   { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
   { href: '/resources', label: 'Resources', icon: '📚' },
@@ -66,9 +71,14 @@ export function Navigation() {
   }, [pathname])
 
   const navItems = (() => {
-    if (!isLoggedIn || userRole === 'pending') return publicNavItems
+    if (!isLoggedIn) return publicNavItems
+    // Pending applicants keep their account surfaces (home, events, calendar,
+    // and their own profile) while the rest of the camp stays gated.
+    if (userRole === 'pending') {
+      return [...publicNavItems.slice(0, 3), { href: '/my-deli', label: 'My Deli', icon: '👤' }]
+    }
     const items = [...baseNavItems]
-    if (userRole === 'builder' || userRole === 'admin') items.splice(6, 0, buildWeekNavItem)
+    if (userRole === 'builder' || userRole === 'admin') items.push(buildWeekNavItem)
     if (userRole === 'admin') items.push(adminNavItem)
     return items
   })()

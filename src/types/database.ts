@@ -84,6 +84,10 @@ export interface CamperRow {
   is_admin: boolean
   paid: boolean
   notes: string | null
+  /** Event this operational camper profile belongs to (see events table). */
+  event_id: string | null
+  /** Permanent CRM identity behind this camper profile. */
+  person_id: string | null
 }
 
 export interface CamperInsert {
@@ -144,6 +148,8 @@ export interface CamperInsert {
   is_admin?: boolean
   paid?: boolean
   notes?: string | null
+  event_id?: string | null
+  person_id?: string | null
 }
 
 export interface CamperUpdate {
@@ -203,6 +209,8 @@ export interface CamperUpdate {
   is_admin?: boolean
   paid?: boolean
   notes?: string | null
+  event_id?: string | null
+  person_id?: string | null
 }
 
 // Auth & User Profile Types (defined before Database interface for type resolution)
@@ -221,6 +229,8 @@ export interface UserProfileRow {
   denied_reason: string | null
   bio: string | null
   last_sign_in_at: string | null
+  /** Permanent CRM identity. Survives every event this account participates in. */
+  person_id: string | null
 }
 
 export interface UserProfileInsert {
@@ -229,6 +239,7 @@ export interface UserProfileInsert {
   role?: UserRole
   camper_id?: string | null
   bio?: string | null
+  person_id?: string | null
 }
 
 export interface UserProfileUpdate {
@@ -240,6 +251,7 @@ export interface UserProfileUpdate {
   denied_reason?: string | null
   bio?: string | null
   last_sign_in_at?: string | null
+  person_id?: string | null
 }
 
 export interface CamperPhotoRow {
@@ -499,6 +511,42 @@ export interface Database {
         Row: CampEventRow
         Insert: CampEventInsert
         Update: CampEventUpdate
+        Relationships: []
+      }
+      events: {
+        Row: EventRow
+        Insert: EventInsert
+        Update: EventUpdate
+        Relationships: []
+      }
+      event_stage_history: {
+        Row: EventStageHistoryRow
+        Insert: Omit<EventStageHistoryRow, 'id' | 'created_at'>
+        Update: Partial<Omit<EventStageHistoryRow, 'id' | 'created_at'>>
+        Relationships: []
+      }
+      people: {
+        Row: PersonRow
+        Insert: PersonInsert
+        Update: PersonUpdate
+        Relationships: []
+      }
+      person_notes: {
+        Row: PersonNoteRow
+        Insert: PersonNoteInsert
+        Update: Partial<PersonNoteInsert>
+        Relationships: []
+      }
+      event_applications: {
+        Row: EventApplicationRow
+        Insert: EventApplicationInsert
+        Update: EventApplicationUpdate
+        Relationships: []
+      }
+      event_participants: {
+        Row: EventParticipantRow
+        Insert: EventParticipantInsert
+        Update: EventParticipantUpdate
         Relationships: []
       }
       user_profiles: {
@@ -1008,10 +1056,21 @@ export interface UtilityLineUpdate {
 }
 
 // ==========================================
-// Camp Events Types
+// Camp Calendar Types (org-level NYC Deli calendar)
 // ==========================================
 
-export type EventCategory = 'general' | 'social' | 'planning' | 'fundraiser' | 'build' | 'shopping' | 'other'
+export type EventCategory =
+  | 'general'
+  | 'social'
+  | 'planning'
+  | 'meeting'
+  | 'deadline'
+  | 'application'
+  | 'fundraiser'
+  | 'build'
+  | 'shopping'
+  | 'event'
+  | 'other'
 
 export interface CampEventRow {
   id: string
@@ -1020,33 +1079,51 @@ export interface CampEventRow {
   title: string
   description: string | null
   event_date: string
+  end_date: string | null
   start_time: string | null
   end_time: string | null
+  all_day: boolean
   location: string | null
   category: EventCategory
+  event_id: string | null
+  is_public: boolean
+  link_url: string | null
   created_by: string | null
+  created_by_user_id: string | null
 }
 
 export interface CampEventInsert {
   title: string
   description?: string | null
   event_date: string
+  end_date?: string | null
   start_time?: string | null
   end_time?: string | null
+  all_day?: boolean
   location?: string | null
   category?: EventCategory
+  event_id?: string | null
+  is_public?: boolean
+  link_url?: string | null
   created_by?: string | null
+  created_by_user_id?: string | null
 }
 
 export interface CampEventUpdate {
   title?: string
   description?: string | null
   event_date?: string
+  end_date?: string | null
   start_time?: string | null
   end_time?: string | null
+  all_day?: boolean
   location?: string | null
   category?: EventCategory
+  event_id?: string | null
+  is_public?: boolean
+  link_url?: string | null
   created_by?: string | null
+  created_by_user_id?: string | null
 }
 
 export type CampEvent = CampEventRow
@@ -1558,3 +1635,365 @@ export interface PackingListItemUpdate {
 }
 
 export type PackingListItem = PackingListItemRow
+
+// ==========================================
+// Multi-Event Core (migration 083/084)
+//
+// NYC Deli Rats
+//   -> people                (permanent identity / CRM)
+//     -> event_applications  (person -> potential event)
+//       -> event_participants (person -> event operations)
+//   -> events                (lifecycle-staged, independently configured)
+// ==========================================
+
+/** Lifecycle stages an event moves through. `information` is the org-level
+ *  resting state when no event is active — it is not an event row stage. */
+export type EventStage =
+  | 'development'
+  | 'application'
+  | 'prep'
+  | 'finalization'
+  | 'build'
+  | 'live'
+  | 'post_event'
+  | 'closed'
+
+export type EventKind =
+  | 'burning_man'
+  | 'regional_burn'
+  | 'camp_social'
+  | 'fundraiser'
+  | 'build_day'
+  | 'meeting'
+  | 'retreat'
+  | 'other'
+
+export type ApplicationStatus =
+  | 'draft'
+  | 'submitted'
+  | 'under_review'
+  | 'waitlisted'
+  | 'approved'
+  | 'denied'
+  | 'withdrawn'
+
+export type ParticipantStatus =
+  | 'invited'
+  | 'confirmed'
+  | 'tentative'
+  | 'withdrawn'
+  | 'no_show'
+  | 'attended'
+
+export type ParticipantRole = 'camper' | 'lead' | 'builder' | 'guest' | 'vendor'
+
+export type PersonStatus =
+  | 'prospect'
+  | 'applicant'
+  | 'member'
+  | 'alumni'
+  | 'inactive'
+  | 'blocked'
+
+/** Optional per-event modules. Absent key === feature off. */
+export type EventFeatureKey =
+  | 'applications'
+  | 'roster'
+  | 'directory'
+  | 'layout'
+  | 'build_week'
+  | 'inventory'
+  | 'electrical'
+  | 'kitchen'
+  | 'shift_draft'
+  | 'packing'
+  | 'tents'
+  | 'transport'
+  | 'meals'
+  | 'meetings'
+  | 'photos'
+
+export type EventFeatures = Partial<Record<EventFeatureKey, boolean>>
+
+/** One question on an event's application form. */
+export interface EventApplicationField {
+  key: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'select'
+  required?: boolean
+  help?: string
+  options?: string[]
+  /** Person field to preload from for returning applicants. */
+  prefill?: keyof PersonRow
+}
+
+export interface EventRow {
+  id: string
+  created_at: string
+  updated_at: string
+  slug: string
+  name: string
+  kind: EventKind
+  year: number | null
+  tagline: string | null
+  description: string | null
+  location_name: string | null
+  location_address: string | null
+  timezone: string
+  start_date: string | null
+  end_date: string | null
+  build_start_date: string | null
+  strike_end_date: string | null
+  applications_open_at: string | null
+  applications_close_at: string | null
+  stage: EventStage
+  is_public: boolean
+  is_flagship: boolean
+  applications_open: boolean
+  capacity: number | null
+  features: EventFeatures
+  config: Record<string, unknown>
+  application_schema: EventApplicationField[]
+  cover_image_path: string | null
+  closed_at: string | null
+  closed_by: string | null
+  created_by: string | null
+}
+
+export interface EventInsert {
+  slug: string
+  name: string
+  kind?: EventKind
+  year?: number | null
+  tagline?: string | null
+  description?: string | null
+  location_name?: string | null
+  location_address?: string | null
+  timezone?: string
+  start_date?: string | null
+  end_date?: string | null
+  build_start_date?: string | null
+  strike_end_date?: string | null
+  applications_open_at?: string | null
+  applications_close_at?: string | null
+  stage?: EventStage
+  is_public?: boolean
+  is_flagship?: boolean
+  applications_open?: boolean
+  capacity?: number | null
+  features?: EventFeatures
+  config?: Record<string, unknown>
+  application_schema?: EventApplicationField[]
+  cover_image_path?: string | null
+  created_by?: string | null
+}
+
+export type EventUpdate = Partial<Omit<EventInsert, 'slug'>> & {
+  slug?: string
+  closed_at?: string | null
+  closed_by?: string | null
+}
+
+export interface EventStageHistoryRow {
+  id: string
+  created_at: string
+  event_id: string
+  from_stage: EventStage | null
+  to_stage: EventStage
+  changed_by: string | null
+  note: string | null
+}
+
+export interface PersonRow {
+  id: string
+  created_at: string
+  updated_at: string
+  user_id: string | null
+  full_name: string
+  preferred_name: string | null
+  playa_name: string | null
+  email: string
+  phone: string | null
+  pronouns: string | null
+  city: string | null
+  region: string | null
+  country: string | null
+  socials: Record<string, string>
+  emergency_contact_name: string | null
+  emergency_contact_number: string | null
+  emergency_contact_relationship: string | null
+  dietary_restrictions: string | null
+  allergies: string | null
+  medical_notes: string | null
+  bio: string | null
+  photo_path: string | null
+  status: PersonStatus
+  tags: string[]
+  admin_notes: string | null
+  first_seen_at: string
+  last_active_at: string | null
+}
+
+export interface PersonInsert {
+  user_id?: string | null
+  full_name: string
+  preferred_name?: string | null
+  playa_name?: string | null
+  email: string
+  phone?: string | null
+  pronouns?: string | null
+  city?: string | null
+  region?: string | null
+  country?: string | null
+  socials?: Record<string, string>
+  emergency_contact_name?: string | null
+  emergency_contact_number?: string | null
+  emergency_contact_relationship?: string | null
+  dietary_restrictions?: string | null
+  allergies?: string | null
+  medical_notes?: string | null
+  bio?: string | null
+  photo_path?: string | null
+  status?: PersonStatus
+  tags?: string[]
+  admin_notes?: string | null
+}
+
+export type PersonUpdate = Partial<PersonInsert> & { last_active_at?: string | null }
+
+/** Fields a person may edit about themselves from their account. */
+export type PersonSelfUpdate = Pick<
+  PersonUpdate,
+  | 'full_name'
+  | 'preferred_name'
+  | 'playa_name'
+  | 'phone'
+  | 'pronouns'
+  | 'city'
+  | 'region'
+  | 'country'
+  | 'socials'
+  | 'emergency_contact_name'
+  | 'emergency_contact_number'
+  | 'emergency_contact_relationship'
+  | 'dietary_restrictions'
+  | 'allergies'
+  | 'bio'
+>
+
+export interface PersonNoteRow {
+  id: string
+  created_at: string
+  updated_at: string
+  person_id: string
+  event_id: string | null
+  author_id: string | null
+  body: string
+  is_pinned: boolean
+}
+
+export interface PersonNoteInsert {
+  person_id: string
+  event_id?: string | null
+  author_id?: string | null
+  body: string
+  is_pinned?: boolean
+}
+
+export interface EventApplicationRow {
+  id: string
+  created_at: string
+  updated_at: string
+  event_id: string
+  person_id: string
+  status: ApplicationStatus
+  responses: Record<string, unknown>
+  source: string
+  is_returning: boolean
+  submitted_at: string | null
+  decided_at: string | null
+  decided_by: string | null
+  decision_note: string | null
+  admin_summary: string | null
+  camper_id: string | null
+}
+
+export interface EventApplicationInsert {
+  event_id: string
+  person_id: string
+  status?: ApplicationStatus
+  responses?: Record<string, unknown>
+  source?: string
+  is_returning?: boolean
+  submitted_at?: string | null
+  camper_id?: string | null
+}
+
+export type EventApplicationUpdate = Partial<
+  Omit<EventApplicationInsert, 'event_id' | 'person_id'>
+> & {
+  decided_at?: string | null
+  decided_by?: string | null
+  decision_note?: string | null
+  admin_summary?: string | null
+}
+
+export interface EventParticipantRow {
+  id: string
+  created_at: string
+  updated_at: string
+  event_id: string
+  person_id: string
+  application_id: string | null
+  camper_id: string | null
+  role: ParticipantRole
+  status: ParticipantStatus
+  teams: string[]
+  arrival_date: string | null
+  departure_date: string | null
+  paid: boolean
+  dues_amount: number | null
+  notes: string | null
+  joined_at: string
+}
+
+export interface EventParticipantInsert {
+  event_id: string
+  person_id: string
+  application_id?: string | null
+  camper_id?: string | null
+  role?: ParticipantRole
+  status?: ParticipantStatus
+  teams?: string[]
+  arrival_date?: string | null
+  departure_date?: string | null
+  paid?: boolean
+  dues_amount?: number | null
+  notes?: string | null
+}
+
+export type EventParticipantUpdate = Partial<
+  Omit<EventParticipantInsert, 'event_id' | 'person_id'>
+>
+
+// Convenience aliases + joined shapes used by the CRM/event screens.
+export type DeliEvent = EventRow
+export type Person = PersonRow
+export type EventApplication = EventApplicationRow
+export type EventParticipant = EventParticipantRow
+
+export interface EventApplicationWithPerson extends EventApplicationRow {
+  person: PersonRow | null
+}
+
+export interface EventParticipantWithPerson extends EventParticipantRow {
+  person: PersonRow | null
+}
+
+/** Everything the CRM knows about one person, across every event. */
+export interface PersonHistory {
+  person: PersonRow
+  applications: (EventApplicationRow & { event: EventRow | null })[]
+  participations: (EventParticipantRow & { event: EventRow | null })[]
+  notes: PersonNoteRow[]
+}

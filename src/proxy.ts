@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that don't require auth at all — no Supabase calls needed
-const publicRoutes = ['/', '/login', '/register', '/pending', '/intake', '/stone-age']
+// Routes that don't require auth at all — no Supabase calls needed.
+// /events and /calendar are the public face of the camp; RLS limits anonymous
+// visitors to rows explicitly flagged public.
+const publicRoutes = ['/', '/login', '/register', '/pending', '/intake', '/stone-age', '/events', '/calendar']
 
 // During maintenance, only these paths stay reachable for non-admins
 const MAINTENANCE_ALLOWLIST = ['/stone-age', '/login']
@@ -11,6 +13,9 @@ const MAINTENANCE_ALLOWLIST = ['/stone-age', '/login']
 const adminRoutes = ['/admin']
 
 // Routes where pending users must be redirected (need profile query)
+// Routes that require *some* signed-in account but no particular role.
+// /my-deli is deliberately absent from roleCheckRoutes: a pending applicant
+// still owns their NYC Deli account and must be able to maintain it.
 const roleCheckRoutes = [
   '/campers', '/ideas', '/kitchen', '/layout', '/layout-view',
   '/map', '/profile', '/resources', '/schedule', '/shift-draft',

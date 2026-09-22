@@ -119,6 +119,7 @@ export default function AdminPage() {
       denied_reason: null,
       bio: null,
       last_sign_in_at: null,
+      person_id: c.person_id ?? null,
       camper: c,
     }))
 
@@ -471,6 +472,30 @@ export default function AdminPage() {
               <p className="text-xs uppercase tracking-wider text-gray-500">Open Shifts</p>
             </CardContent>
           </Card>
+          <Link href="/admin/events" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🎪</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Events</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/people" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🗂️</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">People (CRM)</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/calendar" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🗓️</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Camp Calendar</p>
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/admin/layout-builder" className="block">
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
