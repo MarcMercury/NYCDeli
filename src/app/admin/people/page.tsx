@@ -1,35 +1,51 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { PERSON_STATUS_META, fetchPeople, personDisplayName } from '@/lib/people'
+import {
+  APPLICATION_STATUS_META,
+  PERSON_STATUS_META,
+  fetchPeople,
+  personDisplayName,
+  type PersonWithPipeline,
+} from '@/lib/people'
+import { fetchEvents } from '@/lib/events'
 import { createPersonAction } from '@/app/actions/people'
-import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from '@/components/ui'
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import type { PersonRow, PersonStatus } from '@/types/database'
+import type { EventRow, PersonStatus } from '@/types/database'
 
 /**
  * The historical CRM. Everyone NYC Deli has ever dealt with lives here,
  * independent of any event — closing an event never removes anyone.
  */
 export default function AdminPeoplePage() {
-  const [people, setPeople] = useState<PersonRow[]>([])
+  const [people, setPeople] = useState<PersonWithPipeline[]>([])
+  const [events, setEvents] = useState<EventRow[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<PersonStatus | 'all'>('all')
+  const [eventId, setEventId] = useState<string | 'all'>('all')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [, startTransition] = useTransition()
 
   const load = useCallback(async () => {
     setLoading(true)
-    setPeople(await fetchPeople({ search, status }))
+    setPeople(await fetchPeople({ search, status, eventId }))
     setLoading(false)
-  }, [search, status])
+  }, [search, status, eventId])
 
   useEffect(() => {
-    const timer = setTimeout(load, 200)
+    const timer = setTimeout(() => startTransition(() => { load() }), 200)
     return () => clearTimeout(timer)
   }, [load])
+
+  useEffect(() => {
+    startTransition(() => {
+      fetchEvents().then(setEvents)
+    })
+  }, [])
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -39,6 +55,10 @@ export default function AdminPeoplePage() {
           <h1 className="text-4xl font-black uppercase tracking-wider mt-2">People</h1>
           <p className="text-gray-600 mt-1">
             Every member, applicant and alum. Profiles persist across every NYC Deli event.
+          </p>
+          <p className="text-sm text-gray-600 mt-1">
+            Status is read live from the application pipeline —{' '}
+            <Link href="/admin/applicants" className="font-bold underline">review the queue →</Link>
           </p>
         </div>
         <Button onClick={() => setShowForm(v => !v)}>{showForm ? 'Cancel' : '+ Add Person'}</Button>
@@ -73,6 +93,16 @@ export default function AdminPeoplePage() {
             ]}
           />
         </div>
+        <div className="w-56">
+          <Select
+            value={eventId}
+            onChange={e => setEventId(e.target.value)}
+            options={[
+              { value: 'all', label: 'All Events' },
+              ...events.map(event => ({ value: event.id, label: event.name })),
+            ]}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -90,12 +120,15 @@ export default function AdminPeoplePage() {
                   <th className="py-2 font-black uppercase text-xs">Name</th>
                   <th className="py-2 font-black uppercase text-xs">Email</th>
                   <th className="py-2 font-black uppercase text-xs">Status</th>
+                  <th className="py-2 font-black uppercase text-xs">Latest Application</th>
                   <th className="py-2 font-black uppercase text-xs">Account</th>
                 </tr>
               </thead>
               <tbody>
                 {people.map(person => {
-                  const meta = PERSON_STATUS_META[person.status]
+                  const { derivedStatus, latestApplication, accountRole, accountDeniedAt } = person.pipeline
+                  const meta = PERSON_STATUS_META[derivedStatus]
+                  const appMeta = latestApplication ? APPLICATION_STATUS_META[latestApplication.status] : null
                   return (
                     <tr key={person.id} className="border-b border-gray-200 hover:bg-gray-50">
                       <td className="py-2">
@@ -109,7 +142,25 @@ export default function AdminPeoplePage() {
                           {meta.label}
                         </span>
                       </td>
-                      <td className="py-2 text-gray-600">{person.user_id ? 'Has login' : '—'}</td>
+                      <td className="py-2">
+                        {latestApplication && appMeta ? (
+                          <div className="flex items-center gap-2">
+                            <Badge variant={appMeta.variant}>{appMeta.label}</Badge>
+                            <span className="text-gray-600">{latestApplication.event?.name ?? '—'}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">No application</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-gray-600">
+                        {!person.user_id && !accountRole
+                          ? '—'
+                          : accountDeniedAt
+                            ? 'Denied'
+                            : accountRole === 'pending'
+                              ? 'Awaiting approval'
+                              : 'Has login'}
+                      </td>
                     </tr>
                   )
                 })}

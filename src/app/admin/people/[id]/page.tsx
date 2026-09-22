@@ -131,9 +131,19 @@ export default function AdminPersonPage() {
               <div key={app.id} className="border-b border-gray-200 pb-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-black uppercase">{app.event?.name ?? 'Event'}</p>
-                  <Badge variant={app.status === 'approved' ? 'success' : app.status === 'denied' ? 'error' : 'info'}>
-                    {app.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={app.status === 'approved' ? 'success' : app.status === 'denied' ? 'error' : 'info'}>
+                      {app.status}
+                    </Badge>
+                    {app.event && (
+                      <Link
+                        href={`/admin/events/${app.event.id}?tab=applications`}
+                        className="text-sm font-bold underline"
+                      >
+                        Review
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 <p className="text-sm text-gray-600">
                   Applied {app.submitted_at?.slice(0, 10) ?? app.created_at.slice(0, 10)}

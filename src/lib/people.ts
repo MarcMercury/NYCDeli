@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { DeliSupabase } from '@/lib/events'
 import type {
+  ApplicationStatus,
   EventApplicationRow,
   EventParticipantRow,
   EventRow,
@@ -8,6 +9,7 @@ import type {
   PersonNoteRow,
   PersonRow,
   PersonStatus,
+  UserRole,
 } from '@/types/database'
 
 /**
@@ -43,21 +45,46 @@ export function personDisplayName(person: Pick<PersonRow, 'full_name' | 'preferr
 export interface PeopleFilter {
   search?: string
   status?: PersonStatus | 'all'
+  /** Restrict to people who applied to, or took part in, one specific event. */
+  eventId?: string | 'all'
   limit?: number
 }
 
-export async function fetchPeople(filter: PeopleFilter = {}, client?: DeliSupabase): Promise<PersonRow[]> {
-  let query = db(client).from('people').select('*').order('full_name', { ascending: true })
+/**
+ * Everyone matching the filter, each carrying their live application pipeline.
+ *
+ * The `people.status` column is a manual label and historically drifted from
+ * the truth (bulk imports stamped every camper as `member`), so the CRM filters
+ * on {@link derivePersonStatus} instead — a status read back out of the
+ * applications, participations and account-approval state.
+ */
+export async function fetchPeople(filter: PeopleFilter = {}, client?: DeliSupabase): Promise<PersonWithPipeline[]> {
+  const supabase = db(client)
 
-  if (filter.status && filter.status !== 'all') query = query.eq('status', filter.status)
+  let query = supabase.from('people').select('*').order('full_name', { ascending: true })
   if (filter.search?.trim()) {
     const term = `%${filter.search.trim()}%`
     query = query.or(`full_name.ilike.${term},email.ilike.${term},playa_name.ilike.${term}`)
   }
-  if (filter.limit) query = query.limit(filter.limit)
 
   const { data } = await query
-  return (data as PersonRow[] | null) ?? []
+  const people = (data as PersonRow[] | null) ?? []
+  if (people.length === 0) return []
+
+  const enriched = await attachPipelines(supabase, people)
+
+  let result = enriched
+  if (filter.status && filter.status !== 'all') {
+    result = result.filter(p => p.pipeline.derivedStatus === filter.status)
+  }
+  if (filter.eventId && filter.eventId !== 'all') {
+    result = result.filter(
+      p =>
+        p.pipeline.applications.some(a => a.event_id === filter.eventId) ||
+        p.pipeline.participations.some(x => x.event_id === filter.eventId)
+    )
+  }
+  return filter.limit ? result.slice(0, filter.limit) : result
 }
 
 export async function fetchPersonById(id: string, client?: DeliSupabase): Promise<PersonRow | null> {
@@ -89,6 +116,8 @@ export async function fetchPersonByEmail(email: string, client?: DeliSupabase): 
 
 type JoinedApplication = EventApplicationRow & { event: EventRow | null }
 type JoinedParticipation = EventParticipantRow & { event: EventRow | null }
+
+export type { JoinedApplication, JoinedParticipation }
 
 export async function fetchPersonHistory(personId: string, client?: DeliSupabase): Promise<PersonHistory | null> {
   const supabase = db(client)
@@ -146,6 +175,124 @@ export function summarizeHistory(history: Pick<PersonHistory, 'applications' | '
     lastEventName: attended[0]?.event?.name ?? null,
     isReturning: attended.length > 0,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Application pipeline
+// ---------------------------------------------------------------------------
+
+/** Statuses that mean "this application is still waiting on a decision". */
+export const OPEN_APPLICATION_STATUSES: ApplicationStatus[] = [
+  'draft',
+  'submitted',
+  'under_review',
+  'waitlisted',
+]
+
+export const APPLICATION_STATUS_META: Record<ApplicationStatus, { label: string; variant: 'success' | 'error' | 'warning' | 'info' }> = {
+  draft: { label: 'Draft', variant: 'info' },
+  submitted: { label: 'Submitted', variant: 'warning' },
+  under_review: { label: 'Under Review', variant: 'warning' },
+  waitlisted: { label: 'Waitlisted', variant: 'warning' },
+  approved: { label: 'Approved', variant: 'success' },
+  denied: { label: 'Denied', variant: 'error' },
+  withdrawn: { label: 'Withdrawn', variant: 'info' },
+}
+
+/** What the application/account system currently says about one person. */
+export interface PersonPipeline {
+  applications: JoinedApplication[]
+  participations: JoinedParticipation[]
+  /** The most recent application still awaiting a decision, if any. */
+  openApplication: JoinedApplication | null
+  /** The most recent application of any status. */
+  latestApplication: JoinedApplication | null
+  /** Role on the legacy account-approval gate, when they have a login. */
+  accountRole: UserRole | null
+  accountDeniedAt: string | null
+  /** Status read out of the pipeline rather than the stored `status` column. */
+  derivedStatus: PersonStatus
+}
+
+export type PersonWithPipeline = PersonRow & { pipeline: PersonPipeline }
+
+/**
+ * Reconcile the two review queues into one status.
+ *
+ * An open application outranks everything: someone who applied again is an
+ * applicant even if they were denied or attended in a previous year. A `pending`
+ * account is treated as an application in flight, because that is exactly what
+ * it is on the legacy `/admin/applicants` screen.
+ */
+export function derivePersonStatus(
+  stored: PersonStatus,
+  pipeline: Omit<PersonPipeline, 'derivedStatus'>
+): PersonStatus {
+  if (stored === 'blocked') return 'blocked'
+  if (pipeline.openApplication) return 'applicant'
+  if (pipeline.accountDeniedAt || pipeline.latestApplication?.status === 'denied') return 'inactive'
+  if (pipeline.accountRole === 'pending') return 'applicant'
+  return stored
+}
+
+type AccountState = { role: UserRole; denied_at: string | null; person_id: string | null; email: string }
+
+async function attachPipelines(supabase: DeliSupabase, people: PersonRow[]): Promise<PersonWithPipeline[]> {
+  const ids = people.map(p => p.id)
+
+  const [appsRes, partsRes, accountsRes] = await Promise.all([
+    supabase
+      .from('event_applications')
+      .select('*, event:events(*)')
+      .in('person_id', ids)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('event_participants')
+      .select('*, event:events(*)')
+      .in('person_id', ids)
+      .order('created_at', { ascending: false }),
+    supabase.from('user_profiles').select('email, role, denied_at, person_id'),
+  ])
+
+  const appsByPerson = groupBy((appsRes.data as unknown as JoinedApplication[] | null) ?? [], a => a.person_id)
+  const partsByPerson = groupBy((partsRes.data as unknown as JoinedParticipation[] | null) ?? [], p => p.person_id)
+
+  // Not every account carries person_id yet, so fall back to the email key.
+  const accounts = (accountsRes.data as AccountState[] | null) ?? []
+  const accountByPerson = new Map<string, AccountState>()
+  const accountByEmail = new Map<string, AccountState>()
+  for (const account of accounts) {
+    if (account.person_id) accountByPerson.set(account.person_id, account)
+    if (account.email) accountByEmail.set(account.email.toLowerCase(), account)
+  }
+
+  return people.map(person => {
+    const applications = appsByPerson.get(person.id) ?? []
+    const participations = partsByPerson.get(person.id) ?? []
+    const account = accountByPerson.get(person.id) ?? accountByEmail.get(person.email.toLowerCase()) ?? null
+
+    const base = {
+      applications,
+      participations,
+      openApplication: applications.find(a => OPEN_APPLICATION_STATUSES.includes(a.status)) ?? null,
+      latestApplication: applications[0] ?? null,
+      accountRole: account?.role ?? null,
+      accountDeniedAt: account?.denied_at ?? null,
+    }
+
+    return { ...person, pipeline: { ...base, derivedStatus: derivePersonStatus(person.status, base) } }
+  })
+}
+
+function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
+  const map = new Map<string, T[]>()
+  for (const row of rows) {
+    const k = key(row)
+    const bucket = map.get(k)
+    if (bucket) bucket.push(row)
+    else map.set(k, [row])
+  }
+  return map
 }
 
 // ---------------------------------------------------------------------------
