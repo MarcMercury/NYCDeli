@@ -5,30 +5,44 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { eventDateLabel, stageMeta } from '@/lib/events'
 import { PERSON_STATUS_META, fetchPersonHistory, personDisplayName, summarizeHistory } from '@/lib/people'
+import { ACCESS_META, ASSIGNABLE_ROLES, fetchDirectoryEntry, type DirectoryEntry } from '@/lib/directory'
 import {
   addPersonNoteAction,
   deletePersonNoteAction,
   setPersonStatusAction,
   updatePersonAction,
 } from '@/app/actions/people'
+import {
+  approvePersonAction,
+  denyPersonAction,
+  resetPersonPasswordAction,
+  setAccessRoleAction,
+} from '@/app/actions/directory'
+import { updateCamperAction } from '@/app/actions/admin'
+import { CamperRecordForm } from '@/components/admin/camper-record-form'
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Textarea } from '@/components/ui'
-import { cn } from '@/lib/utils'
-import type { PersonHistory, PersonStatus, PersonUpdate } from '@/types/database'
+import { cn, formatDate } from '@/lib/utils'
+import type { CamperUpdate, PersonHistory, PersonStatus, PersonUpdate, UserRole } from '@/types/database'
 
 /**
- * One person's permanent record: who they are now, everything they applied to,
- * everything they attended, and the admin notes behind it.
+ * One person's whole record: who they are, what they can reach, everything they
+ * applied to, everything they attended, their camper data for each event, and
+ * the admin notes behind it.
  */
 export default function AdminPersonPage() {
   const { id } = useParams<{ id: string }>()
   const [history, setHistory] = useState<PersonHistory | null>(null)
+  const [entry, setEntry] = useState<DirectoryEntry | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [credential, setCredential] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [, startTransition] = useTransition()
 
   const load = useCallback(async () => {
-    setHistory(await fetchPersonHistory(id))
+    const [nextHistory, nextEntry] = await Promise.all([fetchPersonHistory(id), fetchDirectoryEntry(id)])
+    setHistory(nextHistory)
+    setEntry(nextEntry)
     setLoading(false)
   }, [id])
 
@@ -60,11 +74,11 @@ export default function AdminPersonPage() {
 
   const { person, applications, participations, notes } = history
   const summary = summarizeHistory(history)
-  const statusMeta = PERSON_STATUS_META[person.status]
+  const statusMeta = PERSON_STATUS_META[entry?.status ?? person.status]
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <Link href="/admin/people" className="text-sm font-bold uppercase tracking-wider underline">← People</Link>
+      <Link href="/admin/people" className="text-sm font-bold uppercase tracking-wider underline">← People &amp; Users</Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -82,13 +96,46 @@ export default function AdminPersonPage() {
       </div>
 
       {message && <Alert variant={message.type === 'error' ? 'error' : 'success'}>{message.text}</Alert>}
+      {credential && (
+        <Alert variant="success">
+          <p className="font-black uppercase">New password</p>
+          <p className="text-sm mt-1">
+            Shown once and stored nowhere. {person.full_name} will be asked to change it on next sign-in.
+          </p>
+          <p className="font-mono text-lg mt-2 select-all">{credential}</p>
+          <button className="text-sm underline font-bold mt-2" onClick={() => setCredential(null)}>Dismiss</button>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Events attended" value={String(summary.eventsAttended)} />
         <Stat label="Applications" value={String(summary.eventsApplied)} />
         <Stat label="First event" value={summary.firstEventYear ? String(summary.firstEventYear) : '—'} />
-        <Stat label="Account" value={person.user_id ? 'Yes' : 'No login'} />
+        <Stat label="Access" value={ACCESS_META[entry?.access ?? 'none'].label} />
       </div>
+
+      {entry && (
+        <AccessCard
+          entry={entry}
+          onApprove={async () => {
+            const result = await approvePersonAction({ personId: person.id })
+            if (!result.success) {
+              setMessage({ type: 'error', text: result.error })
+              return
+            }
+            if (result.data?.password) setCredential(result.data.password)
+            else setMessage({ type: 'success', text: 'Approved — they already had a login.' })
+            load()
+          }}
+          onDeny={() => run(() => denyPersonAction({ personId: person.id }), 'Denied.')}
+          onRole={role => run(() => setAccessRoleAction(person.id, role), 'Access updated.')}
+          onResetPassword={async () => {
+            const result = await resetPersonPasswordAction(person.id)
+            if (result.success) setCredential(result.data?.password ?? null)
+            else setMessage({ type: 'error', text: result.error })
+          }}
+        />
+      )}
 
       <Card>
         <CardHeader>
@@ -162,6 +209,15 @@ export default function AdminPersonPage() {
         onSave={patch => run(() => updatePersonAction(person.id, patch), 'Saved.')}
       />
 
+      {entry && entry.campers.length > 0 && (
+        <CamperRecords
+          entry={entry}
+          onSave={async (camperId, patch) => {
+            await run(() => updateCamperAction(camperId, patch), 'Camper record saved.')
+          }}
+        />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Admin Notes</CardTitle>
@@ -220,6 +276,131 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="text-2xl font-black">{value}</p>
       <p className="text-xs font-bold uppercase tracking-wider text-gray-600">{label}</p>
     </Card>
+  )
+}
+
+/**
+ * What this person can reach, and the one button that turns an applicant into a
+ * member: login, role, camper record and roster entry in a single step.
+ */
+function AccessCard({
+  entry,
+  onApprove,
+  onDeny,
+  onRole,
+  onResetPassword,
+}: {
+  entry: DirectoryEntry
+  onApprove: () => void
+  onDeny: () => void
+  onRole: (role: UserRole) => void
+  onResetPassword: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const meta = ACCESS_META[entry.access]
+
+  const wrap = (fn: () => void | Promise<void>) => async () => {
+    setBusy(true)
+    await fn()
+    setBusy(false)
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Access &amp; Account</CardTitle>
+      </CardHeader>
+      <CardContent className="py-4 space-y-4">
+        <div className="grid md:grid-cols-3 gap-4">
+          <div>
+            {entry.access === 'none' ? (
+              <>
+                <p className="text-xs font-bold uppercase text-gray-500">Access</p>
+                <span className={cn('inline-block mt-1 px-2 py-0.5 text-xs font-bold uppercase border border-black', meta.className)}>
+                  {meta.label}
+                </span>
+              </>
+            ) : (
+              <Select
+                label="Access"
+                value={entry.access}
+                disabled={busy}
+                onChange={e => onRole(e.target.value as UserRole)}
+                options={ASSIGNABLE_ROLES.map(role => ({ value: role, label: ACCESS_META[role].label }))}
+              />
+            )}
+            <p className="text-xs text-gray-500 mt-1">{meta.hint}</p>
+          </div>
+          <div className="text-sm text-gray-600 space-y-1 md:pt-6">
+            <p>{entry.account?.last_sign_in_at ? `Last signed in ${formatDate(entry.account.last_sign_in_at)}` : 'Never signed in'}</p>
+            {entry.account?.approved_at && <p>Approved {formatDate(entry.account.approved_at)}</p>}
+            {entry.account?.denied_at && (
+              <p className="text-red-700">Denied {formatDate(entry.account.denied_at)} — {entry.account.denied_reason}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-start gap-2 md:pt-6">
+            {entry.awaitingDecision && (
+              <>
+                <Button size="sm" loading={busy} onClick={wrap(onApprove)}>Approve</Button>
+                <Button size="sm" variant="ghost" disabled={busy} onClick={wrap(onDeny)}>Deny</Button>
+              </>
+            )}
+            {entry.access !== 'none' && (
+              <Button size="sm" variant="secondary" disabled={busy} onClick={wrap(onResetPassword)}>
+                Reset Password
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {entry.access === 'none' && (
+          <Alert variant="warning">
+            No login exists yet. Approving creates the account, generates a password, adds a camper record for the
+            current event and puts them on the roster.
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The operational camper record, one per event this person took part in. */
+function CamperRecords({
+  entry,
+  onSave,
+}: {
+  entry: DirectoryEntry
+  onSave: (camperId: string, patch: CamperUpdate) => Promise<void>
+}) {
+  const [selectedId, setSelectedId] = useState(entry.campers[0]?.id ?? '')
+  const camper = entry.campers.find(c => c.id === selectedId) ?? entry.campers[0]
+  if (!camper) return null
+
+  const eventName = (eventId: string | null) =>
+    entry.participations.find(p => p.event_id === eventId)?.event?.name ??
+    entry.applications.find(a => a.event_id === eventId)?.event?.name ??
+    'No event'
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-2xl font-black uppercase tracking-wider">Camper Record</h2>
+        {entry.campers.length > 1 && (
+          <div className="w-64">
+            <Select
+              label="Event"
+              value={selectedId}
+              onChange={e => setSelectedId(e.target.value)}
+              options={entry.campers.map(c => ({ value: c.id, label: eventName(c.event_id) }))}
+            />
+          </div>
+        )}
+      </div>
+      <p className="text-sm text-gray-600">
+        {eventName(camper.event_id)} — this is what the layout, kitchen and packing tools read.
+      </p>
+      <CamperRecordForm camper={camper} onSave={patch => onSave(camper.id, patch)} />
+    </div>
   )
 }
 

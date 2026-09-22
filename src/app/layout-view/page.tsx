@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Alert } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { cn, getInitials } from '@/lib/utils'
-import { fetchCampDimensions, type CampDimensions } from '@/lib/settings'
-import { withOpsScope } from '@/lib/active-event'
+import { campDimensions, fetchEventSettings, type CampDimensions } from '@/lib/event-settings'
+import { fetchOpsEvent, withOpsScope } from '@/lib/active-event'
 import type { Camper } from '@/types/database'
 
 interface PlacedCamper extends Camper {
@@ -109,7 +109,8 @@ export default function LayoutPage() {
 
   const fetchCampers = useCallback(async () => {
     const supabase = createClient()
-    const campDims = await fetchCampDimensions()
+    const opsEvent = await fetchOpsEvent()
+    const campDims = campDimensions(await fetchEventSettings(opsEvent?.id ?? null))
     setDims(campDims)
     const { data, error } = await withOpsScope(
       supabase

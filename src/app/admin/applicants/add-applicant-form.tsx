@@ -13,8 +13,6 @@ import type {
   CamperInsert, ShelterType, ArrivalMethod, PowerType, OrientationPreference, SkillTag,
 } from '@/types/database'
 
-const DEFAULT_PASSWORD = 'NYCDeli2026!'
-
 type FormState = {
   full_name: string
   playa_name: string
@@ -217,7 +215,7 @@ export default function AddApplicantForm({ onClose, onCreated }: AddApplicantFor
       setError(result.error || 'Failed to create applicant')
       return
     }
-    const password = form.password.trim() || DEFAULT_PASSWORD
+    const password = (result.data as { password?: string } | undefined)?.password ?? form.password.trim()
     onCreated(
       `${form.email.trim().toLowerCase()} created${approve ? ' and approved' : ' as pending'} — login password: ${password}`
     )
@@ -231,8 +229,8 @@ export default function AddApplicantForm({ onClose, onCreated }: AddApplicantFor
             <div>
               <CardTitle className="text-xl">➕ Add Applicant</CardTitle>
               <CardDescription>
-                Create a camper profile on someone&apos;s behalf. An auth login is created with the
-                password below (default {DEFAULT_PASSWORD}).
+                Create a camper profile on someone&apos;s behalf. A login is created and a one-off password is
+                shown once the record is saved.
               </CardDescription>
             </div>
             <Button variant="secondary" size="sm" onClick={onClose}>✕</Button>
@@ -252,8 +250,8 @@ export default function AddApplicantForm({ onClose, onCreated }: AddApplicantFor
             <Input label="Phone" value={form.phone}
               onChange={e => set('phone', e.target.value)} />
             <Input label="Login Password" type="text" value={form.password}
-              placeholder={DEFAULT_PASSWORD}
-              helpText="Leave blank to use the default password"
+              placeholder="Generated automatically"
+              helpText="Leave blank to generate a random one-off password"
               onChange={e => set('password', e.target.value)} />
           </Section>
 

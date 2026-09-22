@@ -531,6 +531,12 @@ export interface Database {
         Update: EventPhotoAlbumUpdate
         Relationships: []
       }
+      event_settings: {
+        Row: EventSettingRow
+        Insert: EventSettingInsert
+        Update: Partial<EventSettingInsert>
+        Relationships: []
+      }
       people: {
         Row: PersonRow
         Insert: PersonInsert
@@ -2072,6 +2078,22 @@ export type EventFeedbackUpdate = Partial<Omit<EventFeedbackInsert, 'event_id' |
 
 export interface EventFeedbackWithPerson extends EventFeedbackRow {
   person: PersonRow | null
+}
+
+/** Per-event override of a value that used to live in `system_settings`. */
+export interface EventSettingRow {
+  id: string
+  event_id: string
+  key: string
+  value: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EventSettingInsert {
+  event_id: string
+  key: string
+  value: string
 }
 
 /** Everything the CRM knows about one person, across every event. */

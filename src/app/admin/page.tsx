@@ -1,48 +1,34 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { 
   Card, CardHeader, CardTitle, CardDescription, CardContent,
-  Badge, Alert, Button, Input, Tabs, TabPanel, Select, Textarea
+  Badge, Alert, Button, Input, Tabs, TabPanel, Textarea
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { cn, formatDate, getSkillDisplayName } from '@/lib/utils'
-import { updateCamperAction, deleteCamperAction, deleteUserEntityAction, updateSettingAction, updateUserRoleAction, updateUserProfileAction, adminResetPasswordAction } from '@/app/actions/admin'
+import { cn, formatDate } from '@/lib/utils'
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
-import AddApplicantForm from './applicants/add-applicant-form'
-import { resolveTentMateIds } from '@/lib/tent-mates'
 import { withOpsScope } from '@/lib/active-event'
-import { SETTINGS_SCHEMA, SETTING_GROUPS, MAINTENANCE_KEY } from '@/lib/settings'
-import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
+import { fetchDeliSummary, type DeliSummary } from '@/lib/events'
+import type { SystemSetting, KitchenShift, ScheduleAssignment } from '@/types/database'
 
 type Tab = { id: string; label: string }
 
-interface UserWithCamper extends UserProfileRow {
-  camper: Camper | null
+const tabs: Tab[] = [{ id: 'kitchen-shifts', label: 'Kitchen Shifts' }]
+
+function SummaryStat({ value, label, hint }: { value: ReactNode; label: string; hint: string }) {
+  return (
+    <Card>
+      <CardContent className="py-4 text-center">
+        <p className="text-3xl font-black">{value}</p>
+        <p className="text-xs uppercase tracking-wider text-gray-500">{label}</p>
+        <p className="text-[11px] text-gray-400 truncate" title={hint}>{hint}</p>
+      </CardContent>
+    </Card>
+  )
 }
-
-type UserSortKey = 'name' | 'role' | 'status' | 'shelter' | 'sharing' | 'arrival' | 'lastLogin' | 'phone' | 'paid' | 'tent' | 'exit'
-
-/**
- * A tent is "confirmed" once real dimensions have been entered — i.e. it has a
- * positive length and width and isn't the default 11×11 placeholder footprint.
- */
-function isTentConfirmed(c: Camper | null): boolean {
-  if (!c) return false
-  const l = Number(c.shelter_length_ft)
-  const w = Number(c.shelter_width_ft)
-  const h = c.shelter_height_ft == null ? 0 : Number(c.shelter_height_ft)
-  if (!(l > 0) || !(w > 0)) return false
-  if (l === 11 && w === 11 && h === 0) return false
-  return true
-}
-
-const tabs: Tab[] = [
-  { id: 'campers', label: 'Campers & Users' },
-  { id: 'kitchen-shifts', label: 'Kitchen Shifts' },
-  { id: 'settings', label: 'Settings' },
-]
 
 /** Admin tools grouped by the job being done, not by when they were built. */
 const ADMIN_GROUPS: {
@@ -55,7 +41,7 @@ const ADMIN_GROUPS: {
     blurb: 'lifecycle, applications and crews',
     links: [
       { href: '/admin/events', icon: '🎪', label: 'Events', hint: 'Stages, modules, roster' },
-      { href: '/admin/applicants', icon: '📋', label: 'Applicant Review', hint: 'Approve or deny' },
+      { href: '/admin/people', icon: '🗂️', label: 'People & Users', hint: 'Directory, access, approvals' },
       { href: '/admin/shift-draft', icon: '🎯', label: 'Shift Draft', hint: 'Rank, draft, publish' },
       { href: '/events?view=calendar', icon: '🗓️', label: 'Camp Calendar', hint: 'Meetings & deadlines' },
     ],
@@ -64,7 +50,6 @@ const ADMIN_GROUPS: {
     title: 'People',
     blurb: 'the permanent record',
     links: [
-      { href: '/admin/people', icon: '🗂️', label: 'People (CRM)', hint: 'History across events' },
       { href: '/admin/ideas', icon: '💡', label: 'Forum', hint: 'Ideas & questions' },
     ],
   },
@@ -81,21 +66,13 @@ const ADMIN_GROUPS: {
 ]
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState('campers')
-  const [campers, setCampers] = useState<Camper[]>([])
-  const [users, setUsers] = useState<UserWithCamper[]>([])
-  const [settings, setSettings] = useState<SystemSetting[]>([])
+  const [activeTab, setActiveTab] = useState('kitchen-shifts')
   const [shifts, setShifts] = useState<KitchenShift[]>([])
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
-  const [openTaskCount, setOpenTaskCount] = useState(0)
+  const [summary, setSummary] = useState<DeliSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchErrors, setFetchErrors] = useState<Record<string, string>>({})
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
-  const [selectedUser, setSelectedUser] = useState<UserWithCamper | null>(null)
-  const [selectedCamper, setSelectedCamper] = useState<Camper | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [userFilter, setUserFilter] = useState<'all' | 'linked' | 'unlinked' | 'admin' | 'builder' | 'pending'>('all')
-  const [userSort, setUserSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' })
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // Kitchen shift editor state
   const [shiftCategories, setShiftCategories] = useState<DraftShiftCategory[]>([])
@@ -104,69 +81,27 @@ export default function AdminPage() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [editingPosition, setEditingPosition] = useState<{ pos: DraftShiftPosition; catIdx: number; posIdx: number } | null>(null)
   const [editForm, setEditForm] = useState<{ role: string; time: string; description: string }>({ role: '', time: '', description: '' })
-  const [resetPwUserId, setResetPwUserId] = useState<string | null>(null)
-  const [resetPwValue, setResetPwValue] = useState('')
-  const [resetPwLoading, setResetPwLoading] = useState(false)
-  const [showAddApplicant, setShowAddApplicant] = useState(false)
 
   const fetchData = useCallback(async () => {
     const supabase = createClient()
     const errors: Record<string, string> = {}
     
-    const [campersRes, usersRes, settingsRes, shiftsRes, assignmentsRes, tasksRes] = await Promise.all([
-      withOpsScope(supabase.from('campers').select('*').order('created_at', { ascending: false })),
-      supabase.from('user_profiles').select('*').order('created_at', { ascending: false }),
+    const [settingsRes, shiftsRes, assignmentsRes, summaryData] = await Promise.all([
       supabase.from('system_settings').select('*').order('key'),
       withOpsScope(supabase.from('kitchen_shifts').select('*').order('date')),
       supabase.from('schedule_assignments').select('*'),
-      supabase.from('build_tasks').select('status'),
+      fetchDeliSummary(supabase).catch(() => null),
     ])
 
-    if (campersRes.error) errors.campers = campersRes.error.message
-    if (usersRes.error) errors.users = usersRes.error.message
     if (settingsRes.error) errors.settings = settingsRes.error.message
     if (shiftsRes.error) errors.shifts = shiftsRes.error.message
     if (assignmentsRes.error) errors.assignments = assignmentsRes.error.message
-    if (tasksRes.error) errors.tasks = tasksRes.error.message
+    if (!summaryData) errors.summary = 'Could not load the Deli summary'
 
-    const campersData = (campersRes.data || []) as Camper[]
-    const usersData = (usersRes.data || []) as UserProfileRow[]
-    
-    // Build users with linked camper data
-    const usersWithCampers: UserWithCamper[] = usersData.map(user => ({
-      ...user,
-      camper: campersData.find(c => c.id === user.camper_id || c.email === user.email) || null,
-    }))
-    
-    // Find campers that have no linked user profile
-    const linkedCamperIds = new Set(usersWithCampers.filter(u => u.camper).map(u => u.camper!.id))
-    const orphanCampers = campersData.filter(c => !linkedCamperIds.has(c.id))
-    
-    // Create synthetic user entries for orphan campers
-    const orphanUsers: UserWithCamper[] = orphanCampers.map(c => ({
-      id: `orphan-${c.id}`,
-      created_at: c.created_at,
-      updated_at: c.updated_at,
-      email: c.email,
-      role: 'user' as UserRole,
-      camper_id: c.id,
-      approved_at: null,
-      approved_by: null,
-      denied_at: null,
-      denied_reason: null,
-      bio: null,
-      last_sign_in_at: null,
-      person_id: c.person_id ?? null,
-      camper: c,
-    }))
-
-    setCampers(campersData)
-    setUsers([...usersWithCampers, ...orphanUsers])
     const allSettings = (settingsRes.data || []) as SystemSetting[]
-    setSettings(allSettings)
     setShifts(shiftsRes.data || [])
     setAssignments(assignmentsRes.data || [])
-    setOpenTaskCount(((tasksRes.data || []) as { status: string }[]).filter(t => t.status !== 'done').length)
+    setSummary(summaryData)
 
     // Load shift categories with any admin overrides applied
     const baseCategories = getAllDraftShiftCategories()
@@ -189,181 +124,6 @@ export default function AdminPage() {
      
     fetchData()
   }, [fetchData])
-
-  // Open shifts = scheduled shifts with no camper assigned to them
-  const assignedShiftIds = new Set(assignments.map(a => a.shift_id))
-  const openShiftCount = shifts.filter(s => !assignedShiftIds.has(s.id)).length
-
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = 
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.camper?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.camper?.playa_name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    
-    if (!matchesSearch) return false
-    
-    switch (userFilter) {
-      case 'linked': return !!u.camper
-      case 'unlinked': return !u.camper
-      case 'admin': return u.role === 'admin'
-      case 'builder': return u.role === 'builder'
-      case 'pending': return u.role === 'pending'
-      default: return true
-    }
-  })
-
-  const userSortValue = (u: UserWithCamper): string => {
-    switch (userSort.key) {
-      case 'name': return (u.camper?.playa_name || u.camper?.full_name || u.email).toLowerCase()
-      case 'role': return u.role
-      case 'status': return u.camper ? 'linked' : 'no profile'
-      case 'shelter': return (u.camper?.shelter_type || '').toLowerCase()
-      case 'sharing': {
-        if (!u.camper) return ''
-        return resolveTentMateIds(u.camper.id, campers)
-          .map(id => campers.find(c => c.id === id))
-          .filter((c): c is Camper => !!c)
-          .map(m => (m.playa_name || m.full_name || '').toLowerCase())
-          .join(', ')
-      }
-      case 'arrival': return u.camper?.arrival_date || ''
-      case 'lastLogin': return u.last_sign_in_at || ''
-      case 'phone': return u.camper?.phone || ''
-      case 'paid': return u.camper?.paid ? '1' : '0'
-      case 'tent': return isTentConfirmed(u.camper) ? '1' : '0'
-      case 'exit': return u.camper?.departure_date || ''
-      default: return ''
-    }
-  }
-
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    const av = userSortValue(a)
-    const bv = userSortValue(b)
-    // Push empty values to the bottom regardless of direction
-    if (av === '' && bv !== '') return 1
-    if (bv === '' && av !== '') return -1
-    const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' })
-    return userSort.dir === 'asc' ? cmp : -cmp
-  })
-
-  const toggleUserSort = (key: UserSortKey) => {
-    setUserSort(prev =>
-      prev.key === key
-        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { key, dir: 'asc' }
-    )
-  }
-
-  const updateCamper = async (camperId: string, updates: CamperUpdate) => {
-    const result = await updateCamperAction(camperId, updates)
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Update failed' })
-    } else {
-      setMessage({ type: 'success', text: 'Camper updated successfully' })
-      fetchData()
-    }
-  }
-
-  const togglePaid = async (camper: Camper, paid: boolean) => {
-    // Optimistic update so the checkbox responds immediately.
-    setCampers(prev => prev.map(c => (c.id === camper.id ? { ...c, paid } : c)))
-    setUsers(prev => prev.map(u => (u.camper?.id === camper.id ? { ...u, camper: { ...u.camper, paid } } : u)))
-    const result = await updateCamperAction(camper.id, { paid })
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Failed to update paid status' })
-      fetchData()
-    }
-  }
-
-  const exportUsersCsv = () => {
-    const headers = ['Name', 'Email', 'Number', 'Role', 'Paid', 'Tent Confirmed', 'Arrival Date', 'Exit Date']
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const rows = sortedUsers.map(u => [
-      u.camper?.full_name || u.camper?.playa_name || '',
-      u.email || '',
-      u.camper?.phone || '',
-      u.role || '',
-      u.camper?.paid ? 'Yes' : 'No',
-      isTentConfirmed(u.camper) ? 'Yes' : 'No',
-      u.camper?.arrival_date || '',
-      u.camper?.departure_date || '',
-    ].map(v => escape(String(v))).join(','))
-    const csv = [headers.map(escape).join(','), ...rows].join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `campers-${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
-
-  const updateSetting = async (key: string, value: string) => {
-    const result = await updateSettingAction(key, value)
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Update failed' })
-    } else {
-      setMessage({ type: 'success', text: 'Setting updated' })
-      fetchData()
-    }
-  }
-
-  const deleteCamper = async (camperId: string) => {
-    if (!confirm('Are you sure? This will delete the camper and all their assignments.')) return
-    
-    const result = await deleteCamperAction(camperId)
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Delete failed' })
-    } else {
-      setMessage({ type: 'success', text: 'Camper deleted' })
-      setSelectedCamper(null)
-      setSelectedUser(null)
-      fetchData()
-    }
-  }
-
-  const deleteUserEntity = async (user: UserWithCamper) => {
-    const label = user.camper?.full_name || user.camper?.playa_name || user.email
-    if (!confirm(`Permanently delete ${label}? This removes their camper profile, login, and all associated data. This cannot be undone.`)) return
-
-    const profileId = user.id.startsWith('orphan-') ? null : user.id
-    const result = await deleteUserEntityAction({ profileId, camperId: user.camper_id })
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Delete failed' })
-    } else {
-      setMessage({ type: 'success', text: `Deleted ${label}` })
-      setSelectedCamper(null)
-      setSelectedUser(null)
-      fetchData()
-    }
-  }
-
-  const updateUserRole = async (profileId: string, role: UserRole) => {
-    if (profileId.startsWith('orphan-')) {
-      setMessage({ type: 'error', text: 'This camper has no user profile to update. They need to register/login first.' })
-      return
-    }
-    const result = await updateUserRoleAction(profileId, role)
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Role update failed' })
-    } else {
-      setMessage({ type: 'success', text: 'User role updated' })
-      fetchData()
-    }
-  }
-
-  const updateUserBio = async (profileId: string, bio: string) => {
-    if (profileId.startsWith('orphan-')) return
-    const result = await updateUserProfileAction(profileId, { bio })
-    if (!result.success) {
-      setMessage({ type: 'error', text: result.error || 'Profile update failed' })
-    } else {
-      setMessage({ type: 'success', text: 'Profile updated' })
-      fetchData()
-    }
-  }
 
   if (loading) {
     return (
@@ -412,17 +172,6 @@ export default function AdminPage() {
           </Alert>
         )}
 
-        {showAddApplicant && (
-          <AddApplicantForm
-            onClose={() => setShowAddApplicant(false)}
-            onCreated={(text) => {
-              setShowAddApplicant(false)
-              setMessage({ type: 'success', text })
-              fetchData()
-            }}
-          />
-        )}
-
         {/* Data Connection Status */}
         {Object.keys(fetchErrors).length > 0 && (
           <Alert variant="error" className="mb-4">
@@ -436,12 +185,12 @@ export default function AdminPage() {
           </Alert>
         )}
 
-        {/* Quick Stats */}
+        {/* Deli Summary */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className={`inline-block w-2 h-2 rounded-full ${Object.keys(fetchErrors).length === 0 ? 'bg-green-500' : 'bg-red-500'}`} />
             <span className="text-xs text-gray-500 uppercase tracking-wider">
-              {Object.keys(fetchErrors).length === 0 ? 'Live Data' : 'Partial Data'}
+              Deli Summary{Object.keys(fetchErrors).length > 0 && ' — Partial Data'}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -458,57 +207,27 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <Card>
-            <CardContent className="py-4 text-center">
-              {fetchErrors.users ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.users}>⚠</p>
-              ) : (
-                <p className="text-3xl font-black">{users.length}</p>
-              )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Total Users</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4 text-center">
-              {fetchErrors.campers ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.campers}>⚠</p>
-              ) : (
-                <p className="text-3xl font-black">{campers.length}</p>
-              )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Campers</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4 text-center">
-              {fetchErrors.campers ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.campers}>⚠</p>
-              ) : (
-                <p className="text-3xl font-black">{campers.filter(c => c.build_week_attending).length}</p>
-              )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Build Week</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4 text-center">
-              {fetchErrors.tasks ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.tasks}>⚠</p>
-              ) : (
-                <p className="text-3xl font-black">{openTaskCount}</p>
-              )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Open Tasks</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4 text-center">
-              {fetchErrors.assignments || fetchErrors.shifts ? (
-                <p className="text-2xl font-black text-red-500" title={fetchErrors.assignments || fetchErrors.shifts}>⚠</p>
-              ) : (
-                <p className="text-3xl font-black">{openShiftCount}</p>
-              )}
-              <p className="text-xs uppercase tracking-wider text-gray-500">Open Shifts</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <SummaryStat
+            value={summary?.totalCampers ?? '⚠'}
+            label="Total Campers"
+            hint="Every event, all time"
+          />
+          <SummaryStat
+            value={summary ? summary.activeEventCampers : '⚠'}
+            label="Campers On-Event"
+            hint={summary?.activeEvent?.name ?? 'No event running'}
+          />
+          <SummaryStat
+            value={summary ? summary.openEventApplications : '⚠'}
+            label="Applications"
+            hint={summary?.openEvent?.name ?? 'Applications closed'}
+          />
+          <SummaryStat
+            value={summary?.daysUntilNextApplicationEvent ?? '—'}
+            label="Days To Next Event"
+            hint={summary?.nextApplicationEvent?.name ?? 'Nothing needing applicants'}
+          />
         </div>
 
         <div className="space-y-6 mb-8">
@@ -537,932 +256,6 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-
-        {/* Campers & Users Tab */}
-        <TabPanel tabId="campers" activeTab={activeTab}>
-          {selectedUser ? (
-            /* ───── DETAIL VIEW ───── */
-            <div className="space-y-6">
-              {/* Back + header */}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => { setSelectedUser(null); setSelectedCamper(null) }}
-                  >
-                    ← Back to list
-                  </Button>
-                  <div>
-                    <h2 className="text-xl font-black uppercase tracking-wider">
-                      {selectedUser.camper?.playa_name || selectedUser.camper?.full_name || selectedUser.email}
-                    </h2>
-                    <p className="text-sm text-gray-500">{selectedUser.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={
-                    selectedUser.role === 'admin' ? 'error' :
-                    selectedUser.role === 'pending' ? 'warning' : 'success'
-                  }>
-                    {selectedUser.role}
-                  </Badge>
-                  {selectedUser.camper ? (
-                    <Badge variant="success">Profile Linked</Badge>
-                  ) : (
-                    <Badge variant="warning">No Camper Profile</Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Top row: Account + Save bar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account & Role</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-4 gap-4">
-                    <div>
-                      <label className="text-xs font-bold uppercase">Role</label>
-                      <Select
-                        options={[
-                          { value: 'pending', label: 'Pending' },
-                          { value: 'user', label: 'User (Approved)' },
-                          { value: 'builder', label: 'Builder (Build Week access)' },
-                          { value: 'admin', label: 'Admin (full access)' },
-                        ]}
-                        value={selectedUser.role}
-                        onChange={(e) => updateUserRole(selectedUser.id, e.target.value as UserRole)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-bold uppercase">Bio</label>
-                      <div className="flex gap-2 mt-1">
-                        <Textarea
-                          value={selectedUser.bio || ''}
-                          onChange={(e) => setSelectedUser({ ...selectedUser, bio: e.target.value })}
-                          rows={1}
-                          className="flex-1"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => updateUserBio(selectedUser.id, selectedUser.bio || '')}
-                        >
-                          Save Bio
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-500 space-y-1 pt-5">
-                      {selectedUser.approved_at && <p>Approved: {formatDate(selectedUser.approved_at)}</p>}
-                      {selectedUser.last_sign_in_at && <p>Last login: {formatDate(selectedUser.last_sign_in_at)}</p>}
-                      {selectedUser.created_at && <p>Registered: {formatDate(selectedUser.created_at)}</p>}
-                    </div>
-                  </div>
-                  {!selectedUser.camper && !selectedUser.id.startsWith('orphan-') && (
-                    <Alert variant="warning" className="mt-4">
-                      This user has no linked camper profile. They may need to complete the intake form.
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
-
-              {selectedCamper ? (
-                <>
-                  {/* ───── CONTACT INFORMATION ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>📇 Contact Information</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-4 gap-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Full Name</label>
-                          <Input
-                            value={selectedCamper.full_name}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, full_name: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Playa Name</label>
-                          <Input
-                            value={selectedCamper.playa_name || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, playa_name: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Email</label>
-                          <Input
-                            value={selectedCamper.email}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, email: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Phone</label>
-                          <Input
-                            value={selectedCamper.phone || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, phone: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── ARRIVAL & LOGISTICS ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>🚗 Arrival & Logistics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-4 gap-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Arrival Date</label>
-                          <Input
-                            type="date"
-                            value={selectedCamper.arrival_date}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, arrival_date: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Departure Date</label>
-                          <Input
-                            type="date"
-                            value={selectedCamper.departure_date}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, departure_date: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Arrival Method</label>
-                          <Select
-                            options={[
-                              { value: 'car', label: 'Car' },
-                              { value: 'bus', label: 'Bus' },
-                              { value: 'other', label: 'Other' },
-                            ]}
-                            value={selectedCamper.arrival_method}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, arrival_method: e.target.value as Camper['arrival_method']})}
-                          />
-                        </div>
-                        <div className="flex items-end pb-1">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedCamper.early_arrival}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, early_arrival: e.target.checked})}
-                            />
-                            <span className="text-sm font-bold">Early Arrival</span>
-                          </label>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── SHELTER & INFRASTRUCTURE ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>🏕️ Shelter & Infrastructure</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Shelter Type</label>
-                          <Select
-                            options={[
-                              { value: 'tent', label: 'Tent' },
-                              { value: 'shiftpod', label: 'Shiftpod' },
-                              { value: 'rv', label: 'RV' },
-                              { value: 'vehicle', label: 'Vehicle' },
-                              { value: 'other', label: 'Other' },
-                            ]}
-                            value={selectedCamper.shelter_type}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, shelter_type: e.target.value as Camper['shelter_type']})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Length (ft)</label>
-                          <Input
-                            type="number"
-                            value={selectedCamper.shelter_length_ft}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, shelter_length_ft: parseFloat(e.target.value)})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Width (ft)</label>
-                          <Input
-                            type="number"
-                            value={selectedCamper.shelter_width_ft}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, shelter_width_ft: parseFloat(e.target.value)})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Height (ft)</label>
-                          <Input
-                            type="number"
-                            value={selectedCamper.shelter_height_ft || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, shelter_height_ft: e.target.value ? parseFloat(e.target.value) : null})}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid md:grid-cols-4 gap-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Power Type</label>
-                          <Select
-                            options={[
-                              { value: 'none', label: 'None' },
-                              { value: 'low', label: 'Low' },
-                              { value: 'medium', label: 'Medium' },
-                              { value: 'high', label: 'High' },
-                            ]}
-                            value={selectedCamper.power_type}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, power_type: e.target.value as Camper['power_type']})}
-                          />
-                        </div>
-                        <div className="flex items-end gap-4 pb-1">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedCamper.power_required}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, power_required: e.target.checked})}
-                            />
-                            <span className="text-sm">Power Req.</span>
-                          </label>
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Special Requests</label>
-                          <Input
-                            value={selectedCamper.special_requests || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, special_requests: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid md:grid-cols-4 gap-4 mt-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Tent Entrances</label>
-                          <Select
-                            options={[
-                              { value: '', label: 'Not set' },
-                              { value: '1', label: '1 Side' },
-                              { value: '2', label: '2 Side' },
-                              { value: '3', label: '3 Side' },
-                              { value: '4', label: '4 Side' },
-                            ]}
-                            value={selectedCamper.tent_entrance_count ?? ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, tent_entrance_count: e.target.value ? parseInt(e.target.value) : null})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Entrance Orientation</label>
-                          <Select
-                            options={[
-                              { value: '', label: 'Not set' },
-                              { value: 'width', label: 'Short Side' },
-                              { value: 'length', label: 'Long Side' },
-                              { value: 'both', label: 'Short and Long Sides' },
-                            ]}
-                            value={selectedCamper.tent_opening_side || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, tent_opening_side: (e.target.value || null) as Camper['tent_opening_side']})}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-xs font-bold uppercase">Tent Make/Model</label>
-                          <Input
-                            value={selectedCamper.tent_make_model || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, tent_make_model: e.target.value || null})}
-                            placeholder="e.g. Coleman/4 Person, Shiftpod Mini"
-                          />
-                        </div>
-                        {([
-                          { field: 'sharing_tent_with', label: 'Sharing Tent With' },
-                          { field: 'sharing_tent_with_2', label: 'Sharing Tent With (2nd)' },
-                          { field: 'sharing_tent_with_3', label: 'Sharing Tent With (3rd)' },
-                          { field: 'sharing_tent_with_4', label: 'Sharing Tent With (4th)' },
-                          { field: 'sharing_tent_with_5', label: 'Sharing Tent With (5th)' },
-                        ] as const).map(({ field, label }) => {
-                          const otherFields = [
-                            'sharing_tent_with',
-                            'sharing_tent_with_2',
-                            'sharing_tent_with_3',
-                            'sharing_tent_with_4',
-                            'sharing_tent_with_5',
-                          ].filter(f => f !== field) as (keyof typeof selectedCamper)[]
-                          const takenIds = new Set(otherFields.map(f => selectedCamper[f]).filter(Boolean) as string[])
-                          return (
-                            <div key={field}>
-                              <label className="text-xs font-bold uppercase">{label}</label>
-                              <Select
-                                placeholder="None"
-                                options={[
-                                  { value: '', label: 'None' },
-                                  ...campers
-                                    .filter(c => c.id !== selectedCamper.id && !takenIds.has(c.id))
-                                    .map(c => ({
-                                      value: c.id,
-                                      label: c.playa_name ? `${c.full_name} ("${c.playa_name}")` : c.full_name,
-                                    }))
-                                ]}
-                                value={(selectedCamper[field] as string | null) || ''}
-                                onChange={(e) => setSelectedCamper({ ...selectedCamper, [field]: e.target.value || null })}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── PARTICIPATION & SKILLS ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>🤝 Participation & Skills</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold uppercase text-gray-500">Commitments</p>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={selectedCamper.kitchen_participation} onChange={(e) => setSelectedCamper({...selectedCamper, kitchen_participation: e.target.checked})} />
-                            <span className="text-sm">Kitchen Participation</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={selectedCamper.strike_participation} onChange={(e) => setSelectedCamper({...selectedCamper, strike_participation: e.target.checked})} />
-                            <span className="text-sm">Strike Participation</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={selectedCamper.build_week_attending} onChange={(e) => setSelectedCamper({...selectedCamper, build_week_attending: e.target.checked})} />
-                            <span className="text-sm">Build Week Attending</span>
-                          </label>
-                          {selectedCamper.build_week_attending && (
-                            <div className="pl-6 space-y-2">
-                              <p className="text-xs text-gray-500">
-                                Arrival date is set in the Arrival &amp; Departure fields above &mdash; that single date is the builder&apos;s build-week arrival.
-                              </p>
-                              <div>
-                                <label className="text-xs font-bold uppercase">Vehicle Info</label>
-                                <Input
-                                  value={selectedCamper.vehicle_info || ''}
-                                  onChange={(e) => setSelectedCamper({...selectedCamper, vehicle_info: e.target.value})}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs font-bold uppercase">Tools Bringing</label>
-                                <Input
-                                  value={(selectedCamper.tools_bringing || []).join(', ')}
-                                  onChange={(e) => setSelectedCamper({...selectedCamper, tools_bringing: e.target.value.split(',').map(t => t.trim()).filter(Boolean)})}
-                                  placeholder="Comma-separated list"
-                                />
-                              </div>
-                            </div>
-                          )}
-                          <div>
-                            <label className="text-xs font-bold uppercase">Preferred Shift Types</label>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(selectedCamper.preferred_shift_types || []).map(st => (
-                                <Badge key={st}>{st}</Badge>
-                              ))}
-                              {(!selectedCamper.preferred_shift_types || selectedCamper.preferred_shift_types.length === 0) && (
-                                <span className="text-xs text-gray-400">None specified</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold uppercase text-gray-500">Skills</p>
-                          <div className="flex flex-wrap gap-1">
-                            {selectedCamper.skills.map(skill => (
-                              <Badge key={skill}>{getSkillDisplayName(skill)}</Badge>
-                            ))}
-                            {selectedCamper.skills.length === 0 && (
-                              <span className="text-xs text-gray-400">No skills listed</span>
-                            )}
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold uppercase">Custom Skills</label>
-                            <Textarea
-                              value={selectedCamper.custom_skills || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, custom_skills: e.target.value})}
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── SAFETY & MEDICAL ───── */}
-                  <Card className="border-red-200">
-                    <CardHeader>
-                      <CardTitle>🚨 Safety & Medical</CardTitle>
-                      <CardDescription>Emergency and health information</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <p className="text-xs font-bold uppercase text-gray-500">Emergency Contact</p>
-                        <div className="grid md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="text-xs font-bold uppercase">Contact Name</label>
-                            <Input
-                              value={selectedCamper.emergency_contact_name || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, emergency_contact_name: e.target.value})}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold uppercase">Contact Number</label>
-                            <Input
-                              value={selectedCamper.emergency_contact_number || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, emergency_contact_number: e.target.value})}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold uppercase">Relationship</label>
-                            <Input
-                              value={selectedCamper.emergency_contact_relationship || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, emergency_contact_relationship: e.target.value})}
-                            />
-                          </div>
-                        </div>
-                        {selectedCamper.emergency_contact && (
-                          <div>
-                            <label className="text-xs font-bold uppercase text-gray-400">Legacy Emergency Contact</label>
-                            <Input
-                              value={selectedCamper.emergency_contact || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, emergency_contact: e.target.value})}
-                            />
-                          </div>
-                        )}
-                        <hr className="border-gray-200" />
-                        <p className="text-xs font-bold uppercase text-gray-500">Health Information</p>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold uppercase">Medical Conditions</label>
-                            <Textarea
-                              value={selectedCamper.medical_conditions || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, medical_conditions: e.target.value})}
-                              rows={2}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold uppercase">Medications</label>
-                            <Textarea
-                              value={selectedCamper.medications || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, medications: e.target.value})}
-                              rows={2}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold uppercase">Allergies</label>
-                            <Textarea
-                              value={selectedCamper.allergies || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, allergies: e.target.value})}
-                              rows={2}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold uppercase">Dietary Restrictions</label>
-                            <Textarea
-                              value={selectedCamper.dietary_restrictions || ''}
-                              onChange={(e) => setSelectedCamper({...selectedCamper, dietary_restrictions: e.target.value})}
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── ABOUT YOU ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>🔥 About This Camper</CardTitle>
-                      <CardDescription>Application responses</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Burn Count</label>
-                          <Input
-                            value={selectedCamper.burn_count || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, burn_count: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Referral Source</label>
-                          <Input
-                            value={selectedCamper.referral_source || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, referral_source: e.target.value})}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-xs font-bold uppercase">What Attracted You to NYC Deli?</label>
-                          <Textarea
-                            value={selectedCamper.what_attracted_you || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, what_attracted_you: e.target.value})}
-                            rows={2}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Character References</label>
-                          <Textarea
-                            value={selectedCamper.character_references || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, character_references: e.target.value})}
-                            rows={2}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">First Burn Hopes</label>
-                          <Textarea
-                            value={selectedCamper.first_burn_hopes || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, first_burn_hopes: e.target.value})}
-                            rows={2}
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── AGREEMENTS ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>✅ Agreements</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-3 gap-4">
-                        <div className="flex items-center gap-2 p-3 border-2 rounded">
-                          {selectedCamper.volunteer_commitment ? (
-                            <span className="text-green-600 font-bold">✓</span>
-                          ) : (
-                            <span className="text-red-500 font-bold">✗</span>
-                          )}
-                          <span className="text-sm">Volunteer Commitment</span>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 border-2 rounded">
-                          {selectedCamper.sober_shifts ? (
-                            <span className="text-green-600 font-bold">✓</span>
-                          ) : (
-                            <span className="text-red-500 font-bold">✗</span>
-                          )}
-                          <span className="text-sm">Sober Shifts</span>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 border-2 rounded">
-                          {selectedCamper.background_check_consent ? (
-                            <span className="text-green-600 font-bold">✓</span>
-                          ) : (
-                            <span className="text-red-500 font-bold">✗</span>
-                          )}
-                          <span className="text-sm">Background Check Consent</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── ADMIN & LAYOUT ───── */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>⚙️ Admin & Layout</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <label className="text-xs font-bold uppercase">Layout X</label>
-                          <Input
-                            type="number"
-                            value={selectedCamper.layout_x || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, layout_x: e.target.value ? parseFloat(e.target.value) : null})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Layout Y</label>
-                          <Input
-                            type="number"
-                            value={selectedCamper.layout_y || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, layout_y: e.target.value ? parseFloat(e.target.value) : null})}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase">Zone Assignment</label>
-                          <Input
-                            value={selectedCamper.zone_assignment || ''}
-                            onChange={(e) => setSelectedCamper({...selectedCamper, zone_assignment: e.target.value})}
-                          />
-                        </div>
-                        <div className="flex items-end gap-4 pb-1 flex-wrap">
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={selectedCamper.placement_locked} onChange={(e) => setSelectedCamper({...selectedCamper, placement_locked: e.target.checked})} />
-                            <span className="text-sm">Lock Placement</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={selectedCamper.is_admin} onChange={(e) => setSelectedCamper({...selectedCamper, is_admin: e.target.checked})} />
-                            <span className="text-sm">Is Admin</span>
-                          </label>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase">Notes</label>
-                        <Textarea
-                          value={selectedCamper.notes || ''}
-                          onChange={(e) => setSelectedCamper({...selectedCamper, notes: e.target.value})}
-                          rows={3}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* ───── SAVE / DELETE BAR ───── */}
-                  <div className="flex justify-between items-center sticky bottom-4 bg-white border-2 border-black p-4 shadow-lg">
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => deleteCamper(selectedCamper.id)}
-                    >
-                      Delete Camper
-                    </Button>
-                    <Button onClick={() => updateCamper(selectedCamper.id, selectedCamper)}>
-                      Save All Changes
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-gray-500">
-                    <p>No camper profile linked</p>
-                    <p className="text-xs mt-1">This user needs to complete the intake form.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : (
-            /* ───── LIST VIEW ───── */
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle>All Users & Campers ({filteredUsers.length})</CardTitle>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex gap-1 flex-wrap">
-                      {(['all', 'linked', 'unlinked', 'admin', 'builder', 'pending'] as const).map(f => (
-                        <button
-                          key={f}
-                          onClick={() => setUserFilter(f)}
-                          className={cn(
-                            "text-xs px-2 py-1 border-2 uppercase tracking-wider font-bold transition-colors",
-                            userFilter === f
-                              ? "bg-black text-white border-black"
-                              : "border-gray-300 text-gray-500 hover:border-black"
-                          )}
-                        >
-                          {f === 'linked' ? 'Has Profile' : f === 'unlinked' ? 'No Profile' : f}
-                        </button>
-                      ))}
-                    </div>
-                    <Button size="sm" onClick={() => setShowAddApplicant(true)} title="Create a camper profile administratively">
-                      ➕ Add Applicant
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={exportUsersCsv} title="Download the current list as a CSV">
-                      ⬇ Export CSV
-                    </Button>
-                  </div>
-                </div>
-                <Input
-                  placeholder="Search by name, playa name, or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="mt-2"
-                />
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="max-h-[700px] overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-white border-b-2 border-black">
-                      <tr>
-                        {([
-                          { key: 'name', label: 'Name / Email', className: '' },
-                          { key: 'phone', label: 'Number', className: 'hidden md:table-cell' },
-                          { key: 'role', label: 'Role', className: 'hidden md:table-cell' },
-                          { key: 'paid', label: 'Paid', className: '' },
-                          { key: 'tent', label: 'Tent ✓', className: 'hidden sm:table-cell' },
-                          { key: 'status', label: 'Status', className: 'hidden md:table-cell' },
-                          { key: 'shelter', label: 'Shelter', className: 'hidden md:table-cell' },
-                          { key: 'sharing', label: 'Sharing Tent With', className: 'hidden lg:table-cell' },
-                          { key: 'arrival', label: 'Arrival', className: 'hidden lg:table-cell' },
-                          { key: 'exit', label: 'Exit', className: 'hidden lg:table-cell' },
-                          { key: 'lastLogin', label: 'Last Login', className: 'hidden lg:table-cell' },
-                        ] as const).map(col => (
-                          <th key={col.key} className={cn('text-left p-3 font-bold uppercase tracking-wider', col.className)}>
-                            <button
-                              type="button"
-                              onClick={() => toggleUserSort(col.key)}
-                              className="flex items-center gap-1 uppercase tracking-wider hover:text-black text-inherit"
-                            >
-                              {col.label}
-                              <span className={cn('text-[10px]', userSort.key === col.key ? 'opacity-100' : 'opacity-30')}>
-                                {userSort.key === col.key ? (userSort.dir === 'asc' ? '▲' : '▼') : '↕'}
-                              </span>
-                            </button>
-                          </th>
-                        ))}
-                        <th className="text-left p-3 font-bold uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedUsers.map(user => (
-                        <tr
-                          key={user.id}
-                          className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            setSelectedUser(user)
-                            setSelectedCamper(user.camper ? { ...user.camper } : null)
-                          }}
-                        >
-                          <td className="p-3">
-                            <p className="font-bold">
-                              {user.camper?.playa_name || user.camper?.full_name || user.email}
-                            </p>
-                            <p className="text-xs text-gray-500">{user.email}</p>
-                          </td>
-                          <td className="p-3 hidden md:table-cell text-xs text-gray-600">
-                            {user.camper?.phone || '—'}
-                          </td>
-                          <td className="p-3 hidden md:table-cell">
-                            <Badge variant={
-                              user.role === 'admin' ? 'error' :
-                              user.role === 'pending' ? 'warning' : 'success'
-                            }>
-                              {user.role}
-                            </Badge>
-                          </td>
-                          <td className="p-3">
-                            {user.camper ? (
-                              <input
-                                type="checkbox"
-                                checked={!!user.camper.paid}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => togglePaid(user.camper!, e.target.checked)}
-                                className="h-4 w-4 cursor-pointer accent-black"
-                                title="Mark whether this camper has paid"
-                              />
-                            ) : (
-                              <span className="text-xs text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="p-3 hidden sm:table-cell">
-                            <input
-                              type="checkbox"
-                              checked={isTentConfirmed(user.camper)}
-                              readOnly
-                              disabled
-                              className="h-4 w-4 accent-black"
-                              title="Tent confirmed — checked when tent dimensions have been entered"
-                            />
-                          </td>
-                          <td className="p-3 hidden md:table-cell">
-                            {user.camper ? (
-                              <Badge variant="success">Linked</Badge>
-                            ) : (
-                              <Badge variant="warning">No Profile</Badge>
-                            )}
-                          </td>
-                          <td className="p-3 hidden md:table-cell text-xs text-gray-600">
-                            {user.camper?.shelter_type || '—'}
-                          </td>
-                          <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
-                            {(() => {
-                              if (!user.camper) return '—'
-                              const mates = resolveTentMateIds(user.camper.id, campers)
-                                .map(id => campers.find(c => c.id === id))
-                                .filter((c): c is Camper => !!c)
-                              if (mates.length === 0) return '—'
-                              return mates.map(m => m.playa_name || m.full_name).join(', ')
-                            })()}
-                          </td>
-                          <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
-                            {user.camper?.arrival_date || '—'}
-                          </td>
-                          <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
-                            {user.camper?.departure_date || '—'}
-                          </td>
-                          <td className="p-3 hidden lg:table-cell text-xs text-gray-500">
-                            {user.last_sign_in_at ? formatDate(user.last_sign_in_at) : '—'}
-                          </td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Select
-                                options={[
-                                  { value: 'pending', label: 'Pending' },
-                                  { value: 'user', label: 'User' },
-                                  { value: 'builder', label: 'Builder' },
-                                  { value: 'admin', label: 'Admin' },
-                                ]}
-                                value={user.role}
-                                onChange={(e) => updateUserRole(user.id, e.target.value as UserRole)}
-                                className="h-8 text-xs"
-                                title="Access level — User: basic tabs · Builder: + Build Week · Admin: + Admin"
-                              />
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedUser(user)
-                                  setSelectedCamper(user.camper ? { ...user.camper } : null)
-                                }}
-                              >
-                                View
-                              </Button>
-                              {resetPwUserId === user.id ? (
-                                <form
-                                  className="flex items-center gap-1"
-                                  onClick={(e) => e.stopPropagation()}
-                                  onSubmit={async (e) => {
-                                    e.preventDefault()
-                                    if (!resetPwValue || resetPwValue.length < 8) {
-                                      setMessage({ type: 'error', text: 'Password must be at least 8 characters' })
-                                      return
-                                    }
-                                    setResetPwLoading(true)
-                                    const result = await adminResetPasswordAction(user.id, resetPwValue)
-                                    setResetPwLoading(false)
-                                    if (result.success) {
-                                      setMessage({ type: 'success', text: `Password reset for ${user.email}` })
-                                    } else {
-                                      setMessage({ type: 'error', text: result.error || 'Failed to reset password' })
-                                    }
-                                    setResetPwUserId(null)
-                                    setResetPwValue('')
-                                  }}
-                                >
-                                  <Input
-                                    type="password"
-                                    placeholder="New password"
-                                    value={resetPwValue}
-                                    onChange={(e) => setResetPwValue(e.target.value)}
-                                    className="h-8 w-32 text-xs"
-                                    autoFocus
-                                  />
-                                  <Button size="sm" type="submit" disabled={resetPwLoading}>
-                                    {resetPwLoading ? '...' : 'Set'}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    type="button"
-                                    onClick={() => { setResetPwUserId(null); setResetPwValue('') }}
-                                  >
-                                    ✕
-                                  </Button>
-                                </form>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setResetPwUserId(user.id)
-                                    setResetPwValue('')
-                                  }}
-                                  title="Reset password"
-                                >
-                                  Reset PW
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  deleteUserEntity(user)
-                                }}
-                                title="Permanently delete this user and all their data"
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredUsers.length === 0 && (
-                        <tr>
-                          <td colSpan={12} className="p-8 text-center text-gray-500">
-                            No users matching your filters.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {!selectedUser && (
-            <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-400 text-sm">
-              <p className="font-bold uppercase tracking-wider mb-1">⚠️ About Roles</p>
-              <ul className="space-y-1 text-gray-700">
-                <li><strong>Pending:</strong> Awaiting approval. No access to camp pages until promoted.</li>
-                <li><strong>User:</strong> Full read/write access to camp pages (spots, kitchen, schedule, events, etc.). Does NOT see Build Week or Admin tabs.</li>
-                <li><strong>Builder:</strong> Everything a User can do, plus the Build Week tab (schedule, inventory, electrical load, layout sync, shade guide).</li>
-                <li><strong>Admin:</strong> Everything a Builder can do, plus the Admin dashboard, applicant review, and permission management.</li>
-              </ul>
-            </div>
-          )}
-        </TabPanel>
 
         {/* Kitchen Shifts Tab */}
         <TabPanel tabId="kitchen-shifts" activeTab={activeTab}>
@@ -1745,122 +538,6 @@ export default function AdminPage() {
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabPanel>
-
-        {/* Settings Tab */}
-        <TabPanel tabId="settings" activeTab={activeTab}>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-6">
-              {SETTING_GROUPS.map(group => {
-                const fields = SETTINGS_SCHEMA.filter(
-                  def => def.group === group && settings.some(s => s.key === def.key)
-                )
-                if (fields.length === 0) return null
-                return (
-                  <Card key={group}>
-                    <CardHeader>
-                      <CardTitle>{group}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {fields.map(def => {
-                          const row = settings.find(s => s.key === def.key)!
-                          const setLocal = (value: string) =>
-                            setSettings(settings.map(s => (s.id === row.id ? { ...s, value } : s)))
-                          if (def.type === 'boolean') {
-                            const on = row.value === 'true'
-                            return (
-                              <div key={def.key} className="flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-bold uppercase tracking-wider">{def.label}</p>
-                                  {def.help && <p className="text-xs text-gray-500">{def.help}</p>}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant={on ? 'primary' : 'secondary'}
-                                  onClick={() => updateSetting(def.key, on ? 'false' : 'true')}
-                                >
-                                  {on ? 'On' : 'Off'}
-                                </Button>
-                              </div>
-                            )
-                          }
-                          return (
-                            <div key={def.key}>
-                              <label className="text-xs font-bold uppercase tracking-wider">{def.label}</label>
-                              {def.help && <p className="text-xs text-gray-500">{def.help}</p>}
-                              <div className="flex gap-2">
-                                <Input
-                                  type={def.type === 'date' ? 'date' : def.type === 'number' ? 'number' : 'text'}
-                                  value={row.value}
-                                  onChange={e => setLocal(e.target.value)}
-                                />
-                                <Button size="sm" onClick={() => updateSetting(def.key, row.value)}>
-                                  Save
-                                </Button>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-
-            <Card variant="error">
-              <CardHeader>
-                <CardTitle>⚠️ Danger Zone</CardTitle>
-                <CardDescription>
-                  Actions here can break things. Be careful.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(() => {
-                  const maintOn = settings.find(s => s.key === MAINTENANCE_KEY)?.value === 'true'
-                  return (
-                    <div className={cn('border-2 p-4', maintOn ? 'border-red-600 bg-red-50' : 'border-red-500')}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-bold">Stone Age Mode (Full Shutdown)</h4>
-                        <Badge variant={maintOn ? 'error' : 'success'}>
-                          {maintOn ? 'STONE AGE — SITE DARK' : 'LIVE'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-4">
-                        When enabled, every non-admin visitor is redirected to the hidden
-                        &ldquo;stone age&rdquo; page and the entire site goes dark. Admins keep
-                        full access so you can turn it back on. Takes effect within ~15 seconds.
-                      </p>
-                      {maintOn ? (
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            if (confirm('Bring the site back online for everyone?')) {
-                              updateSetting(MAINTENANCE_KEY, 'false')
-                            }
-                          }}
-                        >
-                          Reopen the Site
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            if (confirm('This shuts the entire site down for ALL non-admin users and sends them to the stone age page. Continue?')) {
-                              updateSetting(MAINTENANCE_KEY, 'true')
-                            }
-                          }}
-                        >
-                          Shut Down the Site
-                        </Button>
-                      )}
-                    </div>
-                  )
-                })()}
               </CardContent>
             </Card>
           </div>

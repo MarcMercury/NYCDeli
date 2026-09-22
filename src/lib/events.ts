@@ -8,6 +8,7 @@ import type {
   EventKind,
   EventFeatureKey,
   EventFeatures,
+  ParticipantStatus,
 } from '@/types/database'
 
 /**
@@ -426,5 +427,94 @@ export async function fetchEventCounts(eventId: string, client?: DeliSupabase): 
     applications: all.count ?? 0,
     pendingApplications: pending.count ?? 0,
     participants: participants.count ?? 0,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Org-wide summary
+// ---------------------------------------------------------------------------
+
+/** Stages where an event is being run right now, rather than planned or archived. */
+const RUNNING_STAGES: EventStage[] = ['prep', 'finalization', 'build', 'live']
+
+export interface DeliSummary {
+  /** Distinct people who have camped with NYC Deli at any event, ever. */
+  totalCampers: number
+  /** The event currently being run, or null while the camp is between events. */
+  activeEvent: EventRow | null
+  activeEventCampers: number
+  /** The event currently taking applications, or null when none are open. */
+  openEvent: EventRow | null
+  openEventApplications: number
+  /** The soonest upcoming event that still needs people to apply. */
+  nextApplicationEvent: EventRow | null
+  daysUntilNextApplicationEvent: number | null
+}
+
+/** Calendar days from today to a bare event date, read as UTC so it can't slip a day. */
+function daysUntil(isoDate: string): number {
+  const target = new Date(`${isoDate}T12:00:00Z`).getTime()
+  const today = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`).getTime()
+  return Math.max(0, Math.round((target - today) / 86_400_000))
+}
+
+async function countApplications(supabase: DeliSupabase, eventId: string | null): Promise<number> {
+  if (!eventId) return 0
+  const { count } = await supabase
+    .from('event_applications')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .neq('status', 'draft')
+  return count ?? 0
+}
+
+/**
+ * The numbers the admin dashboard leads with. Deliberately org-wide: the old
+ * dashboard counted whatever event the ops tooling happened to be pointed at,
+ * which reads as live data long after that event has been archived.
+ */
+export async function fetchDeliSummary(client?: DeliSupabase): Promise<DeliSummary> {
+  const supabase = db(client)
+
+  const { data: eventRows } = await supabase
+    .from('events')
+    .select('*')
+    .order('start_date', { ascending: true, nullsFirst: false })
+  const events = (eventRows as EventRow[] | null) ?? []
+  const today = new Date().toISOString().slice(0, 10)
+
+  const activeEvent = events.find(e => RUNNING_STAGES.includes(e.stage)) ?? null
+  const openEvent = events.find(isAcceptingApplications) ?? null
+  const nextApplicationEvent =
+    events.find(
+      e =>
+        e.stage !== 'closed' &&
+        hasFeature(e, 'applications') &&
+        !!e.start_date &&
+        e.start_date >= today
+    ) ?? null
+
+  const [participantsRes, openEventApplications] = await Promise.all([
+    supabase.from('event_participants').select('event_id, person_id, status'),
+    countApplications(supabase, openEvent?.id ?? null),
+  ])
+
+  type ParticipantTally = { event_id: string; person_id: string; status: ParticipantStatus }
+  const participants = (((participantsRes.data as ParticipantTally[] | null) ?? []).filter(
+    p => p.status !== 'withdrawn'
+  ))
+
+  return {
+    totalCampers: new Set(participants.map(p => p.person_id)).size,
+    activeEvent,
+    activeEventCampers: activeEvent
+      ? participants.filter(p => p.event_id === activeEvent.id).length
+      : 0,
+    openEvent,
+    openEventApplications,
+    nextApplicationEvent,
+    daysUntilNextApplicationEvent: nextApplicationEvent?.start_date
+      ? daysUntil(nextApplicationEvent.start_date)
+      : null,
   }
 }

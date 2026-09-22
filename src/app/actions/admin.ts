@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
 import { fetchOpsEvent } from '@/lib/active-event'
+import { generatePassword } from '@/app/actions/directory'
 import { parse as csvParse } from 'csv-parse/sync'
 import type { DeliSupabase } from '@/lib/events'
 import type { CamperInsert, CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
@@ -361,7 +362,7 @@ export async function createApplicantAction(params: {
     return { success: false, error: 'Full name and email are required' }
   }
 
-  const password = params.password?.trim() || 'NYCDeli2026!'
+  const password = params.password?.trim() || (await generatePassword())
   if (password.length < 8) {
     return { success: false, error: 'Password must be at least 8 characters' }
   }
@@ -391,19 +392,52 @@ export async function createApplicantAction(params: {
     userId = authData.user.id
   }
 
-  // 2. Camper record
+  // 2. Directory record — the spine every other row links to. Without this the
+  //    new applicant would not appear in /admin/people at all. `people` is
+  //    unique on lower(email) via a functional index, which upsert cannot
+  //    target, so look it up first.
+  const personPayload = {
+    email,
+    full_name: fullName,
+    playa_name: params.camper.playa_name ?? null,
+    phone: params.camper.phone ?? null,
+    status: params.approve ? 'member' : 'applicant',
+    user_id: userId,
+  }
+
+  const { data: foundPerson } = await adminClient
+    .from('people')
+    .select('id')
+    .ilike('email', email)
+    .maybeSingle()
+
+  const { data: personRow } = foundPerson
+    ? await adminClient
+        .from('people')
+        .update(personPayload as never)
+        .eq('id', (foundPerson as { id: string }).id)
+        .select('id')
+        .single()
+    : await adminClient.from('people').insert(personPayload as never).select('id').single()
+
+  const personId = (personRow as { id: string } | null)?.id ?? null
+
+  // 3. Camper record
   const opsEventId = (await fetchOpsEvent(adminClient as unknown as DeliSupabase))?.id ?? null
   const { data: camperData, error: camperError } = await adminClient
     .from('campers')
-    .upsert({ ...params.camper, email, full_name: fullName, event_id: opsEventId } as never, { onConflict: 'email' })
+    .upsert(
+      { ...params.camper, email, full_name: fullName, event_id: opsEventId, person_id: personId } as never,
+      { onConflict: 'email' }
+    )
     .select('id')
     .single()
 
   if (camperError) return { success: false, error: camperError.message }
   const camperId = (camperData as { id: string } | null)?.id ?? null
 
-  // 3. Link + set approval state on the profile
-  const profileUpdate: Record<string, unknown> = { camper_id: camperId }
+  // 4. Link + set approval state on the profile
+  const profileUpdate: Record<string, unknown> = { camper_id: camperId, person_id: personId }
   if (params.approve) {
     profileUpdate.role = 'user'
     profileUpdate.approved_at = new Date().toISOString()
