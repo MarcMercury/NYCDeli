@@ -151,7 +151,7 @@ export default function EventDetailPage() {
           <Card>
             <CardContent className="py-6 text-gray-700">
               Applications are not open for this event.{' '}
-              <Link href="/calendar" className="underline font-bold">Watch the camp calendar</Link> for the
+              <Link href="/events?view=calendar" className="underline font-bold">Watch the camp calendar</Link> for the
               application window.
             </CardContent>
           </Card>
@@ -347,7 +347,7 @@ function ApplyCard({
           <p className="mb-4">Sign in or create an NYC Deli account to apply. Your account carries across every event.</p>
           <div className="flex gap-3">
             <Link href="/login"><Button>Sign In</Button></Link>
-            <Link href="/register"><Button variant="secondary">Create Account</Button></Link>
+            <Link href="/intake"><Button variant="secondary">Create Account</Button></Link>
           </div>
         </CardContent>
       </Card>

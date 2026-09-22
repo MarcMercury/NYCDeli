@@ -44,6 +44,42 @@ const tabs: Tab[] = [
   { id: 'settings', label: 'Settings' },
 ]
 
+/** Admin tools grouped by the job being done, not by when they were built. */
+const ADMIN_GROUPS: {
+  title: string
+  blurb: string
+  links: { href: string; icon: string; label: string; hint: string }[]
+}[] = [
+  {
+    title: 'Run the Event',
+    blurb: 'lifecycle, applications and crews',
+    links: [
+      { href: '/admin/events', icon: '🎪', label: 'Events', hint: 'Stages, modules, roster' },
+      { href: '/admin/applicants', icon: '📋', label: 'Applicant Review', hint: 'Approve or deny' },
+      { href: '/admin/shift-draft', icon: '🎯', label: 'Shift Draft', hint: 'Rank, draft, publish' },
+      { href: '/events?view=calendar', icon: '🗓️', label: 'Camp Calendar', hint: 'Meetings & deadlines' },
+    ],
+  },
+  {
+    title: 'People',
+    blurb: 'the permanent record',
+    links: [
+      { href: '/admin/people', icon: '🗂️', label: 'People (CRM)', hint: 'History across events' },
+      { href: '/admin/ideas', icon: '💡', label: 'Forum', hint: 'Ideas & questions' },
+    ],
+  },
+  {
+    title: 'Camp Assets & Setup',
+    blurb: 'what gets built and what the public sees',
+    links: [
+      { href: '/admin/layout-builder', icon: '🗺️', label: 'Layout Builder', hint: 'Place everything' },
+      { href: '/admin/staking-plan', icon: '🚩', label: 'Staking Plan', hint: 'Print for the field' },
+      { href: '/admin/tent-map', icon: '⛺', label: 'Tent Map', hint: 'Who sleeps where' },
+      { href: '/admin/home', icon: '🏠', label: 'Home Page', hint: 'Public CTAs' },
+    ],
+  },
+]
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('campers')
   const [campers, setCampers] = useState<Camper[]>([])
@@ -473,86 +509,30 @@ export default function AdminPage() {
               <p className="text-xs uppercase tracking-wider text-gray-500">Open Shifts</p>
             </CardContent>
           </Card>
-          <Link href="/admin/home" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🏠</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Home Page</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/events" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🎪</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Events</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/people" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🗂️</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">People (CRM)</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/calendar" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🗓️</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Camp Calendar</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/layout-builder" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🗺️</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Layout Builder</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/staking-plan" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🚩</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Staking Plan</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/tent-map" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">⛺</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Tent Map</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/applicants" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">📋</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Applicant Review</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/shift-draft" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">🎯</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Shift Draft</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/admin/ideas" className="block">
-            <Card className="hover:border-yellow-500 transition-colors h-full">
-              <CardContent className="py-4 text-center">
-                <p className="text-3xl font-black">💡</p>
-                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Forum (Ideas &amp; Q&apos;s)</p>
-              </CardContent>
-            </Card>
-          </Link>
+        </div>
+
+        <div className="space-y-6 mb-8">
+          {ADMIN_GROUPS.map(group => (
+            <section key={group.title}>
+              <h2 className="text-sm font-black uppercase tracking-[0.2em] border-b-2 border-black pb-1 mb-3">
+                {group.title}
+                <span className="ml-2 font-bold normal-case tracking-normal text-gray-500">{group.blurb}</span>
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {group.links.map(link => (
+                  <Link key={link.href} href={link.href} className="block">
+                    <Card className="hover:border-yellow-500 transition-colors h-full">
+                      <CardContent className="py-4 text-center">
+                        <p className="text-3xl font-black">{link.icon}</p>
+                        <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">{link.label}</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{link.hint}</p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
 
         {/* Tabs */}

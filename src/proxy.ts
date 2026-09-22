@@ -2,9 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that don't require auth at all — no Supabase calls needed.
-// /events and /calendar are the public face of the camp; RLS limits anonymous
-// visitors to rows explicitly flagged public.
-const publicRoutes = ['/', '/login', '/register', '/pending', '/intake', '/stone-age', '/events', '/calendar']
+// /events is the public face of the camp (and carries the camp calendar); RLS
+// limits anonymous visitors to rows explicitly flagged public.
+const publicRoutes = ['/', '/login', '/pending', '/intake', '/stone-age', '/events', '/calendar']
 
 // During maintenance, only these paths stay reachable for non-admins
 const MAINTENANCE_ALLOWLIST = ['/stone-age', '/login']
@@ -17,8 +17,8 @@ const adminRoutes = ['/admin']
 // Pending applicants stay out of /profile; they maintain their account from
 // the /pending page instead, which embeds the same My NYC Deli panel.
 const roleCheckRoutes = [
-  '/campers', '/ideas', '/kitchen', '/layout', '/layout-view',
-  '/map', '/now', '/profile', '/resources', '/schedule', '/shift-draft',
+  '/camp', '/campers', '/ideas', '/kitchen', '/layout-view',
+  '/map', '/now', '/profile', '/resources',
   '/build-week',
 ]
 
@@ -28,11 +28,8 @@ const roleCheckRoutes = [
 const featureRoutes: { prefix: string; feature: string }[] = [
   { prefix: '/build-week', feature: 'build_week' },
   { prefix: '/kitchen', feature: 'kitchen' },
-  { prefix: '/schedule', feature: 'kitchen' },
-  { prefix: '/shift-draft', feature: 'shift_draft' },
   { prefix: '/map', feature: 'layout' },
   { prefix: '/layout-view', feature: 'layout' },
-  { prefix: '/layout', feature: 'layout' },
   { prefix: '/campers', feature: 'directory' },
 ]
 

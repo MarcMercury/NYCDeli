@@ -84,7 +84,7 @@ export default function LayoutSyncTab() {
   if (!floorplanId || !audit) {
     return (
       <div className="text-xs text-gray-500 py-1">
-        No active floorplan. <a href="/layout" className="underline">Create a layout</a> to enable sync.
+        No active floorplan. <a href="/admin/layout-builder" className="underline">Create a layout</a> to enable sync.
       </div>
     )
   }

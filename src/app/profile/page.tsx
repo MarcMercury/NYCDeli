@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { withOpsScope } from '@/lib/active-event'
 import { syncMyPersonFromCamperAction } from '@/app/actions/people'
@@ -60,7 +61,18 @@ const arrivalGuides = [
 ]
 
 export default function ProfilePage() {
-  const [activeTab, setActiveTab] = useState('about')
+  return (
+    <Suspense fallback={null}>
+      <ProfilePageBody />
+    </Suspense>
+  )
+}
+
+function ProfilePageBody() {
+  const requestedTab = useSearchParams().get('tab')
+  const [activeTab, setActiveTab] = useState(
+    profileTabs.some(t => t.id === requestedTab) ? requestedTab! : 'about'
+  )
   const [profile, setProfile] = useState<UserProfileRow | null>(null)
   const [camper, setCamper] = useState<CamperRow | null>(null)
   const [photos, setPhotos] = useState<CamperPhotoRow[]>([])

@@ -136,7 +136,7 @@ export function MyDeliPanel({ onPersonSaved }: { onPersonSaved?: () => void }) {
           {openEvents.length === 0 ? (
             <p className="text-gray-600">
               Nothing is open for applications right now. Upcoming events get announced on the{' '}
-              <Link href="/calendar" className="underline font-bold">camp calendar</Link>.
+              <Link href="/events?view=calendar" className="underline font-bold">camp calendar</Link>.
             </p>
           ) : (
             <div className="space-y-3">
@@ -175,7 +175,7 @@ export function MyDeliPanel({ onPersonSaved }: { onPersonSaved?: () => void }) {
               ))}
             </ul>
           )}
-          <Link href="/calendar" className="inline-block mt-4 text-sm font-bold underline">
+          <Link href="/events?view=calendar" className="inline-block mt-4 text-sm font-bold underline">
             Full camp calendar →
           </Link>
         </CardContent>

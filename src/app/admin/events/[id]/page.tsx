@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { Suspense, useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import {
   EVENT_FEATURE_META,
   EVENT_KIND_LABELS,
@@ -15,6 +15,7 @@ import {
   stageMeta,
   type EventCounts,
 } from '@/lib/events'
+import { fetchEventReadiness, readinessHeadline, type EventReadiness } from '@/lib/event-readiness'
 import { fetchEventApplications, fetchEventParticipants, personDisplayName } from '@/lib/people'
 import {
   closeEventAction,
@@ -43,14 +44,26 @@ import type {
 
 type Tab = 'lifecycle' | 'details' | 'modules' | 'applications' | 'participants' | 'photos' | 'wrap_up'
 
+const TAB_KEYS: Tab[] = ['lifecycle', 'details', 'modules', 'applications', 'participants', 'photos', 'wrap_up']
+
 export default function AdminEventDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminEventDetailBody />
+    </Suspense>
+  )
+}
+
+function AdminEventDetailBody() {
   const { id } = useParams<{ id: string }>()
+  const requestedTab = useSearchParams().get('tab') as Tab | null
   const [event, setEvent] = useState<EventRow | null>(null)
   const [counts, setCounts] = useState<EventCounts | null>(null)
+  const [readiness, setReadiness] = useState<EventReadiness | null>(null)
   const [applications, setApplications] = useState<(EventApplicationRow & { person: PersonRow | null })[]>([])
   const [participants, setParticipants] = useState<(EventParticipantRow & { person: PersonRow | null })[]>([])
   const [feedback, setFeedback] = useState<EventFeedbackWithPerson[]>([])
-  const [tab, setTab] = useState<Tab>('lifecycle')
+  const [tab, setTab] = useState<Tab>(requestedTab && TAB_KEYS.includes(requestedTab) ? requestedTab : 'lifecycle')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [, startTransition] = useTransition()
@@ -68,6 +81,7 @@ export default function AdminEventDetailPage() {
     setApplications(apps)
     setParticipants(parts)
     setFeedback((feedbackRes.data as unknown as EventFeedbackWithPerson[] | null) ?? [])
+    setReadiness(found ? await fetchEventReadiness(found) : null)
     setLoading(false)
   }, [id])
 
@@ -166,6 +180,7 @@ export default function AdminEventDetailPage() {
           <LifecycleTab
             event={event}
             counts={counts}
+            readiness={readiness}
             onSetStage={(stage, note) => run(() => setEventStageAction(event.id, stage, note), 'Stage updated.')}
             onClose={note => run(() => closeEventAction(event.id, note), 'Event closed and archived.')}
             onReopen={() => run(() => reopenEventAction(event.id), 'Event reopened.')}
@@ -228,6 +243,7 @@ export default function AdminEventDetailPage() {
 function LifecycleTab({
   event,
   counts,
+  readiness,
   onSetStage,
   onClose,
   onReopen,
@@ -235,6 +251,7 @@ function LifecycleTab({
 }: {
   event: EventRow
   counts: EventCounts | null
+  readiness: EventReadiness | null
   onSetStage: (stage: EventStage, note?: string) => void
   onClose: (note?: string) => void
   onReopen: () => void
@@ -244,8 +261,59 @@ function LifecycleTab({
   const forward = nextStage(event.stage)
   const back = previousStage(event.stage)
 
+  // Advancing with unfinished required work is allowed, but never by accident.
+  const advance = (stage: EventStage) => {
+    const blockers = readiness?.blockers ?? []
+    if (blockers.length > 0) {
+      const list = blockers.map(b => `\u2022 ${b.label} \u2014 ${b.detail}`).join('\n')
+      if (!confirm(`This stage isn't finished:\n\n${list}\n\nAdvance anyway?`)) return
+    }
+    onSetStage(stage)
+  }
+
   return (
     <div className="space-y-6">
+      {readiness && readiness.total > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Stage {meta.step} Readiness · {readiness.done}/{readiness.total}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-4 space-y-3">
+            <p className="font-bold">{readinessHeadline(readiness)}</p>
+            <ul className="space-y-2">
+              {readiness.checks.map(check => (
+                <li
+                  key={check.key}
+                  className={cn(
+                    'border-2 p-3 flex flex-wrap items-center justify-between gap-2',
+                    check.done
+                      ? 'border-gray-300 bg-white'
+                      : check.required
+                        ? 'border-black bg-red-100'
+                        : 'border-gray-300 bg-yellow-50'
+                  )}
+                >
+                  <div>
+                    <p className="font-black uppercase text-sm">
+                      {check.done ? '✅' : check.required ? '⛔' : '⭕'} {check.label}
+                      {check.required && !check.done && (
+                        <span className="ml-2 text-xs bg-black text-yellow-400 px-2 py-0.5">Required</span>
+                      )}
+                    </p>
+                    <p className="text-sm text-gray-600">{check.detail}</p>
+                  </div>
+                  {check.href && !check.done && (
+                    <Link href={check.href} className="text-sm font-bold underline">Fix it →</Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Lifecycle</CardTitle>
@@ -290,7 +358,7 @@ function LifecycleTab({
               </Button>
             )}
             {forward && forward !== 'closed' && (
-              <Button size="sm" onClick={() => onSetStage(forward)}>
+              <Button size="sm" onClick={() => advance(forward)}>
                 Advance to {stageMeta(forward).label} →
               </Button>
             )}

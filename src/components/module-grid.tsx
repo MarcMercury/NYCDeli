@@ -24,31 +24,24 @@ const modules: ModuleCard[] = [
     href: '/events',
     icon: '📅',
     title: 'Events',
-    description: 'Everything NYC Deli builds, burns and throws — what’s coming up, what’s open for applications, and every past event.',
+    description: 'What’s coming up, what’s open for applications, the camp calendar and every past event.',
     status: 'Always On',
     statusColor: 'text-green-400',
   },
   {
-    href: '/calendar',
-    icon: '🗓️',
-    title: 'Camp Calendar',
-    description: 'Meetings, deadlines, socials, build dates and application windows across the whole year.',
-    status: 'Always On',
-    statusColor: 'text-green-400',
-  },
-  {
-    href: '/profile',
-    icon: '👤',
-    title: 'Your Profile',
-    description: 'Your permanent NYC Deli account: contact info, participation history, photos, packing list and schedule.',
-    status: 'Always On',
-    statusColor: 'text-green-400',
+    href: '/camp',
+    icon: '🏕️',
+    title: 'Camp',
+    description: 'The event we’re running right now: map, kitchen and shifts, build week and the onsite view.',
+    status: 'Event',
+    statusColor: 'text-yellow-400',
+    eventOnly: true,
   },
   {
     href: '/campers',
     icon: '🐀',
-    title: 'Campers Directory',
-    description: 'Search by name, playa name, or email. Photos, bios and who’s who.',
+    title: 'The Rats',
+    description: 'Who’s who — search by name, playa name or event. Photos, bios and history.',
     status: 'Active',
     statusColor: 'text-green-400',
     feature: 'directory',
@@ -62,43 +55,12 @@ const modules: ModuleCard[] = [
     statusColor: 'text-green-400',
   },
   {
-    href: '/kitchen',
-    icon: '🍳',
-    title: 'Kitchen',
-    description: 'Role definitions year round; sign-ups, coverage and the published schedule once an event is running.',
-    status: 'Active',
+    href: '/profile',
+    icon: '👤',
+    title: 'Your Profile',
+    description: 'Your permanent NYC Deli account: contact info, participation history, photos, packing list and schedule.',
+    status: 'Always On',
     statusColor: 'text-green-400',
-    feature: 'kitchen',
-  },
-  {
-    href: '/map',
-    icon: '🏕️',
-    title: 'Camp Map',
-    description: 'Interactive 2D & 3D camp map — tents, kitchen, shade and zones with pan, zoom and search.',
-    status: 'Event',
-    statusColor: 'text-yellow-400',
-    feature: 'layout',
-    eventOnly: true,
-  },
-  {
-    href: '/schedule',
-    icon: '⏰',
-    title: 'Your Schedule',
-    description: 'Your shifts and the full team schedule for the event in progress.',
-    status: 'Event',
-    statusColor: 'text-yellow-400',
-    feature: 'kitchen',
-    eventOnly: true,
-  },
-  {
-    href: '/build-week',
-    icon: '🔨',
-    title: 'Build Week',
-    description: 'Crew roster, day-by-day schedule, inventory and electrical load for the build.',
-    status: 'Event',
-    statusColor: 'text-yellow-400',
-    feature: 'build_week',
-    eventOnly: true,
   },
 ]
 
@@ -135,7 +97,7 @@ export function ModuleGrid() {
         <p className="text-center text-gray-300 mb-12">
           {offseason
             ? 'What’s open right now. Event tooling — the map, shifts and build week — switches on when the next event does.'
-            : 'The tooling the Rats run on. Each event switches on only the modules it actually needs.'}
+            : 'Everything the Rats run on, in four doors. Each event switches on only the modules it actually needs.'}
         </p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

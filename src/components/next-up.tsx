@@ -47,7 +47,7 @@ export function NextUp() {
           <h2 className="text-sm font-black uppercase tracking-[0.3em] text-[#fccc0a]">What&apos;s Next</h2>
           <div className="flex gap-4 text-sm font-bold uppercase tracking-wider">
             <Link href="/events" className="text-white hover:text-[#fccc0a]">All events →</Link>
-            <Link href="/calendar" className="text-white hover:text-[#fccc0a]">Camp calendar →</Link>
+            <Link href="/events?view=calendar" className="text-white hover:text-[#fccc0a]">Camp calendar →</Link>
           </div>
         </div>
 

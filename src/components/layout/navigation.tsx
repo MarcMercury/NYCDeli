@@ -1,53 +1,62 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { getOpsEvent, isInformationStage } from '@/lib/active-event'
-import { hasFeature } from '@/lib/events'
 import { signOut } from '@/app/actions/auth'
-import type { EventFeatureKey, EventRow, UserRole } from '@/types/database'
+import type { EventRow, UserRole } from '@/types/database'
 
-const publicNavItems = [
-  { href: '/', label: 'Home', icon: '🥪' },
-  { href: '/events', label: 'Events', icon: '📅' },
-  { href: '/calendar', label: 'Calendar', icon: '🗓️' },
-  { href: '/intake', label: 'Register', icon: '📝' },
-]
-
-// `feature` items disappear when the current event doesn't use that module.
-// `eventOnly` items disappear in the offseason — they describe one event's
-// operations, and every event is different.
-const baseNavItems: {
+interface NavItem {
   href: string
   label: string
   icon: string
-  feature?: EventFeatureKey
+  /** Hidden in the offseason — it only describes one event's operations. */
   eventOnly?: boolean
-}[] = [
+}
+
+/**
+ * Five destinations, maximum. Everything the camp does answers one of them:
+ * what's happening (Events), what we're running right now (Camp), who we are
+ * (Rats), how any of it works (Resources). Personal account surfaces live in
+ * the account menu on the right rather than the main row.
+ */
+const publicNavItems: NavItem[] = [
   { href: '/', label: 'Home', icon: '🥪' },
   { href: '/events', label: 'Events', icon: '📅' },
-  { href: '/calendar', label: 'Calendar', icon: '🗓️' },
-  { href: '/campers', label: 'Campers', icon: '🐀', feature: 'directory' },
-  { href: '/profile', label: 'Profile', icon: '👤' },
-  { href: '/map', label: 'Camp Map', icon: '🏕️', feature: 'layout', eventOnly: true },
-  { href: '/kitchen', label: 'Kitchen', icon: '🍳', feature: 'kitchen' },
+  { href: '/resources', label: 'Resources', icon: '📚' },
+  { href: '/intake', label: 'Register', icon: '📝' },
+]
+
+const memberNavItems: NavItem[] = [
+  { href: '/', label: 'Home', icon: '🥪' },
+  { href: '/events', label: 'Events', icon: '📅' },
+  { href: '/camp', label: 'Camp', icon: '🏕️', eventOnly: true },
+  { href: '/campers', label: 'Rats', icon: '🐀' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
-const buildWeekNavItem = { href: '/build-week', label: 'Build Week', icon: '🔨', feature: 'build_week' as EventFeatureKey }
-const adminNavItem = { href: '/admin', label: 'Admin', icon: '⚙️' }
-const nowNavItem = { href: '/now', label: 'Now', icon: '🔥' }
+const nowNavItem: NavItem = { href: '/now', label: 'Now', icon: '🔥' }
+
+const accountLinks: { href: string; label: string; icon: string; adminOnly?: boolean }[] = [
+  { href: '/profile', label: 'Your Profile', icon: '👤' },
+  { href: '/profile?tab=my-schedule', label: 'Your Schedule', icon: '⏰' },
+  { href: '/profile?tab=packing-list', label: 'Packing List', icon: '🎒' },
+  { href: '/ideas', label: 'Ideas & Questions', icon: '💡' },
+  { href: '/admin', label: 'Admin', icon: '⚙️', adminOnly: true },
+]
 
 export function Navigation() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [userRole, setUserRole] = useState<UserRole | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [opsEvent, setOpsEvent] = useState<EventRow | null>(null)
+  const accountRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     getOpsEvent().then(setOpsEvent)
@@ -86,29 +95,42 @@ export function Navigation() {
     return () => subscription.unsubscribe()
   }, [pathname])
 
+  useEffect(() => {
+    setAccountOpen(false)
+    setMobileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!accountOpen) return
+    const close = (e: MouseEvent) => {
+      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [accountOpen])
+
   const navItems = (() => {
     if (!isLoggedIn) return publicNavItems
     // Pending applicants keep their account surfaces; /pending carries the
     // same My NYC Deli panel the rest of the camp gets under Profile.
     if (userRole === 'pending') {
-      return [...publicNavItems.slice(0, 3), { href: '/pending', label: 'My Deli', icon: '👤' }]
+      return [
+        { href: '/', label: 'Home', icon: '🥪' },
+        { href: '/events', label: 'Events', icon: '📅' },
+        { href: '/pending', label: 'My Deli', icon: '👤' },
+      ]
     }
 
     const offseason = isInformationStage(opsEvent)
-    const items = [...baseNavItems]
-    if (userRole === 'builder' || userRole === 'admin') items.push(buildWeekNavItem)
-
-    const visible = items.filter(item => {
-      if (item.eventOnly && offseason) return false
-      return !item.feature || hasFeature(opsEvent, item.feature)
-    })
+    const visible = memberNavItems.filter(item => !(item.eventOnly && offseason))
 
     // Once the team is onsite, the stripped-down view leads.
     if (opsEvent && ['build', 'live'].includes(opsEvent.stage)) visible.splice(1, 0, nowNavItem)
 
-    if (userRole === 'admin') visible.push(adminNavItem)
     return visible
   })()
+
+  const visibleAccountLinks = accountLinks.filter(link => !link.adminOnly || userRole === 'admin')
 
   return (
     <header className="bg-yellow-400 border-b-4 border-black sticky top-0 z-50">
@@ -148,7 +170,49 @@ export function Navigation() {
                 </Link>
               )
             })}
-            {isLoggedIn ? (
+            {isLoggedIn && userRole !== 'pending' ? (
+              <div className="relative ml-1" ref={accountRef}>
+                <button
+                  onClick={() => setAccountOpen(v => !v)}
+                  aria-expanded={accountOpen}
+                  aria-haspopup="menu"
+                  className={cn(
+                    'px-3 py-2 text-sm font-bold uppercase tracking-wider border-2 border-black transition-all',
+                    pathname.startsWith('/profile') || pathname.startsWith('/admin')
+                      ? 'bg-black text-yellow-400'
+                      : 'bg-white hover:bg-black hover:text-yellow-400'
+                  )}
+                >
+                  👤 You ▾
+                </button>
+                {accountOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-1 w-56 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  >
+                    {visibleAccountLinks.map(link => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="block px-4 py-2 text-sm font-bold uppercase tracking-wider hover:bg-yellow-400"
+                      >
+                        <span className="mr-2">{link.icon}</span>
+                        {link.label}
+                      </Link>
+                    ))}
+                    <form action={signOut} className="border-t-2 border-black">
+                      <button
+                        type="submit"
+                        className="w-full text-left px-4 py-2 text-sm font-bold uppercase tracking-wider hover:bg-black hover:text-yellow-400"
+                      >
+                        <span className="mr-2">🚪</span>
+                        Sign Out
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            ) : isLoggedIn ? (
               <form action={signOut}>
                 <button
                   type="submit"
@@ -204,16 +268,33 @@ export function Navigation() {
               )
             })}
             {isLoggedIn ? (
-              <form action={signOut}>
-                <button
-                  type="submit"
-                  onClick={() => setMobileOpen(false)}
-                  className="block w-full text-left px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all hover:bg-black hover:text-yellow-400"
-                >
-                  <span className="mr-2">🚪</span>
-                  Sign Out
-                </button>
-              </form>
+              <>
+                {userRole !== 'pending' && (
+                  <div className="mt-2 pt-2 border-t-2 border-black">
+                    {visibleAccountLinks.map(link => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMobileOpen(false)}
+                        className="block px-4 py-3 text-sm font-bold uppercase tracking-wider hover:bg-black hover:text-yellow-400"
+                      >
+                        <span className="mr-2">{link.icon}</span>
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+                <form action={signOut}>
+                  <button
+                    type="submit"
+                    onClick={() => setMobileOpen(false)}
+                    className="block w-full text-left px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all hover:bg-black hover:text-yellow-400"
+                  >
+                    <span className="mr-2">🚪</span>
+                    Sign Out
+                  </button>
+                </form>
+              </>
             ) : (
               <Link
                 href="/login"

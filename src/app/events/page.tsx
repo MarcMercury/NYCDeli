@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   EVENT_KIND_LABELS,
   eventDateLabel,
@@ -9,15 +10,37 @@ import {
   isAcceptingApplications,
   stageMeta,
 } from '@/lib/events'
+import { CampCalendar } from '@/components/camp-calendar'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { EventRow } from '@/types/database'
 
+type View = 'upcoming' | 'calendar' | 'past'
+
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'upcoming', label: 'Current & Upcoming' },
+  { key: 'calendar', label: 'Calendar' },
+  { key: 'past', label: 'Past Events' },
+]
+
 /**
- * Public event index. Anonymous visitors see only events flagged public (RLS),
- * which is what makes this double as the camp's promotional page.
+ * Public events index. Anonymous visitors see only events flagged public (RLS),
+ * which is what makes this double as the camp's promotional page. The camp
+ * calendar lives here too — "what is the camp doing" is one question, not two.
  */
 export default function EventsPage() {
+  return (
+    <Suspense fallback={null}>
+      <EventsPageBody />
+    </Suspense>
+  )
+}
+
+function EventsPageBody() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const requested = params.get('view') as View | null
+  const [view, setView] = useState<View>(requested === 'calendar' || requested === 'past' ? requested : 'upcoming')
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -28,49 +51,67 @@ export default function EventsPage() {
     })
   }, [])
 
+  const select = (next: View) => {
+    setView(next)
+    router.replace(next === 'upcoming' ? '/events' : `/events?view=${next}`, { scroll: false })
+  }
+
   const active = events.filter(e => e.stage !== 'closed')
   const archived = events.filter(e => e.stage === 'closed')
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-4xl font-black uppercase tracking-wider">Events</h1>
-      <p className="text-gray-600 mt-1 mb-8">
-        Everything NYC Deli Rats builds, burns and throws — past, present and upcoming.
+      <p className="text-gray-600 mt-1 mb-6">
+        Everything NYC Deli Rats builds, burns and throws — plus every meeting, deadline and social in between.
       </p>
 
-      {loading ? (
+      <div className="flex flex-wrap gap-1 mb-6 border-b-2 border-black">
+        {VIEWS.map(v => (
+          <button
+            key={v.key}
+            onClick={() => select(v.key)}
+            className={cn(
+              'px-4 py-2 text-sm font-bold uppercase tracking-wider border-2 border-b-0',
+              view === v.key ? 'bg-black text-yellow-400 border-black' : 'bg-white border-transparent hover:bg-gray-100'
+            )}
+          >
+            {v.label}
+            {v.key === 'past' && archived.length > 0 && ` (${archived.length})`}
+          </button>
+        ))}
+      </div>
+
+      {view === 'calendar' ? (
+        <CampCalendar />
+      ) : loading ? (
         <p className="font-bold uppercase tracking-wider text-gray-500">Loading…</p>
-      ) : events.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-gray-600">
-            No events are listed right now. Check the{' '}
-            <Link href="/calendar" className="underline font-bold">camp calendar</Link> for what&apos;s coming up.
-          </CardContent>
-        </Card>
+      ) : view === 'upcoming' ? (
+        <EventList
+          events={active}
+          emptyText="Nothing currently in the works — check the Calendar tab for what the camp is up to."
+        />
       ) : (
-        <div className="space-y-10">
-          <Section title="Current & Upcoming" events={active} emptyText="Nothing currently in the works." />
-          {archived.length > 0 && <Section title="Past Events" events={archived} emptyText="" />}
-        </div>
+        <EventList events={archived} emptyText="No archived events yet." />
       )}
     </div>
   )
 }
 
-function Section({ title, events, emptyText }: { title: string; events: EventRow[]; emptyText: string }) {
+function EventList({ events, emptyText }: { events: EventRow[]; emptyText: string }) {
+  if (events.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-gray-600">{emptyText}</CardContent>
+      </Card>
+    )
+  }
   return (
-    <section>
-      <h2 className="text-lg font-black uppercase tracking-wider border-b-2 border-black pb-1 mb-4">{title}</h2>
-      {events.length === 0 ? (
-        <p className="text-gray-600">{emptyText}</p>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {events.map(event => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
-      )}
-    </section>
+    <div className="grid md:grid-cols-2 gap-4">
+      {events.map(event => (
+        <EventCard key={event.id} event={event} />
+      ))}
+    </div>
   )
 }
 
