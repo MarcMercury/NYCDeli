@@ -27,9 +27,22 @@ export function NextUp() {
 
   if (!loaded || (events.length === 0 && items.length === 0)) return null
 
+  const onsite = events.find(e => e.stage === 'build' || e.stage === 'live')
+
   return (
     <section className="bg-[#111] border-y-2 border-[#fccc0a]/30 py-12">
       <div className="max-w-7xl mx-auto px-4">
+        {onsite && (
+          <Link
+            href="/now"
+            className="block mb-8 border-2 border-[#fccc0a] bg-[#fccc0a] text-black px-4 py-3 hover:bg-[#ffd93d] transition-colors"
+          >
+            <p className="text-xs font-black uppercase tracking-[0.3em]">
+              {onsite.stage === 'build' ? 'Build is on' : 'We are live'}
+            </p>
+            <p className="font-black uppercase">Open the onsite view — works without signal →</p>
+          </Link>
+        )}
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <h2 className="text-sm font-black uppercase tracking-[0.3em] text-[#fccc0a]">What&apos;s Next</h2>
           <div className="flex gap-4 text-sm font-bold uppercase tracking-wider">

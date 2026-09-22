@@ -11,6 +11,7 @@ import type { UserProfileRow, CamperRow } from '@/types/database'
 import { adminResetPasswordAction } from '@/app/actions/admin'
 import { syncApplicantDecisionAction } from '@/app/actions/events'
 import { withOpsScope } from '@/lib/active-event'
+import { PersonHistoryPanel } from '@/components/person-history-panel'
 import AddApplicantForm from './add-applicant-form'
 
 interface ApplicantWithCamper extends UserProfileRow {
@@ -423,6 +424,8 @@ export default function ApplicantReviewPage() {
                         </div>
                       </div>
                     </div>
+
+                    <PersonHistoryPanel email={selectedApplicant.email} />
                   </>
                 ) : (
                   <Alert variant="warning">

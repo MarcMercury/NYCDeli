@@ -18,9 +18,30 @@ const adminRoutes = ['/admin']
 // still owns their NYC Deli account and must be able to maintain it.
 const roleCheckRoutes = [
   '/campers', '/ideas', '/kitchen', '/layout', '/layout-view',
-  '/map', '/profile', '/resources', '/schedule', '/shift-draft',
+  '/map', '/now', '/profile', '/resources', '/schedule', '/shift-draft',
   '/build-week',
 ]
+
+// Routes that only exist when the current event has the matching module turned
+// on (events.features, migration 083). A small event shouldn't expose an
+// electrical load calculator just because Burning Man needed one.
+const featureRoutes: { prefix: string; feature: string }[] = [
+  { prefix: '/build-week', feature: 'build_week' },
+  { prefix: '/kitchen', feature: 'kitchen' },
+  { prefix: '/schedule', feature: 'kitchen' },
+  { prefix: '/shift-draft', feature: 'shift_draft' },
+  { prefix: '/map', feature: 'layout' },
+  { prefix: '/layout-view', feature: 'layout' },
+  { prefix: '/layout', feature: 'layout' },
+  { prefix: '/campers', feature: 'directory' },
+]
+
+function requiredFeature(pathname: string): string | null {
+  const match = featureRoutes.find(
+    r => pathname === r.prefix || pathname.startsWith(r.prefix + '/')
+  )
+  return match?.feature ?? null
+}
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.some(route => 
@@ -121,6 +142,46 @@ async function requestIsAdmin(request: NextRequest): Promise<boolean> {
   }
 }
 
+// Feature set of the current event, cached like the maintenance flag so module
+// gating doesn't add a query to every navigation.
+let featureCache: { value: Record<string, boolean> | null; at: number } = { value: null, at: 0 }
+const FEATURE_TTL_MS = 30_000
+
+/**
+ * Mirrors fetchOpsEvent() in src/lib/active-event.ts: flagship, then the
+ * soonest event still running, then the most recent event of all.
+ */
+async function currentEventFeatures(request: NextRequest): Promise<Record<string, boolean> | null> {
+  const now = Date.now()
+  if (now - featureCache.at < FEATURE_TTL_MS) return featureCache.value
+
+  try {
+    const supabase = createReadClient(request)
+    const { data } = await supabase
+      .from('events')
+      .select('features, is_flagship, stage, start_date')
+      .order('is_flagship', { ascending: false })
+      .order('start_date', { ascending: false, nullsFirst: false })
+
+    const rows = (data as { features: Record<string, boolean>; is_flagship: boolean; stage: string; start_date: string | null }[] | null) ?? []
+    const running = rows
+      .filter(r => r.stage !== 'closed' && r.start_date)
+      .sort((a, b) => a.start_date!.localeCompare(b.start_date!))
+
+    const chosen =
+      rows.find(r => r.is_flagship) ??
+      running[0] ??
+      rows.find(r => r.stage !== 'closed') ??
+      rows[0] ??
+      null
+
+    featureCache = { value: chosen?.features ?? null, at: now }
+    return featureCache.value
+  } catch {
+    return featureCache.value
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -175,6 +236,19 @@ export async function proxy(request: NextRequest) {
     if (isAdminRoute(pathname) && profile?.role !== 'admin') {
       const url = request.nextUrl.clone()
       url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // 5. Modules the current event doesn't use don't exist for anyone but admins,
+  //    who still need them to configure the event.
+  const feature = requiredFeature(pathname)
+  if (feature) {
+    const features = await currentEventFeatures(request)
+    if (features && features[feature] !== true && !(await requestIsAdmin(request))) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      url.searchParams.set('unavailable', feature)
       return NextResponse.redirect(url)
     }
   }

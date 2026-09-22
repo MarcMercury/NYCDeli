@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { CountdownTimer } from '@/components/countdown-timer'
+import { FeatureUnavailableNotice } from '@/components/feature-unavailable-notice'
 import { NextUp } from '@/components/next-up'
 
 const modules = [
@@ -98,6 +99,8 @@ const tentGuidelines = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#111]">
+      <FeatureUnavailableNotice />
+
       {/* Countdown Timer */}
       <CountdownTimer />
 

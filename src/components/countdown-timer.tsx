@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useSyncExternalStore } from 'react'
 import Image from 'next/image'
-import { fetchBurnStartDate } from '@/lib/settings'
-
-// Fallback if the burn_start_date setting is unset. Aug 30, 2026 PDT (BRC time).
-const DEFAULT_TARGET_DATE = new Date('2026-08-30T00:00:00-07:00')
+import { fetchCountdownTarget } from '@/lib/active-event'
 
 function getTimeLeft(target: Date) {
   const now = new Date()
@@ -124,19 +121,25 @@ function CountdownDisplay({ values }: {
 }
 
 export function CountdownTimer() {
-  const [target, setTarget] = useState(DEFAULT_TARGET_DATE)
-  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(DEFAULT_TARGET_DATE))
+  const [target, setTarget] = useState<Date | null>(null)
+  const [eventName, setEventName] = useState<string | null>(null)
+  const [resolved, setResolved] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(new Date()))
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   useEffect(() => {
     let active = true
-    fetchBurnStartDate().then(date => {
-      if (active && date) setTarget(date)
+    fetchCountdownTarget().then(result => {
+      if (!active) return
+      setTarget(result?.date ?? null)
+      setEventName(result?.event.name ?? null)
+      setResolved(true)
     })
     return () => { active = false }
   }, [])
 
   useEffect(() => {
+    if (!target) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reflect new target immediately
     setTimeLeft(getTimeLeft(target))
     const interval = setInterval(() => {
@@ -145,9 +148,12 @@ export function CountdownTimer() {
     return () => clearInterval(interval)
   }, [target])
 
-  if (!mounted) {
+  if (!mounted || !resolved) {
     return <CountdownDisplay placeholder />
   }
+
+  // Information stage: nothing is coming up, so don't count down to anything.
+  if (!target) return null
 
   if (timeLeft.expired) {
     return (
@@ -158,7 +164,7 @@ export function CountdownTimer() {
         <div className="relative z-10 py-4 md:py-5 px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="graffiti-text-main text-2xl md:text-4xl animate-pulse">
-              💥 BOOM. SEE YOU ON THE PLAYA. 💥
+              💥 BOOM. {eventName ? eventName.toUpperCase() : 'SEE YOU ON THE PLAYA'}. 💥
             </h2>
           </div>
         </div>

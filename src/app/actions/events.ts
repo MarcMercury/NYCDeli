@@ -554,3 +554,67 @@ export async function removeParticipantAction(participantId: string): Promise<Ac
   if (data) revalidatePath(`/admin/events/${(data as { event_id: string }).event_id}`)
   return ok()
 }
+
+// ---------------------------------------------------------------------------
+// Post-event wrap-up
+// ---------------------------------------------------------------------------
+
+export interface EventFeedbackInput {
+  rating?: number | null
+  whatWorked?: string
+  whatDidnt?: string
+  suggestions?: string
+  wouldReturn?: boolean | null
+  isAnonymous?: boolean
+}
+
+export async function submitEventFeedbackAction(
+  eventId: string,
+  input: EventFeedbackInput
+): Promise<ActionResult> {
+  const user = await requireAuth()
+  const supabase = await createClient()
+
+  const person = await resolvePersonForUser(supabase, user.id)
+  if (!person) return fail('Could not resolve your NYC Deli profile.')
+
+  const { data: eventData } = await supabase.from('events').select('stage').eq('id', eventId).maybeSingle()
+  const stage = (eventData as { stage: EventStage } | null)?.stage
+  if (!stage) return fail('Event not found')
+  if (stage !== 'post_event') {
+    return fail('Feedback is only open while the event is wrapping up.')
+  }
+
+  const { error } = await supabase.from('event_feedback').upsert(
+    {
+      event_id: eventId,
+      person_id: person.id,
+      rating: input.rating ?? null,
+      what_worked: input.whatWorked?.trim() || null,
+      what_didnt: input.whatDidnt?.trim() || null,
+      suggestions: input.suggestions?.trim() || null,
+      would_return: input.wouldReturn ?? null,
+      is_anonymous: input.isAnonymous ?? false,
+    } as never,
+    { onConflict: 'event_id,person_id' }
+  )
+  if (error) return fail(error.message)
+
+  revalidatePath(`/admin/events/${eventId}`)
+  return ok()
+}
+
+export async function saveRetroNotesAction(eventId: string, notes: string): Promise<ActionResult> {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  // Deliberately allowed on a closed event: lessons often land after archival.
+  const { error } = await supabase
+    .from('events')
+    .update({ retro_notes: notes.trim() || null } as never)
+    .eq('id', eventId)
+  if (error) return fail(error.message)
+
+  revalidatePath(`/admin/events/${eventId}`)
+  return ok()
+}

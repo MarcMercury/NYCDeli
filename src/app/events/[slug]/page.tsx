@@ -14,12 +14,13 @@ import {
   stageMeta,
 } from '@/lib/events'
 import { fetchPersonByUserId, fetchPersonHistory, summarizeHistory } from '@/lib/people'
-import { applyToEventAction } from '@/app/actions/events'
-import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from '@/components/ui'
+import { applyToEventAction, submitEventFeedbackAction } from '@/app/actions/events'
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type {
   EventApplicationField,
   EventApplicationRow,
+  EventFeedbackRow,
   EventRow,
   PersonHistory,
   PersonRow,
@@ -128,6 +129,10 @@ export default function EventDetailPage() {
         </Alert>
       )}
 
+      {event.stage === 'post_event' && person && (
+        <FeedbackCard event={event} personId={person.id} />
+      )}
+
       <div className="mt-8">
         {application ? (
           <ApplicationStatusCard application={application} />
@@ -150,6 +155,126 @@ export default function EventDetailPage() {
         )}
       </div>
     </div>
+  )
+}
+
+/** Stage 8: the event is over but still open for feedback and corrections. */
+function FeedbackCard({ event, personId }: { event: EventRow; personId: string }) {
+  const [form, setForm] = useState({
+    rating: '',
+    whatWorked: '',
+    whatDidnt: '',
+    suggestions: '',
+    wouldReturn: '',
+    isAnonymous: false,
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [existing, setExisting] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('event_feedback')
+      .select('*')
+      .eq('event_id', event.id)
+      .eq('person_id', personId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const row = data as EventFeedbackRow | null
+        setExisting(Boolean(row))
+        if (row) {
+          setForm({
+            rating: row.rating ? String(row.rating) : '',
+            whatWorked: row.what_worked ?? '',
+            whatDidnt: row.what_didnt ?? '',
+            suggestions: row.suggestions ?? '',
+            wouldReturn: row.would_return === null ? '' : String(row.would_return),
+            isAnonymous: row.is_anonymous,
+          })
+        }
+      })
+  }, [event.id, personId])
+
+  if (existing === null) return null
+
+  const submit = async () => {
+    setSaving(true)
+    setError(null)
+    const result = await submitEventFeedbackAction(event.id, {
+      rating: form.rating ? Number(form.rating) : null,
+      whatWorked: form.whatWorked,
+      whatDidnt: form.whatDidnt,
+      suggestions: form.suggestions,
+      wouldReturn: form.wouldReturn === '' ? null : form.wouldReturn === 'true',
+      isAnonymous: form.isAnonymous,
+    })
+    setSaving(false)
+    if (result.success) setSaved(true)
+    else setError(result.error)
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>How was it?</CardTitle>
+      </CardHeader>
+      <CardContent className="py-4 space-y-4">
+        <p className="text-gray-700">
+          {existing
+            ? 'You already sent feedback — you can update it until the event is closed.'
+            : 'The event is wrapping up. Tell us what worked and what didn’t while it’s fresh.'}
+        </p>
+
+        {saved && <Alert variant="success">Thanks — feedback saved.</Alert>}
+        {error && <Alert variant="error">{error}</Alert>}
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Select
+            label="Overall"
+            value={form.rating}
+            onChange={e => setForm({ ...form, rating: e.target.value })}
+            options={[
+              { value: '', label: 'No rating' },
+              { value: '5', label: '5 — best year yet' },
+              { value: '4', label: '4 — great' },
+              { value: '3', label: '3 — fine' },
+              { value: '2', label: '2 — rough' },
+              { value: '1', label: '1 — bad' },
+            ]}
+          />
+          <Select
+            label="Would you come back?"
+            value={form.wouldReturn}
+            onChange={e => setForm({ ...form, wouldReturn: e.target.value })}
+            options={[
+              { value: '', label: 'Not sure' },
+              { value: 'true', label: 'Yes' },
+              { value: 'false', label: 'No' },
+            ]}
+          />
+        </div>
+
+        <Textarea label="What worked" rows={3} value={form.whatWorked} onChange={e => setForm({ ...form, whatWorked: e.target.value })} />
+        <Textarea label="What didn’t" rows={3} value={form.whatDidnt} onChange={e => setForm({ ...form, whatDidnt: e.target.value })} />
+        <Textarea label="Suggestions for next time" rows={3} value={form.suggestions} onChange={e => setForm({ ...form, suggestions: e.target.value })} />
+
+        <label className="flex items-center gap-2 text-sm font-bold">
+          <input
+            type="checkbox"
+            className="w-4 h-4"
+            checked={form.isAnonymous}
+            onChange={e => setForm({ ...form, isAnonymous: e.target.checked })}
+          />
+          Don’t show my name next to this
+        </label>
+
+        <Button onClick={submit} loading={saving}>
+          {existing ? 'Update Feedback' : 'Send Feedback'}
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 

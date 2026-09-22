@@ -21,23 +21,26 @@ import {
   decideApplicationAction,
   reopenEventAction,
   removeParticipantAction,
+  saveRetroNotesAction,
   setApplicationsOpenAction,
   setEventFeaturesAction,
   setEventStageAction,
   updateEventAction,
 } from '@/app/actions/events'
+import { createClient } from '@/lib/supabase/client'
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Checkbox, Input, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type {
   EventApplicationRow,
   EventFeatureKey,
+  EventFeedbackWithPerson,
   EventParticipantRow,
   EventRow,
   EventStage,
   PersonRow,
 } from '@/types/database'
 
-type Tab = 'lifecycle' | 'details' | 'modules' | 'applications' | 'participants'
+type Tab = 'lifecycle' | 'details' | 'modules' | 'applications' | 'participants' | 'wrap_up'
 
 export default function AdminEventDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -45,22 +48,25 @@ export default function AdminEventDetailPage() {
   const [counts, setCounts] = useState<EventCounts | null>(null)
   const [applications, setApplications] = useState<(EventApplicationRow & { person: PersonRow | null })[]>([])
   const [participants, setParticipants] = useState<(EventParticipantRow & { person: PersonRow | null })[]>([])
+  const [feedback, setFeedback] = useState<EventFeedbackWithPerson[]>([])
   const [tab, setTab] = useState<Tab>('lifecycle')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [, startTransition] = useTransition()
 
   const load = useCallback(async () => {
-    const [found, eventCounts, apps, parts] = await Promise.all([
+    const [found, eventCounts, apps, parts, feedbackRes] = await Promise.all([
       fetchEventById(id),
       fetchEventCounts(id),
       fetchEventApplications(id),
       fetchEventParticipants(id),
+      createClient().from('event_feedback').select('*, person:people(*)').eq('event_id', id),
     ])
     setEvent(found)
     setCounts(eventCounts)
     setApplications(apps)
     setParticipants(parts)
+    setFeedback((feedbackRes.data as unknown as EventFeedbackWithPerson[] | null) ?? [])
     setLoading(false)
   }, [id])
 
@@ -99,6 +105,7 @@ export default function AdminEventDetailPage() {
     { key: 'modules', label: 'Modules' },
     { key: 'applications', label: 'Applications', count: counts?.applications },
     { key: 'participants', label: 'Participants', count: counts?.participants },
+    { key: 'wrap_up', label: 'Wrap-Up', count: feedback.length },
   ]
 
   return (
@@ -197,6 +204,14 @@ export default function AdminEventDetailPage() {
             participants={participants}
             disabled={readOnly}
             onRemove={participantId => run(() => removeParticipantAction(participantId), 'Participant removed.')}
+          />
+        )}
+
+        {tab === 'wrap_up' && (
+          <WrapUpTab
+            event={event}
+            feedback={feedback}
+            onSaveNotes={notes => run(() => saveRetroNotesAction(event.id, notes), 'Wrap-up notes saved.')}
           />
         )}
       </div>
@@ -521,6 +536,89 @@ function ResponseList({ responses }: { responses: Record<string, unknown> }) {
         </div>
       ))}
     </dl>
+  )
+}
+
+/** Stage 8: participant feedback plus the admin record of lessons learned. */
+function WrapUpTab({
+  event,
+  feedback,
+  onSaveNotes,
+}: {
+  event: EventRow
+  feedback: EventFeedbackWithPerson[]
+  onSaveNotes: (notes: string) => void
+}) {
+  const [notes, setNotes] = useState(event.retro_notes ?? '')
+
+  const rated = feedback.filter(f => typeof f.rating === 'number')
+  const average = rated.length
+    ? (rated.reduce((sum, f) => sum + (f.rating ?? 0), 0) / rated.length).toFixed(1)
+    : null
+  const returning = feedback.filter(f => f.would_return === true).length
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Lessons Learned</CardTitle>
+        </CardHeader>
+        <CardContent className="py-4 space-y-3">
+          <p className="text-gray-700">
+            Kept with the event forever, including after it&apos;s archived. Write it down before everyone forgets.
+          </p>
+          <Textarea rows={8} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What we'd do differently…" />
+          <Button onClick={() => onSaveNotes(notes)}>Save Notes</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Participant Feedback ({feedback.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="py-4 space-y-4">
+          {feedback.length === 0 ? (
+            <p className="text-gray-600">
+              No feedback yet. Participants can submit it from the event page while the event is in the Post-Event stage.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-4 text-sm font-bold uppercase tracking-wider">
+                {average && <span>Average: {average} / 5</span>}
+                <span>Would return: {returning} of {feedback.length}</span>
+              </div>
+
+              {feedback.map(item => (
+                <div key={item.id} className="border-2 border-black p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-black uppercase">
+                      {item.is_anonymous ? 'Anonymous' : (item.person ? personDisplayName(item.person) : 'Unknown')}
+                    </span>
+                    <span className="flex gap-2">
+                      {item.rating && <Badge variant="info">{item.rating} / 5</Badge>}
+                      {item.would_return === true && <Badge variant="success">Would return</Badge>}
+                      {item.would_return === false && <Badge variant="error">Would not return</Badge>}
+                    </span>
+                  </div>
+                  {item.what_worked && <FeedbackLine label="Worked" value={item.what_worked} />}
+                  {item.what_didnt && <FeedbackLine label="Didn’t" value={item.what_didnt} />}
+                  {item.suggestions && <FeedbackLine label="Suggests" value={item.suggestions} />}
+                </div>
+              ))}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function FeedbackLine({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="text-sm mt-2">
+      <span className="font-bold uppercase text-xs text-gray-500 mr-2">{label}</span>
+      <span className="whitespace-pre-wrap">{value}</span>
+    </p>
   )
 }
 

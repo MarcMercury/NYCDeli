@@ -6,8 +6,10 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { getOpsEvent } from '@/lib/active-event'
+import { hasFeature } from '@/lib/events'
 import { signOut } from '@/app/actions/auth'
-import type { UserRole } from '@/types/database'
+import type { EventFeatureKey, EventRow, UserRole } from '@/types/database'
 
 const publicNavItems = [
   { href: '/', label: 'Home', icon: '🥪' },
@@ -16,26 +18,33 @@ const publicNavItems = [
   { href: '/intake', label: 'Register', icon: '📝' },
 ]
 
-const baseNavItems = [
+// `feature` items disappear when the current event doesn't use that module.
+const baseNavItems: { href: string; label: string; icon: string; feature?: EventFeatureKey }[] = [
   { href: '/', label: 'Home', icon: '🥪' },
   { href: '/events', label: 'Events', icon: '📅' },
   { href: '/calendar', label: 'Calendar', icon: '🗓️' },
-  { href: '/campers', label: 'Campers', icon: '🐀' },
+  { href: '/campers', label: 'Campers', icon: '🐀', feature: 'directory' },
   { href: '/my-deli', label: 'My Deli', icon: '👤' },
   { href: '/profile', label: 'Profile', icon: '🎒' },
-  { href: '/map', label: 'Camp Map', icon: '🏕️' },
-  { href: '/kitchen', label: 'Kitchen', icon: '🍳' },
+  { href: '/map', label: 'Camp Map', icon: '🏕️', feature: 'layout' },
+  { href: '/kitchen', label: 'Kitchen', icon: '🍳', feature: 'kitchen' },
   { href: '/resources', label: 'Resources', icon: '📚' },
 ]
 
-const buildWeekNavItem = { href: '/build-week', label: 'Build Week', icon: '🔨' }
+const buildWeekNavItem = { href: '/build-week', label: 'Build Week', icon: '🔨', feature: 'build_week' as EventFeatureKey }
 const adminNavItem = { href: '/admin', label: 'Admin', icon: '⚙️' }
+const nowNavItem = { href: '/now', label: 'Now', icon: '🔥' }
 
 export function Navigation() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userRole, setUserRole] = useState<UserRole | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [opsEvent, setOpsEvent] = useState<EventRow | null>(null)
+
+  useEffect(() => {
+    getOpsEvent().then(setOpsEvent)
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
@@ -77,10 +86,17 @@ export function Navigation() {
     if (userRole === 'pending') {
       return [...publicNavItems.slice(0, 3), { href: '/my-deli', label: 'My Deli', icon: '👤' }]
     }
+
     const items = [...baseNavItems]
     if (userRole === 'builder' || userRole === 'admin') items.push(buildWeekNavItem)
-    if (userRole === 'admin') items.push(adminNavItem)
-    return items
+
+    // Once the team is onsite, the stripped-down view leads.
+    const onsite = opsEvent ? ['build', 'live'].includes(opsEvent.stage) : false
+    const visible = items.filter(item => !item.feature || hasFeature(opsEvent, item.feature))
+    if (onsite) visible.splice(1, 0, nowNavItem)
+
+    if (userRole === 'admin') visible.push(adminNavItem)
+    return visible
   })()
 
   return (

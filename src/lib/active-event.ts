@@ -62,6 +62,32 @@ export function isInformationStage(event: EventRow | null): boolean {
   return !event || stageMeta(event.stage).readOnly
 }
 
+/** The event the app should count down to, or null when nothing is upcoming. */
+export async function fetchCountdownTarget(
+  client?: DeliSupabase
+): Promise<{ date: Date; event: EventRow } | null> {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data } = await db(client)
+    .from('events')
+    .select('*')
+    .neq('stage', 'closed')
+    .gte('start_date', today)
+    .order('start_date', { ascending: true })
+    .limit(1)
+
+  const event = ((data as EventRow[] | null) ?? [])[0]
+  if (!event?.start_date) return null
+
+  // Bare dates are local to the event, not the viewer.
+  const date = new Date(`${event.start_date}T00:00:00${offsetFor(event.timezone)}`)
+  return Number.isNaN(date.getTime()) ? null : { date, event }
+}
+
+/** Crude but adequate: the only timezones the camp operates in. */
+function offsetFor(timezone: string): string {
+  return timezone === 'America/New_York' ? '-04:00' : '-07:00'
+}
+
 // ---------------------------------------------------------------------------
 // Browser-side scoping
 // ---------------------------------------------------------------------------

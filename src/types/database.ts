@@ -549,6 +549,12 @@ export interface Database {
         Update: EventParticipantUpdate
         Relationships: []
       }
+      event_feedback: {
+        Row: EventFeedbackRow
+        Insert: EventFeedbackInsert
+        Update: EventFeedbackUpdate
+        Relationships: []
+      }
       user_profiles: {
         Row: UserProfileRow
         Insert: UserProfileInsert
@@ -1758,6 +1764,8 @@ export interface EventRow {
   closed_at: string | null
   closed_by: string | null
   created_by: string | null
+  /** Admin wrap-up: lessons learned, captured during the post-event stage. */
+  retro_notes: string | null
 }
 
 export interface EventInsert {
@@ -1792,6 +1800,7 @@ export type EventUpdate = Partial<Omit<EventInsert, 'slug'>> & {
   slug?: string
   closed_at?: string | null
   closed_by?: string | null
+  retro_notes?: string | null
 }
 
 export interface EventStageHistoryRow {
@@ -1987,6 +1996,37 @@ export interface EventApplicationWithPerson extends EventApplicationRow {
 }
 
 export interface EventParticipantWithPerson extends EventParticipantRow {
+  person: PersonRow | null
+}
+
+export interface EventFeedbackRow {
+  id: string
+  created_at: string
+  updated_at: string
+  event_id: string
+  person_id: string
+  rating: number | null
+  what_worked: string | null
+  what_didnt: string | null
+  suggestions: string | null
+  would_return: boolean | null
+  is_anonymous: boolean
+}
+
+export interface EventFeedbackInsert {
+  event_id: string
+  person_id: string
+  rating?: number | null
+  what_worked?: string | null
+  what_didnt?: string | null
+  suggestions?: string | null
+  would_return?: boolean | null
+  is_anonymous?: boolean
+}
+
+export type EventFeedbackUpdate = Partial<Omit<EventFeedbackInsert, 'event_id' | 'person_id'>>
+
+export interface EventFeedbackWithPerson extends EventFeedbackRow {
   person: PersonRow | null
 }
 

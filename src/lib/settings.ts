@@ -18,19 +18,15 @@ export interface SettingDef {
 }
 
 export type SettingGroup =
-  | 'Event Timeline'
   | 'Registration & Intake'
   | 'Camp Geometry'
   | 'Camp Selection'
 
 export const MAINTENANCE_KEY = 'maintenance_mode'
 
+// Event dates are NOT here on purpose — they belong to the event record
+// (events.start_date / end_date / build_start_date), not to global settings.
 export const SETTINGS_SCHEMA: SettingDef[] = [
-  // Event Timeline — drives the homepage countdown and date-gated copy
-  { key: 'burn_start_date', label: 'Burn Start Date', type: 'date', group: 'Event Timeline', help: 'Gate opens / event start. Drives the homepage countdown.' },
-  { key: 'burn_end_date', label: 'Burn End Date', type: 'date', group: 'Event Timeline' },
-  { key: 'build_week_start', label: 'Build Week Start', type: 'date', group: 'Event Timeline' },
-
   // Registration & Intake
   { key: 'registration_deadline', label: 'Registration Deadline', type: 'date', group: 'Registration & Intake' },
   { key: 'intake_open', label: 'Intake Open', type: 'boolean', group: 'Registration & Intake', help: 'When off, new registrations are closed.' },
@@ -46,7 +42,6 @@ export const SETTINGS_SCHEMA: SettingDef[] = [
 ]
 
 export const SETTING_GROUPS: SettingGroup[] = [
-  'Event Timeline',
   'Registration & Intake',
   'Camp Geometry',
   'Camp Selection',
@@ -104,15 +99,4 @@ export async function fetchCampDimensions(): Promise<CampDimensions> {
     lengthFt: toNumber(map.camp_length_ft, CAMP_DIMENSION_DEFAULTS.lengthFt),
     minSpacingFt: toNumber(map.min_tent_spacing_ft, CAMP_DIMENSION_DEFAULTS.minSpacingFt),
   }
-}
-
-/** Burn start date as a Date, or null if unset/invalid. */
-export async function fetchBurnStartDate(): Promise<Date | null> {
-  const map = await fetchSettingsMap()
-  const raw = map.burn_start_date
-  if (!raw) return null
-  // Anchor bare dates to Black Rock City time (PDT) at midnight.
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00-07:00` : raw
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? null : d
 }
