@@ -228,3 +228,57 @@ export function formatCalendarTime(item: Pick<CalendarItem, 'startTime' | 'endTi
   const trim = (t: string) => t.slice(0, 5)
   return item.endTime ? `${trim(item.startTime)}–${trim(item.endTime)}` : trim(item.startTime)
 }
+
+// ---------------------------------------------------------------------------
+// Month grid
+// ---------------------------------------------------------------------------
+
+/** Calendar dates are bare `YYYY-MM-DD`; noon UTC keeps them from shifting a day. */
+function asDate(iso: string): Date {
+  return new Date(`${iso}T12:00:00Z`)
+}
+
+export function todayIso(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+export function addDays(iso: string, days: number): string {
+  return new Date(asDate(iso).getTime() + days * 86_400_000).toISOString().slice(0, 10)
+}
+
+/** `YYYY-MM` shifted by whole months. */
+export function shiftMonth(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split('-').map(Number)
+  const shifted = new Date(Date.UTC(year, month - 1 + delta, 1))
+  return shifted.toISOString().slice(0, 7)
+}
+
+export function monthLabel(monthKey: string): string {
+  return asDate(`${monthKey}-01`).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Six Sunday-start weeks of ISO dates covering the month — a fixed grid never reflows. */
+export function monthGrid(monthKey: string): string[][] {
+  const first = `${monthKey}-01`
+  const start = addDays(first, -asDate(first).getUTCDay())
+  return Array.from({ length: 6 }, (_, week) =>
+    Array.from({ length: 7 }, (_, day) => addDays(start, week * 7 + day))
+  )
+}
+
+/** Items touching a given day, including every day of a multi-day range. */
+export function itemsForDay(items: CalendarItem[], iso: string): CalendarItem[] {
+  return items.filter(item => iso >= item.date && iso <= (item.endDate ?? item.date))
+}
+
+export function isMultiDay(item: CalendarItem): boolean {
+  return Boolean(item.endDate && item.endDate !== item.date)
+}
+
