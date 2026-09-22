@@ -131,7 +131,7 @@ function buildChecks(event: EventRow, c: Counts): ReadinessCheck[] {
           detail: event.application_schema?.length
             ? `${event.application_schema.length} questions`
             : 'Using the default questions',
-          done: Boolean(event.application_schema?.length), href: `${admin}?tab=details`,
+          done: Boolean(event.application_schema?.length), href: `${admin}?tab=applications`,
         })
       }
       break

@@ -2,16 +2,19 @@
 
 import { Suspense, useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
+  DEFAULT_APPLICATION_FIELDS,
   EVENT_FEATURE_META,
   EVENT_KIND_LABELS,
   EVENT_STAGES,
+  applicationFields,
   eventDateLabel,
   fetchEventById,
   fetchEventCounts,
   nextStage,
   previousStage,
+  slugify,
   stageMeta,
   type EventCounts,
 } from '@/lib/events'
@@ -31,9 +34,10 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { EventPhotoAlbumsAdmin } from '@/components/event-photo-albums'
 import { EventSettingsTab } from '@/components/admin/event-settings-tab'
-import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Checkbox, Input, Textarea } from '@/components/ui'
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Checkbox, Input, Select, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type {
+  EventApplicationField,
   EventApplicationRow,
   EventFeatureKey,
   EventFeedbackWithPerson,
@@ -57,6 +61,7 @@ export default function AdminEventDetailPage() {
 
 function AdminEventDetailBody() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const requestedTab = useSearchParams().get('tab') as Tab | null
   const [event, setEvent] = useState<EventRow | null>(null)
   const [counts, setCounts] = useState<EventCounts | null>(null)
@@ -64,7 +69,10 @@ function AdminEventDetailBody() {
   const [applications, setApplications] = useState<(EventApplicationRow & { person: PersonRow | null })[]>([])
   const [participants, setParticipants] = useState<(EventParticipantRow & { person: PersonRow | null })[]>([])
   const [feedback, setFeedback] = useState<EventFeedbackWithPerson[]>([])
-  const [tab, setTab] = useState<Tab>(requestedTab && TAB_KEYS.includes(requestedTab) ? requestedTab : 'lifecycle')
+  // The URL owns the tab so the readiness "Fix it" links can steer the page.
+  const tab: Tab = requestedTab && TAB_KEYS.includes(requestedTab) ? requestedTab : 'lifecycle'
+  const setTab = (next: Tab) =>
+    router.replace(next === 'lifecycle' ? `/admin/events/${id}` : `/admin/events/${id}?tab=${next}`, { scroll: false })
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [, startTransition] = useTransition()
@@ -212,10 +220,14 @@ function AdminEventDetailBody() {
 
         {tab === 'applications' && (
           <ApplicationsTab
+            event={event}
             applications={applications}
             disabled={readOnly}
             onDecide={(applicationId, status) =>
               run(() => decideApplicationAction(applicationId, status), 'Application updated.')
+            }
+            onSaveSchema={schema =>
+              run(() => updateEventAction(event.id, { application_schema: schema }), 'Application form saved.')
             }
           />
         )}
@@ -543,60 +555,203 @@ function ModulesTab({
 }
 
 function ApplicationsTab({
+  event,
   applications,
   disabled,
   onDecide,
+  onSaveSchema,
 }: {
+  event: EventRow
   applications: (EventApplicationRow & { person: PersonRow | null })[]
   disabled: boolean
   onDecide: (applicationId: string, status: 'approved' | 'denied' | 'waitlisted' | 'under_review') => void
+  onSaveSchema: (schema: EventApplicationField[]) => void
 }) {
-  if (applications.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-gray-600">No applications yet.</CardContent>
-      </Card>
-    )
+  return (
+    <div className="space-y-6">
+      <ApplicationFormEditor event={event} disabled={disabled} onSave={onSaveSchema} />
+
+      {applications.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-gray-600">No applications yet.</CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {applications.map(app => (
+            <Card key={app.id} className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant={
+                        app.status === 'approved' ? 'success' : app.status === 'denied' ? 'error' : 'info'
+                      }
+                    >
+                      {app.status}
+                    </Badge>
+                    {app.is_returning && <Badge variant="warning">Returning member</Badge>}
+                  </div>
+                  <h3 className="font-black uppercase mt-1">
+                    {app.person ? personDisplayName(app.person) : 'Unknown applicant'}
+                  </h3>
+                  <p className="text-sm text-gray-600">{app.person?.email}</p>
+                  {app.person && (
+                    <Link href={`/admin/people/${app.person.id}`} className="text-sm font-bold underline">
+                      View full history →
+                    </Link>
+                  )}
+                  <ResponseList responses={app.responses} />
+                </div>
+                {!disabled && (
+                  <div className="flex flex-col gap-2">
+                    <Button size="sm" onClick={() => onDecide(app.id, 'approved')}>Approve</Button>
+                    <Button size="sm" variant="secondary" onClick={() => onDecide(app.id, 'waitlisted')}>Waitlist</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onDecide(app.id, 'denied')}>Deny</Button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const FIELD_TYPE_OPTIONS: { value: EventApplicationField['type']; label: string }[] = [
+  { value: 'text', label: 'Short text' },
+  { value: 'textarea', label: 'Long text' },
+  { value: 'number', label: 'Number' },
+  { value: 'boolean', label: 'Yes / no' },
+  { value: 'date', label: 'Date' },
+  { value: 'select', label: 'Choose one' },
+]
+
+/**
+ * Defines the questions applicants answer. An event with no schema falls back
+ * to `DEFAULT_APPLICATION_FIELDS`, so the editor opens on those defaults and
+ * saving turns them into this event's own form.
+ */
+function ApplicationFormEditor({
+  event,
+  disabled,
+  onSave,
+}: {
+  event: EventRow
+  disabled: boolean
+  onSave: (schema: EventApplicationField[]) => void
+}) {
+  const [fields, setFields] = useState<EventApplicationField[]>(() => applicationFields(event))
+  const custom = (event.application_schema?.length ?? 0) > 0
+
+  const update = (index: number, patch: Partial<EventApplicationField>) =>
+    setFields(prev => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)))
+
+  const move = (index: number, delta: number) =>
+    setFields(prev => {
+      const next = [...prev]
+      const target = index + delta
+      if (target < 0 || target >= next.length) return prev
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+
+  // Keys identify answers in `event_applications.responses`, so they must be unique.
+  const keyFor = (label: string, index: number, all: EventApplicationField[]) => {
+    const base = slugify(label).replace(/-/g, '_') || `question_${index + 1}`
+    const taken = all.some((f, i) => i !== index && f.key === base)
+    return taken ? `${base}_${index + 1}` : base
+  }
+
+  const save = () => {
+    const cleaned = fields
+      .filter(f => f.label.trim())
+      .map((f, i, all) => ({
+        ...f,
+        label: f.label.trim(),
+        key: f.key || keyFor(f.label, i, all),
+        options: f.type === 'select' ? (f.options ?? []).filter(Boolean) : undefined,
+      }))
+    onSave(cleaned)
   }
 
   return (
-    <div className="space-y-3">
-      {applications.map(app => (
-        <Card key={app.id} className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge
-                  variant={
-                    app.status === 'approved' ? 'success' : app.status === 'denied' ? 'error' : 'info'
-                  }
-                >
-                  {app.status}
-                </Badge>
-                {app.is_returning && <Badge variant="warning">Returning member</Badge>}
-              </div>
-              <h3 className="font-black uppercase mt-1">
-                {app.person ? personDisplayName(app.person) : 'Unknown applicant'}
-              </h3>
-              <p className="text-sm text-gray-600">{app.person?.email}</p>
-              {app.person && (
-                <Link href={`/admin/people/${app.person.id}`} className="text-sm font-bold underline">
-                  View full history →
-                </Link>
-              )}
-              <ResponseList responses={app.responses} />
+    <Card>
+      <CardHeader>
+        <CardTitle>Application Form</CardTitle>
+      </CardHeader>
+      <CardContent className="py-4 space-y-4">
+        <p className="text-sm text-gray-600">
+          {custom
+            ? 'These questions are specific to this event.'
+            : 'This event is using the default questions. Edit and save to make them its own.'}
+        </p>
+
+        {fields.map((field, index) => (
+          <div key={index} className="border-2 border-black p-3 space-y-3 bg-white">
+            <div className="grid md:grid-cols-2 gap-3">
+              <Input
+                label={`Question ${index + 1}`}
+                value={field.label}
+                disabled={disabled}
+                onChange={e => update(index, { label: e.target.value })}
+              />
+              <Select
+                label="Answer type"
+                value={field.type}
+                disabled={disabled}
+                options={FIELD_TYPE_OPTIONS}
+                onChange={e => update(index, { type: e.target.value as EventApplicationField['type'] })}
+              />
             </div>
-            {!disabled && (
-              <div className="flex flex-col gap-2">
-                <Button size="sm" onClick={() => onDecide(app.id, 'approved')}>Approve</Button>
-                <Button size="sm" variant="secondary" onClick={() => onDecide(app.id, 'waitlisted')}>Waitlist</Button>
-                <Button size="sm" variant="ghost" onClick={() => onDecide(app.id, 'denied')}>Deny</Button>
-              </div>
+            {field.type === 'select' && (
+              <Input
+                label="Choices (comma separated)"
+                value={(field.options ?? []).join(', ')}
+                disabled={disabled}
+                onChange={e => update(index, { options: e.target.value.split(',').map(o => o.trim()) })}
+              />
             )}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Checkbox
+                label="Required"
+                checked={Boolean(field.required)}
+                disabled={disabled}
+                onChange={e => update(index, { required: e.target.checked })}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" disabled={disabled || index === 0} onClick={() => move(index, -1)}>↑</Button>
+                <Button size="sm" variant="ghost" disabled={disabled || index === fields.length - 1} onClick={() => move(index, 1)}>↓</Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={disabled}
+                  onClick={() => setFields(prev => prev.filter((_, i) => i !== index))}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
           </div>
-        </Card>
-      ))}
-    </div>
+        ))}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            disabled={disabled}
+            onClick={() => setFields(prev => [...prev, { key: '', label: '', type: 'text' }])}
+          >
+            Add question
+          </Button>
+          <Button variant="ghost" disabled={disabled} onClick={() => setFields(DEFAULT_APPLICATION_FIELDS)}>
+            Reset to defaults
+          </Button>
+          <Button disabled={disabled || !fields.some(f => f.label.trim())} onClick={save}>
+            Save Form
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
