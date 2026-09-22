@@ -323,11 +323,19 @@ export function eventDateLabel(event: Pick<EventRow, 'start_date' | 'end_date'>)
   if (!start && !end) return 'Dates TBD'
   if (start && !end) return formatDay(start, { month: 'short', day: 'numeric', year: 'numeric' })
   if (!start && end) return `Through ${formatDay(end!, { month: 'short', day: 'numeric', year: 'numeric' })}`
+
+  const full = { month: 'short', day: 'numeric', year: 'numeric' } as const
+  const sameMonth = start!.slice(0, 7) === end!.slice(0, 7)
   const sameYear = start!.slice(0, 4) === end!.slice(0, 4)
-  const sameMonth = sameYear && start!.slice(0, 7) === end!.slice(0, 7)
-  const left = formatDay(start!, sameMonth ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric' })
-  const right = formatDay(end!, { month: sameMonth ? undefined : 'short', day: 'numeric', year: 'numeric' })
-  return `${left} – ${right}`
+
+  // Intl has no "day and year without month" format, so join that one by hand.
+  if (sameMonth) {
+    return `${formatDay(start!, { month: 'short', day: 'numeric' })} – ${formatDay(end!, { day: 'numeric' })}, ${end!.slice(0, 4)}`
+  }
+  if (sameYear) {
+    return `${formatDay(start!, { month: 'short', day: 'numeric' })} – ${formatDay(end!, full)}`
+  }
+  return `${formatDay(start!, full)} – ${formatDay(end!, full)}`
 }
 
 // ---------------------------------------------------------------------------
