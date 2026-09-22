@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { CountdownTimer } from '@/components/countdown-timer'
 import { CriticalDates } from '@/components/critical-dates'
 import { FeatureUnavailableNotice } from '@/components/feature-unavailable-notice'
+import { HeroCtas, JoinSection } from '@/components/home-cta'
 import { ModuleGrid } from '@/components/module-grid'
 import { NextUp } from '@/components/next-up'
 
@@ -139,12 +140,7 @@ export default function HomePage() {
                 >
                   See Our Events
                 </Link>
-                <Link
-                  href="/intake"
-                  className="inline-flex items-center px-6 py-4 bg-transparent text-[#fccc0a] font-black tracking-wide text-sm uppercase hover:bg-[#fccc0a]/10 transition-all border-2 border-[#fccc0a]/60 hover:border-[#fccc0a]"
-                >
-                  Register for Burning Man
-                </Link>
+                <HeroCtas />
                 <a
                   href="https://www.instagram.com/campnycdeli"
                   target="_blank"
@@ -683,40 +679,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA — Graffiti bodega awning */}
-      <section className="relative py-16 px-4 overflow-hidden font-nunito">
-        <div className="absolute inset-0 bg-[#fccc0a]" />
-        <div className="absolute inset-0 opacity-[0.04]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat',
-        }} />
-        <div className="nyc-awning h-2 absolute top-0 left-0 right-0" />
-        <div className="relative max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight mb-4 text-black">
-            Ready to Join?
-          </h2>
-          <p className="text-lg mb-4 text-black/80 leading-relaxed">
-            Burning Man registration is below. Friends and partners traveling together must each register individually.
-          </p>
-          <p className="text-base mb-8 text-black/60 leading-relaxed">
-            Every field matters. Every deadline is real. Looking for a smaller event instead?
-            Check what&apos;s open on the events page — most of them are a much lighter lift.
-          </p>
-          <div className="flex flex-wrap justify-center items-center gap-4">
-            <Link
-              href="/intake"
-              className="inline-flex items-center px-8 py-4 bg-black text-[#fccc0a] font-black tracking-wide text-lg uppercase hover:bg-gray-900 transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]"
-            >
-              Start Registration &rarr;
-            </Link>
-            <Link
-              href="/events"
-              className="inline-flex items-center px-6 py-4 bg-transparent text-black font-black tracking-wide text-sm uppercase hover:bg-black/10 transition-all border-2 border-black"
-            >
-              Browse All Events
-            </Link>
-          </div>
-        </div>
-      </section>
+      <JoinSection />
     </div>
   )
 }

@@ -473,6 +473,14 @@ export default function AdminPage() {
               <p className="text-xs uppercase tracking-wider text-gray-500">Open Shifts</p>
             </CardContent>
           </Card>
+          <Link href="/admin/home" className="block">
+            <Card className="hover:border-yellow-500 transition-colors h-full">
+              <CardContent className="py-4 text-center">
+                <p className="text-3xl font-black">🏠</p>
+                <p className="text-xs uppercase tracking-wider text-yellow-700 font-bold">Home Page</p>
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/admin/events" className="block">
             <Card className="hover:border-yellow-500 transition-colors h-full">
               <CardContent className="py-4 text-center">
