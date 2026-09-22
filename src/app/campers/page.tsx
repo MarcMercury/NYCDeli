@@ -77,6 +77,7 @@ export default function CampersPage() {
   const [selectedCamper, setSelectedCamper] = useState<DirectoryEntry | null>(null)
   const [campersById, setCampersById] = useState<Map<string, CamperRow>>(new Map())
   const [offseason, setOffseason] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const fetchDirectory = useCallback(async () => {
     const supabase = createClient()
@@ -166,6 +167,7 @@ export default function CampersPage() {
 
     const showEventTab = !!event && roster.length > 0 && attending
 
+    setIsAdmin(myProfile?.role === 'admin')
     setOpsEvent(event)
     setOffseason(isInformationStage(event))
     setAllEntries([...byKey.values()].sort(byDisplayName))
@@ -220,6 +222,8 @@ export default function CampersPage() {
   }
 
   const showTentBadges = activeTab === EVENT_TAB && !offseason
+  // The full directory spans every event; non-admins only get the public blurb there.
+  const showContactDetails = isAdmin || activeTab === EVENT_TAB
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -324,7 +328,7 @@ export default function CampersPage() {
               )}
 
               {/* Contact & Info */}
-              {selectedCamper.camper && (
+              {showContactDetails && selectedCamper.camper && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   <div className="min-w-0">
                     <span className="text-gray-500 block">Email</span>
@@ -369,7 +373,7 @@ export default function CampersPage() {
                 </div>
               )}
 
-              {selectedCamper.camper?.skills && selectedCamper.camper.skills.length > 0 && (
+              {showContactDetails && selectedCamper.camper?.skills && selectedCamper.camper.skills.length > 0 && (
                 <div>
                   <span className="text-gray-500 block text-sm mb-1">Skills</span>
                   <div className="flex flex-wrap gap-1">
