@@ -96,6 +96,75 @@ const tentGuidelines = [
   { people: 'Four People', dimensions: '10 x 17.5' },
 ]
 
+// Where the Deli shows up. The gift is always food; only the scale changes.
+const whereWeServe = [
+  {
+    icon: '🔥',
+    name: 'Burning Man',
+    place: 'Black Rock City, NV',
+    scale: 'Full Build',
+    scaleColor: 'text-[#fccc0a] border-[#fccc0a]/40 bg-yellow-500/10',
+    description:
+      'The big one. A ~70 person camp built from empty playa: full kitchen, shade over every tent, a public cooling center, and six days of hot deli service.',
+  },
+  {
+    icon: '🌴',
+    name: 'Love Burn',
+    place: 'Miami, FL',
+    scale: 'Slimmed Down',
+    scaleColor: 'text-green-400 border-green-500/40 bg-green-500/10',
+    description:
+      'A regional burn with a fraction of the infrastructure. Smaller crew, smaller kitchen, same sandwich. We bring what fits and cook what we can.',
+  },
+  {
+    icon: '🎉',
+    name: 'Re-Entry Parties',
+    place: 'New York City',
+    scale: 'Pop-Up',
+    scaleColor: 'text-blue-400 border-blue-400/40 bg-blue-500/10',
+    description:
+      'Decompression and re-entry events back home. No build week, no shade structure — just the Deli, a hot line, and a room full of people who miss the dust.',
+  },
+  {
+    icon: '💛',
+    name: 'Fundraisers & Build Days',
+    place: 'Wherever the Rats gather',
+    scale: 'Light Touch',
+    scaleColor: 'text-purple-400 border-purple-400/40 bg-purple-500/10',
+    description:
+      'Work parties, container loads, benefit nights and camp socials. Someone is always feeding the crew — that part never changes.',
+  },
+]
+
+const serviceTiers = [
+  {
+    label: 'Burning Man',
+    tagline: 'Everything, built from nothing',
+    accent: 'border-[#fccc0a]',
+    heading: 'text-[#fccc0a]',
+    points: [
+      'Full commercial-scale kitchen with running water and four grills',
+      'Six days of deli service — roughly 5,500 meals',
+      'Public 70° cooling center for several thousand more burners',
+      'Build week, shade over every tent, power, water, ice, refrigeration',
+      'Camp fees, applications, shift draft, and the whole ops platform',
+    ],
+  },
+  {
+    label: 'Everything Else',
+    tagline: 'Less gear, same gift',
+    accent: 'border-green-500',
+    heading: 'text-green-400',
+    points: [
+      'A scaled kitchen sized to whatever the venue actually gives us',
+      'Service measured in hours, not days',
+      'A small crew instead of a 70-person camp — often no application at all',
+      'No build week, no shade build, no infrastructure to haul across a desert',
+      'Show up, cook, hand it over, clean up, go home',
+    ],
+  },
+]
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#111]">
@@ -114,25 +183,32 @@ export default function HomePage() {
           <div className="flex items-center justify-between gap-8">
             <div className="max-w-3xl">
               <div className="inline-block mb-4 px-3 py-1 bg-[#fccc0a] text-black text-xs font-black uppercase tracking-[0.3em]">
-                Est. Black Rock City
+                Born in Black Rock City
               </div>
               <h1 className="text-6xl md:text-8xl font-graffiti tracking-tight text-[#fccc0a] nyc-spray mb-2">
                 NYC DELI
               </h1>
               <div className="nyc-tag-stripe w-56 mb-6" />
               <p className="text-xl md:text-2xl font-semibold text-white nyc-stencil mb-2">
-                Burning Man 2026 &bull; Black Rock City
+                Burning Man &bull; Love Burn &bull; Re-Entry Parties &bull; Wherever We&apos;re Hungry
               </p>
               <p className="text-lg text-gray-200 max-w-2xl mb-8 leading-relaxed">
-                Hot New York Deli food on the playa. A 70&deg; cooling center for thousands.
-                And a kind, safe home base for your Burning Man adventure.
+                We cook hot New York deli food and we give it away. It started on the playa;
+                now the Rats set up at regional burns, decomps and parties back home too.
+                Different events, different gear, same gift.
               </p>
               <div className="flex flex-wrap items-center gap-4">
                 <Link
-                  href="/intake"
+                  href="/events"
                   className="inline-flex items-center px-8 py-4 bg-[#fccc0a] text-black font-black tracking-wide text-lg uppercase hover:bg-[#ffd93d] transition-all border-2 border-[#fccc0a] shadow-[4px_4px_0px_0px_rgba(252,204,10,0.4)] hover:shadow-[2px_2px_0px_0px_rgba(252,204,10,0.4)] hover:translate-x-[2px] hover:translate-y-[2px]"
                 >
-                  Register Now
+                  See Our Events
+                </Link>
+                <Link
+                  href="/intake"
+                  className="inline-flex items-center px-6 py-4 bg-transparent text-[#fccc0a] font-black tracking-wide text-sm uppercase hover:bg-[#fccc0a]/10 transition-all border-2 border-[#fccc0a]/60 hover:border-[#fccc0a]"
+                >
+                  Register for Burning Man
                 </Link>
                 <a
                   href="https://www.instagram.com/campnycdeli"
@@ -174,27 +250,27 @@ export default function HomePage() {
               Our Mission
             </h2>
             <p className="text-xl md:text-2xl font-medium leading-relaxed text-gray-100">
-              Our camp&apos;s gift to playa is <span className="text-[#fccc0a] nyc-neon-subtle">hot New York Deli food</span> served 
-              for two hours per day, six days during Burning Man — Friday through Sunday. Over the entire 
-              Burn, NYC Deli serves nutritious food to approximately <span className="text-[#fccc0a] nyc-neon-subtle">5,500 people</span>.
+              NYC Deli Rats exists to hand people <span className="text-[#fccc0a] nyc-neon-subtle">hot New York deli food</span> as 
+              a gift. Not a trade, not a sale, not a favor owed — a gift. That is the whole point, and it
+              travels with us to every event we show up to.
             </p>
             <p className="text-lg text-gray-300 mt-4 leading-relaxed">
-              We also provide a public <span className="text-[#fccc0a]">70&deg; cooling center</span> in a dedicated 
-              100-person circus tent during daylight hours, cumulatively serving several thousand more 
-              burners during the event.
+              At Burning Man that means a full camp and roughly <span className="text-[#fccc0a]">5,500 meals</span> plus 
+              a public 70&deg; cooling center. At a regional burn or a re-entry party it means a smaller
+              kitchen, a shorter line and a lot less gear. The scale changes. The gift doesn&apos;t.
             </p>
             <p className="text-base text-gray-400 mt-6 italic">
-              The playa appreciates our camp&apos;s gifts and we have fun delivering them!
+              People appreciate our gifts and we have fun delivering them!
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm">
               <span className="px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/40">
-                5,500 meals served
+                Always free, always a gift
               </span>
               <span className="px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/40">
-                Public cooling center
+                Multiple events per year
               </span>
               <span className="px-4 py-2 bg-yellow-500/10 text-[#fccc0a] border border-yellow-500/40">
-                ~70 person camp
+                One permanent crew
               </span>
             </div>
           </div>
@@ -216,11 +292,131 @@ export default function HomePage() {
 
       <div className="nyc-tag-stripe" />
 
+      {/* Where We Serve — the Deli is not one event */}
+      <section className="relative py-16 px-4 nyc-brick-wall nyc-grime">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
+            Where We Serve
+          </h2>
+          <p className="text-center text-gray-300 mb-12 max-w-2xl mx-auto">
+            The Deli started at Burning Man, but the Rats don&apos;t hibernate for eleven months.
+            Every event gets the version of the Deli that fits it.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            {whereWeServe.map((event, i) => (
+              <div
+                key={event.name}
+                className="bg-black/80 border border-white/10 p-6 nyc-poster backdrop-blur-sm"
+                style={{ transform: `rotate(${i % 2 === 0 ? '-0.4' : '0.4'}deg)` }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-4xl">{event.icon}</span>
+                    <div>
+                      <h3 className="text-xl font-black text-white uppercase">{event.name}</h3>
+                      <p className="text-xs uppercase tracking-widest text-gray-500">{event.place}</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-black uppercase px-3 py-1 border whitespace-nowrap ${event.scaleColor}`}>
+                    {event.scale}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-400 mt-4 leading-relaxed">{event.description}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 text-center">
+            <Link
+              href="/events"
+              className="inline-flex items-center px-6 py-3 bg-[#fccc0a] text-black font-black uppercase tracking-wide text-sm hover:bg-[#ffd93d] transition-colors"
+            >
+              What&apos;s open right now &rarr;
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Two Tiers of Service — Burning Man vs. everything else */}
+      <section className="relative py-16 px-4 nyc-concrete-wall nyc-grime nyc-drips">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
+            Two Kitchens, One Gift
+          </h2>
+          <p className="text-center text-gray-300 mb-12 max-w-2xl mx-auto">
+            Burning Man is a city we build from scratch. Everything else is a road show.
+            Here&apos;s the honest difference in what we bring.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {serviceTiers.map((tier) => (
+              <div key={tier.label} className={`bg-black/80 border-l-4 ${tier.accent} p-6 backdrop-blur-sm`}>
+                <h3 className={`text-xl font-black uppercase ${tier.heading}`}>{tier.label}</h3>
+                <p className="text-xs uppercase tracking-widest text-gray-500 mb-4">{tier.tagline}</p>
+                <ul className="space-y-3 text-sm text-gray-300">
+                  {tier.points.map((point) => (
+                    <li key={point} className="flex items-start gap-2">
+                      <span className="text-[#fccc0a] font-bold flex-shrink-0">&#9642;</span>
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-gray-400 mt-8 max-w-2xl mx-auto italic">
+            Whichever version shows up, nobody pays, nobody tips, and nobody owes us anything.
+          </p>
+        </div>
+      </section>
+
+      {/* The Customer Is Always Wrong — house rule, every event */}
+      <section className="relative overflow-hidden nyc-photo-section py-14">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/Images/nyc/street2.jpg')" }}
+        />
+        <div className="relative z-10 max-w-3xl mx-auto px-4 text-center">
+          <h2 className="font-graffiti text-3xl md:text-5xl text-[#fccc0a] nyc-spray tracking-wider mb-4">
+            THE CUSTOMER IS ALWAYS WRONG
+          </h2>
+          <p className="text-gray-200 leading-relaxed">
+            House rule at every event we work. There is no customer, because there is no sale —
+            there&apos;s a gift, a line, and whatever the crew is cooking that day. No menu
+            negotiations, no substitutions, no complaints department. Take the sandwich, say
+            hi, keep moving.
+          </p>
+        </div>
+      </section>
+
+      <div className="nyc-tag-stripe" />
+
+      {/* Burning Man scope marker — everything below is BM-specific */}
+      <section className="bg-[#0a0a0a] py-12 px-4 border-y-2 border-[#fccc0a]/30" id="burning-man">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-block mb-4 px-3 py-1 bg-[#fccc0a] text-black text-xs font-black uppercase tracking-[0.3em]">
+            Our Flagship
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-white mb-4">
+            Burning Man
+          </h2>
+          <p className="text-gray-300 leading-relaxed">
+            Everything below covers the Burning Man camp specifically — the ~70 person roster,
+            camp fees, tents, build week and the arrival rules that come with building a
+            full camp in the desert. Our other events are far lighter and have their own
+            details on each <Link href="/events" className="text-[#fccc0a] underline hover:text-[#ffd93d]">event page</Link>.
+          </p>
+        </div>
+      </section>
+
+
       {/* Camp Overview — Brick wall */}
       <section className="relative py-16 px-4 nyc-brick-wall nyc-grime">
         <div className="relative z-10 max-w-7xl mx-auto">
           <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
-            About Camp
+            About the Burn Camp
           </h2>
           <p className="text-center text-gray-300 mb-12 max-w-2xl mx-auto">
             Camp NYC Deli at Burning Man 2026 will be a ~70 person camp: 70% veteran burners and 
@@ -252,11 +448,12 @@ export default function HomePage() {
       <section className="relative py-16 px-4 nyc-tagged nyc-grime bg-[#111]">
         <div className="relative z-10 max-w-7xl mx-auto">
           <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-2 text-[#fccc0a] nyc-stencil">
-            Camp Amenities
+            Burning Man Camp Amenities
           </h2>
           <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
-            Camp NYC Deli strives to provide our campers a kind, safe and nurturing home 
-            to enable your healthy Burning Man adventure in the desert.
+            On playa, Camp NYC Deli strives to provide our campers a kind, safe and nurturing home 
+            to enable your healthy Burning Man adventure in the desert. Smaller events won&apos;t have
+            most of this — that&apos;s the tradeoff for a lighter build.
           </p>
           
           <div className="max-w-5xl mx-auto nyc-menu-board p-6 md:p-10 relative">
@@ -290,7 +487,7 @@ export default function HomePage() {
       <section className="relative py-16 px-4 nyc-concrete-wall nyc-grime nyc-drips">
         <div className="relative z-10 max-w-7xl mx-auto">
           <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center mb-12 text-[#fccc0a] nyc-stencil">
-            Camp Fees &amp; Tickets
+            Burning Man Camp Fees &amp; Tickets
           </h2>
           
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -498,9 +695,10 @@ export default function HomePage() {
               Volunteer Commitment
             </h2>
             <p className="text-lg text-gray-200 mb-6">
-              All campers volunteer <strong className="text-[#fccc0a]">three 2.5-hour shifts</strong> during burn week to make
+              At Burning Man, all campers volunteer <strong className="text-[#fccc0a]">three 2.5-hour shifts</strong> during burn week to make
               our playa gift and camp happen. As Burning Man camps go, this is a very reasonable 
-              volunteer requirement.
+              volunteer requirement. At smaller events it&apos;s usually a single shift, or just
+              whoever&apos;s around.
             </p>
             <p className="text-sm text-gray-500 italic">
               You&apos;ll be asked to be sober during your shifts. There&apos;s only three of them.
@@ -518,7 +716,8 @@ export default function HomePage() {
             Camp System Modules
           </h2>
           <p className="text-center text-gray-300 mb-12">
-            Nine modules to manage your burn — registration, profile, directory, maps, events, kitchen, schedule, and build week.
+            The tooling the Rats run on. Each event switches on only the modules it actually
+            needs — a re-entry party doesn&apos;t need an electrical load calculator.
           </p>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -549,9 +748,12 @@ export default function HomePage() {
       {/* Important Dates — Subway schedule board */}
       <section className="bg-[#0a0a0a] py-16 px-4">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center text-[#fccc0a] mb-12 nyc-neon-subtle">
+          <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-center text-[#fccc0a] mb-2 nyc-neon-subtle">
             Critical Dates
           </h2>
+          <p className="text-center text-gray-400 mb-12 text-sm uppercase tracking-widest">
+            Burning Man 2026
+          </p>
           
           <div className="grid grid-cols-2 md:grid-cols-5 gap-6 max-w-5xl mx-auto">
             {[
@@ -627,17 +829,26 @@ export default function HomePage() {
             Ready to Join?
           </h2>
           <p className="text-lg mb-4 text-black/80 leading-relaxed">
-            Friends and partners traveling together must each register individually.
+            Burning Man registration is below. Friends and partners traveling together must each register individually.
           </p>
           <p className="text-base mb-8 text-black/60 leading-relaxed">
-            Complete your registration now. Every field matters. Every deadline is real.
+            Every field matters. Every deadline is real. Looking for a smaller event instead?
+            Check what&apos;s open on the events page — most of them are a much lighter lift.
           </p>
-          <Link
-            href="/intake"
-            className="inline-flex items-center px-8 py-4 bg-black text-[#fccc0a] font-black tracking-wide text-lg uppercase hover:bg-gray-900 transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]"
-          >
-            Start Registration &rarr;
-          </Link>
+          <div className="flex flex-wrap justify-center items-center gap-4">
+            <Link
+              href="/intake"
+              className="inline-flex items-center px-8 py-4 bg-black text-[#fccc0a] font-black tracking-wide text-lg uppercase hover:bg-gray-900 transition-all border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]"
+            >
+              Start Registration &rarr;
+            </Link>
+            <Link
+              href="/events"
+              className="inline-flex items-center px-6 py-4 bg-transparent text-black font-black tracking-wide text-sm uppercase hover:bg-black/10 transition-all border-2 border-black"
+            >
+              Browse All Events
+            </Link>
+          </div>
         </div>
       </section>
     </div>
