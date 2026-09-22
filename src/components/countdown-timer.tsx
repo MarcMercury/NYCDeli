@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useSyncExternalStore } from 'react'
 import Image from 'next/image'
-import { fetchCountdownTarget } from '@/lib/active-event'
+import { fetchCountdownTargets, type CountdownTarget } from '@/lib/active-event'
 
-function getTimeLeft(target: Date) {
-  const now = new Date()
-  const diff = target.getTime() - now.getTime()
+function getTimeLeft(target: Date, now: number) {
+  const diff = target.getTime() - now
 
   if (diff <= 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true }
@@ -19,6 +18,8 @@ function getTimeLeft(target: Date) {
 
   return { days, hours, minutes, seconds, expired: false }
 }
+
+type TimeLeft = ReturnType<typeof getTimeLeft>
 
 const emptySubscribe = () => () => {}
 
@@ -38,11 +39,9 @@ function SprayPaintRat() {
   )
 }
 
-function CountdownDisplay({ values }: {
-  values?: { days: number; hours: number; minutes: number; seconds: number };
-  placeholder?: boolean;
-}) {
-  const items = values
+/** One labelled clock. `values` omitted renders the pre-hydration placeholder. */
+function Clock({ label, icon, values }: { label: string; icon: string; values?: TimeLeft }) {
+  const items = values && !values.expired
     ? [
         { value: values.days, label: 'DAYS' },
         { value: values.hours, label: 'HRS' },
@@ -56,6 +55,30 @@ function CountdownDisplay({ values }: {
         { value: '--', label: 'SEC' },
       ]
 
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <h2 className="graffiti-title shrink-0">
+        <span className="graffiti-text-compact">
+          {values?.expired ? `💥 ${label.toUpperCase()} — BOOM.` : `${icon} ${label} in:`}
+        </span>
+      </h2>
+      <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+        {items.map(({ value, label: unit }) => (
+          <div key={unit} className="flex flex-col items-center">
+            <div className="graffiti-number-block-compact">
+              <span className="graffiti-number-compact">
+                {typeof value === 'number' ? String(value).padStart(2, '0') : value}
+              </span>
+            </div>
+            <span className="graffiti-label-compact">{unit}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CountdownDisplay({ clocks }: { clocks: { key: string; label: string; icon: string; values?: TimeLeft }[] }) {
   return (
     <section className="countdown-brick-wall relative overflow-hidden border-b-4 border-black">
       {/* Black background with spray paint texture */}
@@ -76,31 +99,13 @@ function CountdownDisplay({ values }: {
 
       <div className="relative z-10 py-4 md:py-5 px-4">
         <div className="max-w-6xl mx-auto">
-          {/* Single-line: title + countdown + rat */}
-          <div className="flex items-center justify-center gap-3 md:gap-6 flex-wrap md:flex-nowrap">
-            {/* Graffiti title */}
-            <h2 className="graffiti-title shrink-0">
-              <span className="graffiti-text-compact">
-                💣 This page will self destruct in:
-              </span>
-            </h2>
+          <div className="flex items-center justify-center gap-4 md:gap-10 flex-wrap md:flex-nowrap">
+            {clocks.map(clock => (
+              <Clock key={clock.key} label={clock.label} icon={clock.icon} values={clock.values} />
+            ))}
 
-            {/* Countdown numbers */}
-            <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
-              {items.map(({ value, label }) => (
-                <div key={label} className="flex flex-col items-center">
-                  <div className="graffiti-number-block-compact">
-                    <span className="graffiti-number-compact">
-                      {typeof value === 'number' ? String(value).padStart(2, '0') : value}
-                    </span>
-                  </div>
-                  <span className="graffiti-label-compact">{label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Rat next to countdown */}
-            <div className="hidden sm:block relative shrink-0">
+            {/* Rat next to the clocks */}
+            <div className="hidden lg:block relative shrink-0">
               <SprayPaintRat />
             </div>
           </div>
@@ -121,56 +126,42 @@ function CountdownDisplay({ values }: {
 }
 
 export function CountdownTimer() {
-  const [target, setTarget] = useState<Date | null>(null)
-  const [eventName, setEventName] = useState<string | null>(null)
+  const [targets, setTargets] = useState<CountdownTarget[]>([])
   const [resolved, setResolved] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(new Date()))
+  const [now, setNow] = useState(() => Date.now())
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   useEffect(() => {
     let active = true
-    fetchCountdownTarget().then(result => {
+    fetchCountdownTargets().then(result => {
       if (!active) return
-      setTarget(result?.date ?? null)
-      setEventName(result?.event.name ?? null)
+      setTargets(result)
       setResolved(true)
     })
     return () => { active = false }
   }, [])
 
   useEffect(() => {
-    if (!target) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reflect new target immediately
-    setTimeLeft(getTimeLeft(target))
-    const interval = setInterval(() => {
-      setTimeLeft(getTimeLeft(target))
-    }, 1000)
+    if (targets.length === 0) return
+    const interval = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(interval)
-  }, [target])
+  }, [targets])
 
   if (!mounted || !resolved) {
-    return <CountdownDisplay placeholder />
+    return <CountdownDisplay clocks={[{ key: 'placeholder', icon: '💣', label: 'This page will self destruct' }]} />
   }
 
   // Information stage: nothing is coming up, so don't count down to anything.
-  if (!target) return null
+  if (targets.length === 0) return null
 
-  if (timeLeft.expired) {
-    return (
-      <section className="countdown-brick-wall relative overflow-hidden border-b-4 border-black">
-        <div className="absolute inset-0 bg-black">
-          <div className="absolute inset-0 nyc-grime" />
-        </div>
-        <div className="relative z-10 py-4 md:py-5 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="graffiti-text-main text-2xl md:text-4xl animate-pulse">
-              💥 BOOM. {eventName ? eventName.toUpperCase() : 'SEE YOU ON THE PLAYA'}. 💥
-            </h2>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  return <CountdownDisplay values={timeLeft} />
+  return (
+    <CountdownDisplay
+      clocks={targets.map(target => ({
+        key: target.id,
+        label: target.label,
+        icon: '🔥',
+        values: getTimeLeft(target.date, now),
+      }))}
+    />
+  )
 }

@@ -62,10 +62,26 @@ export function isInformationStage(event: EventRow | null): boolean {
   return !event || stageMeta(event.stage).readOnly
 }
 
-/** The event the app should count down to, or null when nothing is upcoming. */
-export async function fetchCountdownTarget(
+/** A moment the home page counts down to. */
+export interface CountdownTarget {
+  id: string
+  /** What is being counted down to, e.g. "The Man Burns" or "Love Burn 2027". */
+  label: string
+  date: Date
+  event: EventRow
+}
+
+/**
+ * The upcoming moments worth a countdown, soonest first.
+ *
+ * An event is normally counted down to by its start date, except that a
+ * Burning Man event counts down to the Man burn when `config.key_dates.man_burn`
+ * says when that is — which is what burningman.org itself does.
+ */
+export async function fetchCountdownTargets(
+  limit = 2,
   client?: DeliSupabase
-): Promise<{ date: Date; event: EventRow } | null> {
+): Promise<CountdownTarget[]> {
   const today = new Date().toISOString().slice(0, 10)
   const { data } = await db(client)
     .from('events')
@@ -73,19 +89,55 @@ export async function fetchCountdownTarget(
     .neq('stage', 'closed')
     .gte('start_date', today)
     .order('start_date', { ascending: true })
-    .limit(1)
 
-  const event = ((data as EventRow[] | null) ?? [])[0]
-  if (!event?.start_date) return null
+  const targets: CountdownTarget[] = []
 
-  // Bare dates are local to the event, not the viewer.
-  const date = new Date(`${event.start_date}T00:00:00${offsetFor(event.timezone)}`)
-  return Number.isNaN(date.getTime()) ? null : { date, event }
+  for (const event of (data as EventRow[] | null) ?? []) {
+    const burn = event.kind === 'burning_man' ? configDate(event, 'man_burn') : null
+    const day = burn && burn >= today ? burn : event.start_date
+    if (!day) continue
+
+    const date = zonedMidnight(day, event.timezone)
+    if (!date) continue
+
+    targets.push({
+      id: event.id,
+      label: burn && burn >= today ? 'The Man Burns' : event.name,
+      date,
+      event,
+    })
+  }
+
+  return targets.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, limit)
 }
 
-/** Crude but adequate: the only timezones the camp operates in. */
-function offsetFor(timezone: string): string {
-  return timezone === 'America/New_York' ? '-04:00' : '-07:00'
+function configDate(event: EventRow, key: string): string | null {
+  const keyDates = (event.config as { key_dates?: Record<string, unknown> } | null)?.key_dates
+  const value = keyDates?.[key]
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+}
+
+/** Midnight on a bare date, read in the event's timezone rather than the viewer's. */
+function zonedMidnight(day: string, timezone: string): Date | null {
+  const asUtc = new Date(`${day}T00:00:00Z`)
+  if (Number.isNaN(asUtc.getTime())) return null
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(asUtc)
+
+  const get = (type: string) => Number(parts.find(p => p.type === type)?.value ?? NaN)
+  const wallClock = Date.UTC(
+    get('year'), get('month') - 1, get('day'),
+    get('hour') % 24, get('minute'), get('second')
+  )
+  if (Number.isNaN(wallClock)) return null
+
+  const offset = wallClock - asUtc.getTime()
+  return new Date(asUtc.getTime() - offset)
 }
 
 // ---------------------------------------------------------------------------
