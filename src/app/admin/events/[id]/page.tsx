@@ -28,6 +28,7 @@ import {
   updateEventAction,
 } from '@/app/actions/events'
 import { createClient } from '@/lib/supabase/client'
+import { EventPhotoAlbumsAdmin } from '@/components/event-photo-albums'
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Checkbox, Input, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type {
@@ -40,7 +41,7 @@ import type {
   PersonRow,
 } from '@/types/database'
 
-type Tab = 'lifecycle' | 'details' | 'modules' | 'applications' | 'participants' | 'wrap_up'
+type Tab = 'lifecycle' | 'details' | 'modules' | 'applications' | 'participants' | 'photos' | 'wrap_up'
 
 export default function AdminEventDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -105,6 +106,7 @@ export default function AdminEventDetailPage() {
     { key: 'modules', label: 'Modules' },
     { key: 'applications', label: 'Applications', count: counts?.applications },
     { key: 'participants', label: 'Participants', count: counts?.participants },
+    { key: 'photos', label: 'Photos' },
     { key: 'wrap_up', label: 'Wrap-Up', count: feedback.length },
   ]
 
@@ -206,6 +208,8 @@ export default function AdminEventDetailPage() {
             onRemove={participantId => run(() => removeParticipantAction(participantId), 'Participant removed.')}
           />
         )}
+
+        {tab === 'photos' && <EventPhotoAlbumsAdmin eventId={event.id} />}
 
         {tab === 'wrap_up' && (
           <WrapUpTab

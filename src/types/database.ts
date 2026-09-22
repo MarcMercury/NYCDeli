@@ -525,6 +525,12 @@ export interface Database {
         Update: Partial<Omit<EventStageHistoryRow, 'id' | 'created_at'>>
         Relationships: []
       }
+      event_photo_albums: {
+        Row: EventPhotoAlbumRow
+        Insert: EventPhotoAlbumInsert
+        Update: EventPhotoAlbumUpdate
+        Relationships: []
+      }
       people: {
         Row: PersonRow
         Insert: PersonInsert
@@ -1802,6 +1808,44 @@ export type EventUpdate = Partial<Omit<EventInsert, 'slug'>> & {
   closed_by?: string | null
   retro_notes?: string | null
 }
+
+export type PhotoAlbumProvider =
+  | 'google_photos'
+  | 'google_drive'
+  | 'dropbox'
+  | 'icloud'
+  | 'smugmug'
+  | 'flickr'
+  | 'other'
+
+/** An externally hosted photo drive linked to an event; outlives the event. */
+export interface EventPhotoAlbumRow {
+  id: string
+  created_at: string
+  updated_at: string
+  event_id: string
+  label: string
+  url: string
+  provider: PhotoAlbumProvider
+  description: string | null
+  /** False = signed-in approved members only (enforced by RLS). */
+  is_public: boolean
+  sort_order: number
+  created_by: string | null
+}
+
+export interface EventPhotoAlbumInsert {
+  event_id: string
+  label: string
+  url: string
+  provider?: PhotoAlbumProvider
+  description?: string | null
+  is_public?: boolean
+  sort_order?: number
+  created_by?: string | null
+}
+
+export type EventPhotoAlbumUpdate = Partial<Omit<EventPhotoAlbumInsert, 'event_id'>>
 
 export interface EventStageHistoryRow {
   id: string

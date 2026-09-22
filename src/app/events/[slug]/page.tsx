@@ -15,6 +15,7 @@ import {
 } from '@/lib/events'
 import { fetchPersonByUserId, fetchPersonHistory, summarizeHistory } from '@/lib/people'
 import { applyToEventAction, submitEventFeedbackAction } from '@/app/actions/events'
+import { EventPhotoAlbums } from '@/components/event-photo-albums'
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type {
@@ -121,6 +122,8 @@ export default function EventDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <EventPhotoAlbums eventId={event.id} />
 
       {event.stage === 'closed' && (
         <Alert variant="info" title="Archived event" className="mt-6">
