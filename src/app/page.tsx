@@ -429,11 +429,12 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-black text-white mb-1">Event Week Camper</h3>
               <p className="text-sm text-gray-400 mb-4">Arriving for the event</p>
-              <div className="text-4xl font-black text-[#fccc0a] mb-4 nyc-neon-subtle">$900</div>
+              <div className="text-3xl font-black text-[#fccc0a] mb-1 nyc-neon-subtle">Typically Around $900</div>
+              <p className="text-xs text-gray-400 mb-4">(inflation&apos;s a bitch)</p>
               <ul className="text-sm space-y-2 text-gray-300">
                 <li>All camp amenities included</li>
                 <li>Daily meal during 6 days of food service</li>
-                <li>Can be split into two payments: 5/1 and 6/1</li>
+                <li>Can be split into two payments: 6/1 and 7/1</li>
               </ul>
             </div>
 
@@ -454,12 +455,22 @@ export default function HomePage() {
             </div>
           </div>
 
+          <div className="mt-8 max-w-4xl mx-auto">
+            <div className="bg-black/70 border border-white/10 p-6">
+              <p className="text-sm text-gray-300">
+                <strong className="text-white">Heads up:</strong> Camp fees fluctuate based on prices for
+                things like food, fuel, and Org fees. Our goal is break even, so whatever the math maths,
+                we math.
+              </p>
+            </div>
+          </div>
+
           <div className="mt-8 max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
             <div className="bg-black/70 border border-white/10 p-6">
               <h3 className="font-black uppercase text-sm mb-3 text-[#fccc0a]">Payment Schedule</h3>
               <ul className="text-sm space-y-2 text-gray-300">
-                <li><strong className="text-white">Due:</strong> May 1, 2026</li>
-                <li><strong className="text-white">Split option:</strong> Half on 5/1, half on 6/1</li>
+                <li><strong className="text-white">1st payment:</strong> Due June 1, 2026</li>
+                <li><strong className="text-white">2nd payment:</strong> Due July 1, 2026</li>
               </ul>
             </div>
             <div className="bg-black/70 border border-white/10 p-6">
