@@ -7,6 +7,7 @@ import {
   Badge, Tabs, TabPanel, Alert, Button, Input
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
 import { cn, formatDate, formatTime } from '@/lib/utils'
 import type {
   KitchenRole, KitchenShift, ScheduleAssignment, Camper,
@@ -320,17 +321,21 @@ export default function KitchenPage() {
     const supabase = createClient()
     
     // Fetch roles
-    const { data: rolesData } = await supabase
-      .from('kitchen_roles')
-      .select('*')
-      .order('name')
+    const { data: rolesData } = await withOpsScope(
+      supabase
+        .from('kitchen_roles')
+        .select('*')
+        .order('name')
+    )
 
     // Fetch shifts with role info
-    const { data: shiftsData } = await supabase
-      .from('kitchen_shifts')
-      .select('*')
-      .order('date')
-      .order('start_time')
+    const { data: shiftsData } = await withOpsScope(
+      supabase
+        .from('kitchen_shifts')
+        .select('*')
+        .order('date')
+        .order('start_time')
+    )
 
     // Fetch assignments
     const { data: assignmentsData } = await supabase
@@ -353,11 +358,12 @@ export default function KitchenPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data: camper } = await supabase
-          .from('campers')
-          .select('id, full_name')
-          .eq('email', user.email!)
-          .single() as unknown as { data: { id: string; full_name: string } | null }
+        const { data: camper } = await withOpsScope(
+          supabase
+            .from('campers')
+            .select('id, full_name')
+            .eq('email', user.email!)
+        ).then(q => q.maybeSingle()) as unknown as { data: { id: string; full_name: string } | null }
         setCurrentUser({ id: user.id, camperId: camper?.id || null, fullName: camper?.full_name || null })
         
         // Check if user is admin
@@ -398,11 +404,12 @@ export default function KitchenPage() {
         let cid: string | null = null
         const { data: { user: u2 } } = await supabase.auth.getUser()
         if (u2?.email) {
-          const { data: c2 } = await supabase
-            .from('campers')
-            .select('id')
-            .eq('email', u2.email)
-            .maybeSingle() as unknown as { data: { id: string } | null }
+          const { data: c2 } = await withOpsScope(
+            supabase
+              .from('campers')
+              .select('id')
+              .eq('email', u2.email)
+          ).then(q => q.maybeSingle()) as unknown as { data: { id: string } | null }
           cid = c2?.id ?? null
         }
         if (cid) {

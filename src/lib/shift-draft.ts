@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { getOpsEventId, withOpsScope } from '@/lib/active-event'
 import type {
   ShiftDraftRow,
   ShiftDraftOrderRow,
@@ -206,13 +207,14 @@ const STATUSES_OPEN = ['open', 'frozen', 'drafted'] as const
 /** Fetch the most recent non-archived draft. */
 export async function fetchActiveDraft(): Promise<ShiftDraftRow | null> {
   const supabase = createClient()
-  const { data } = await supabase
-    .from('shift_drafts')
-    .select('*')
-    .in('status', STATUSES_OPEN as unknown as string[])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const { data } = await withOpsScope(
+    supabase
+      .from('shift_drafts')
+      .select('*')
+      .in('status', STATUSES_OPEN as unknown as string[])
+      .order('created_at', { ascending: false })
+      .limit(1)
+  ).then(q => q.maybeSingle())
   return (data as ShiftDraftRow | null) ?? null
 }
 
@@ -230,10 +232,12 @@ export async function fetchDraft(draftId: string): Promise<ShiftDraftRow | null>
 /** List all drafts (admin overview). */
 export async function fetchAllDrafts(): Promise<ShiftDraftRow[]> {
   const supabase = createClient()
-  const { data } = await supabase
-    .from('shift_drafts')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const { data } = await withOpsScope(
+    supabase
+      .from('shift_drafts')
+      .select('*')
+      .order('created_at', { ascending: false })
+  )
   return (data as ShiftDraftRow[] | null) ?? []
 }
 
@@ -259,6 +263,7 @@ export async function createDraft(input: CreateDraftInput): Promise<ShiftDraftRo
       strike_quota: input.strike_quota ?? 1,
       snake_start_round: input.snake_start_round ?? 3,
       created_by: input.created_by,
+      event_id: await getOpsEventId(),
     } as never)
     .select('*')
     .single()

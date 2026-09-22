@@ -391,7 +391,107 @@ export async function decideApplicationAction(
     await supabase.from('people').update({ status: 'member' } as never).eq('id', application.person_id)
   }
 
+  await syncAccountWithDecision(supabase, application.person_id, application.camper_id, status, user.id, note)
+
   revalidatePath('/admin/events')
+  revalidatePath(`/admin/events/${application.event_id}`)
+  revalidatePath('/admin/applicants')
+  return ok()
+}
+
+/**
+ * Keep the legacy `user_profiles` approval gate in step with an application
+ * decision. Until the pending-role flow is retired these are two views of the
+ * same judgement, and they must not disagree.
+ */
+async function syncAccountWithDecision(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  personId: string,
+  camperId: string | null,
+  status: ApplicationStatus,
+  adminId: string,
+  note?: string
+) {
+  const { data: personData } = await supabase.from('people').select('user_id').eq('id', personId).maybeSingle()
+  const userId = (personData as { user_id: string | null } | null)?.user_id
+  if (!userId) return
+
+  if (status === 'approved') {
+    await supabase
+      .from('user_profiles')
+      .update({
+        role: 'user',
+        approved_at: new Date().toISOString(),
+        approved_by: adminId,
+        denied_at: null,
+        denied_reason: null,
+        ...(camperId ? { camper_id: camperId } : {}),
+      } as never)
+      .eq('id', userId)
+      .eq('role', 'pending')
+  } else if (status === 'denied') {
+    await supabase
+      .from('user_profiles')
+      .update({
+        role: 'pending',
+        denied_at: new Date().toISOString(),
+        denied_reason: note?.trim() || 'No reason provided',
+      } as never)
+      .eq('id', userId)
+  }
+}
+
+/**
+ * The reverse bridge: an approve/deny done on the legacy applicants screen is
+ * recorded against the person's application for the current event.
+ */
+export async function syncApplicantDecisionAction(
+  email: string,
+  decision: 'approved' | 'denied',
+  note?: string
+): Promise<ActionResult> {
+  const { user } = await requireAdmin()
+  const supabase = await createClient()
+
+  const { data: personData } = await supabase.from('people').select('id').ilike('email', email.trim()).maybeSingle()
+  const person = personData as { id: string } | null
+  if (!person) return ok()
+
+  const { data: appData } = await supabase
+    .from('event_applications')
+    .select('id, event_id, camper_id')
+    .eq('person_id', person.id)
+    .in('status', ['draft', 'submitted', 'under_review', 'waitlisted'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const application = ((appData as { id: string; event_id: string; camper_id: string | null }[] | null) ?? [])[0]
+  if (!application) return ok()
+
+  const { error } = await supabase
+    .from('event_applications')
+    .update({
+      status: decision,
+      decided_at: new Date().toISOString(),
+      decided_by: user.id,
+      decision_note: note?.trim() || null,
+    } as never)
+    .eq('id', application.id)
+  if (error) return fail(error.message)
+
+  if (decision === 'approved') {
+    await supabase.from('event_participants').upsert(
+      {
+        event_id: application.event_id,
+        person_id: person.id,
+        application_id: application.id,
+        camper_id: application.camper_id,
+        status: 'confirmed',
+      } as never,
+      { onConflict: 'event_id,person_id' }
+    )
+    await supabase.from('people').update({ status: 'member' } as never).eq('id', person.id)
+  }
+
   revalidatePath(`/admin/events/${application.event_id}`)
   return ok()
 }

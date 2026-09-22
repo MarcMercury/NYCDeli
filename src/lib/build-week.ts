@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
 import type {
   BuildStage,
   BuildGoal,
@@ -27,10 +28,12 @@ export type RosterMember = {
 
 export async function fetchBuildStages(): Promise<BuildStage[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('build_stages')
-    .select('*')
-    .order('sort_order')
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('build_stages')
+      .select('*')
+      .order('sort_order')
+  )
   if (error) throw error
   return (data as BuildStage[]) || []
 }
@@ -58,10 +61,12 @@ export async function fetchBuildStagesWithGoals(): Promise<BuildStageWithGoals[]
 
 export async function fetchBuildResources(): Promise<BuildResource[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('build_resources')
-    .select('*')
-    .order('sort_order')
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('build_resources')
+      .select('*')
+      .order('sort_order')
+  )
   if (error) throw error
   return (data as BuildResource[]) || []
 }
@@ -99,11 +104,13 @@ export async function fetchBuildQuestions(): Promise<BuildQuestion[]> {
 
 export async function fetchBuildWeekBuilders(): Promise<Camper[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('campers')
-    .select('*')
-    .eq('build_week_attending', true)
-    .order('arrival_date')
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('campers')
+      .select('*')
+      .eq('build_week_attending', true)
+      .order('arrival_date')
+  )
   if (error) throw error
   return (data as Camper[]) || []
 }
@@ -277,11 +284,13 @@ export async function deleteBuildResource(resourceId: string) {
 
 export async function fetchBuildInventory(): Promise<BuildInventory[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('build_inventory')
-    .select('*')
-    .order('category')
-    .order('sort_order')
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('build_inventory')
+      .select('*')
+      .order('category')
+      .order('sort_order')
+  )
   if (error) throw error
   return (data as BuildInventory[]) || []
 }
@@ -577,10 +586,12 @@ export const SCHEDULE_CATEGORY_COLORS: Record<string, string> = {
 
 export async function fetchBuildSchedule(): Promise<BuildScheduleItem[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('build_schedule_items')
-    .select('*')
-    .order('sort_order')
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('build_schedule_items')
+      .select('*')
+      .order('sort_order')
+  )
   if (error) throw error
   return (data as BuildScheduleItem[]) || []
 }
@@ -641,11 +652,12 @@ export async function reorderScheduleItems(
 
 export async function fetchElectricalConfig(): Promise<ElectricalLoadConfig | null> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('electrical_load_config')
-    .select('*')
-    .limit(1)
-    .single()
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('electrical_load_config')
+      .select('*')
+      .limit(1)
+  ).then(q => q.maybeSingle())
   if (error && error.code !== 'PGRST116') throw error
   return data as ElectricalLoadConfig | null
 }

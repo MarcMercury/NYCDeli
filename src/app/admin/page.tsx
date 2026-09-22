@@ -12,6 +12,7 @@ import { updateCamperAction, deleteCamperAction, deleteUserEntityAction, updateS
 import { getAllDraftShiftCategories, applyDraftOverrides, isCategoryDeleted, getPositionOverride, type DraftShiftCategory, type DraftShiftPosition, type ShiftOverrides } from '@/lib/shift-draft'
 import AddApplicantForm from './applicants/add-applicant-form'
 import { resolveTentMateIds } from '@/lib/tent-mates'
+import { withOpsScope } from '@/lib/active-event'
 import { SETTINGS_SCHEMA, SETTING_GROUPS, MAINTENANCE_KEY } from '@/lib/settings'
 import type { Camper, SystemSetting, KitchenShift, ScheduleAssignment, CamperUpdate, UserProfileRow, UserRole } from '@/types/database'
 
@@ -77,10 +78,10 @@ export default function AdminPage() {
     const errors: Record<string, string> = {}
     
     const [campersRes, usersRes, settingsRes, shiftsRes, assignmentsRes, tasksRes] = await Promise.all([
-      supabase.from('campers').select('*').order('created_at', { ascending: false }),
+      withOpsScope(supabase.from('campers').select('*').order('created_at', { ascending: false })),
       supabase.from('user_profiles').select('*').order('created_at', { ascending: false }),
       supabase.from('system_settings').select('*').order('key'),
-      supabase.from('kitchen_shifts').select('*').order('date'),
+      withOpsScope(supabase.from('kitchen_shifts').select('*').order('date')),
       supabase.from('schedule_assignments').select('*'),
       supabase.from('build_tasks').select('status'),
     ])

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
 import { buildTentShareGroups } from '@/lib/union-find'
 
 /**
@@ -97,12 +98,14 @@ export async function computeTentNeeds(
 ): Promise<TentNeed[]> {
   const supabase = createClient()
   const placed = new Set<string>(placedCamperIds)
-  const { data, error } = await supabase
-    .from('campers')
-    .select(
-      'id, full_name, email, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5, tent_entrance_count, tent_opening_side, tent_make_model',
-    )
-    .order('full_name')
+  const { data, error } = await withOpsScope(
+    supabase
+      .from('campers')
+      .select(
+        'id, full_name, email, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5, tent_entrance_count, tent_opening_side, tent_make_model',
+      )
+      .order('full_name')
+  )
 
   if (error || !data) return []
   const allRows = data as unknown as CamperRow[]

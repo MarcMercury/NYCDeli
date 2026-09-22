@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui
 import { createClient } from '@/lib/supabase/client'
 import { buildTentShareGroups } from '@/lib/union-find'
 import { filterOutUnapprovedCampers } from '@/lib/tent-needs'
+import { withOpsScope } from '@/lib/active-event'
 import type { FloorplanObjectRow } from '@/types/database'
 
 /* ── CSV path (served from public/) ─────────────────────────────── */
@@ -326,10 +327,12 @@ export function TentSizeSummary({ objects }: TentSizeSummaryProps) {
   const loadFromSupabase = useCallback(async (): Promise<{ campers: CamperInfo[]; groups: string[][] } | null> => {
     try {
       const supabase = createClient()
-      const { data } = await supabase
-        .from('campers')
-        .select('id, full_name, email, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5')
-        .order('full_name')
+      const { data } = await withOpsScope(
+        supabase
+          .from('campers')
+          .select('id, full_name, email, shelter_type, shelter_width_ft, shelter_length_ft, sharing_tent_with, sharing_tent_with_2, sharing_tent_with_3, sharing_tent_with_4, sharing_tent_with_5')
+          .order('full_name')
+      )
       if (!data || data.length === 0) return null
 
       type Row = { id: string; full_name: string; email: string | null; shelter_type: string; shelter_width_ft: number; shelter_length_ft: number; sharing_tent_with: string | null; sharing_tent_with_2: string | null; sharing_tent_with_3: string | null; sharing_tent_with_4: string | null; sharing_tent_with_5: string | null }

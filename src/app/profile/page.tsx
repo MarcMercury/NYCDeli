@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
 import { changePassword } from '@/app/actions/auth'
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
@@ -121,11 +122,13 @@ export default function ProfilePage() {
         // but imported camper rows may have mixed case).
         const normalizedEmail = (profileResult.data.email || '').trim()
         if (normalizedEmail) {
-          const result = await supabase
-            .from('campers')
-            .select('*')
-            .ilike('email', normalizedEmail)
-            .limit(1) as unknown as { data: CamperRow[] | null }
+          const result = await withOpsScope(
+            supabase
+              .from('campers')
+              .select('*')
+              .ilike('email', normalizedEmail)
+              .limit(1)
+          ) as unknown as { data: CamperRow[] | null }
           camperData = result.data?.[0] || null
 
           // Persist the link so subsequent loads are fast and reliable
@@ -143,10 +146,12 @@ export default function ProfilePage() {
       }
 
       // Fetch all campers for Sharing Tent With dropdown
-      const { data: campersForDropdown } = await supabase
-        .from('campers')
-        .select('id, full_name, playa_name')
-        .order('full_name') as unknown as { data: { id: string; full_name: string; playa_name: string | null }[] | null }
+      const { data: campersForDropdown } = await withOpsScope(
+        supabase
+          .from('campers')
+          .select('id, full_name, playa_name')
+          .order('full_name')
+      ) as unknown as { data: { id: string; full_name: string; playa_name: string | null }[] | null }
       setAllCampersList((campersForDropdown || []).filter(c => c.id !== camperData?.id))
     }
 
@@ -154,8 +159,8 @@ export default function ProfilePage() {
 
     // Fetch schedule data — only fetch user's own assignments first, then enrich
     const [rolesRes, shiftsRes] = await Promise.all([
-      supabase.from('kitchen_roles').select('*'),
-      supabase.from('kitchen_shifts').select('*').order('date').order('start_time'),
+      withOpsScope(supabase.from('kitchen_roles').select('*')),
+      withOpsScope(supabase.from('kitchen_shifts').select('*').order('date').order('start_time')),
     ])
 
     const roles = (rolesRes.data as KitchenRole[]) || []

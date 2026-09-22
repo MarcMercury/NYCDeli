@@ -12,6 +12,8 @@ import {
 import { intakeFormSchema, type IntakeFormData, shelterTypes, arrivalMethods, powerTypes, skillTags } from '@/lib/validations'
 import { getRandomLoadingMessage, pageCopy } from '@/lib/tone'
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
+import { submitIntakeAction } from '@/app/actions/intake'
 import type { Step } from '@/components/ui/stepper'
 
 const steps: Step[] = [
@@ -95,10 +97,12 @@ export default function IntakePage() {
   useEffect(() => {
     const fetchCampers = async () => {
       const supabase = createClient()
-      const { data } = await supabase
-        .from('campers')
-        .select('id, full_name, playa_name')
-        .order('full_name')
+      const { data } = await withOpsScope(
+        supabase
+          .from('campers')
+          .select('id, full_name, playa_name')
+          .order('full_name')
+      )
       setAllCampersList(data || [])
     }
     fetchCampers()
@@ -166,42 +170,12 @@ export default function IntakePage() {
         }
       }
 
-      // Step 2: Check if camper record already exists (from a previous partial submission)
-      const { data: existingCamper } = await supabase
-        .from('campers')
-        .select('id')
-        .eq('email', data.email)
-        .maybeSingle() as unknown as { data: { id: string } | null }
-
-      if (existingCamper) {
-        // Camper already registered — go straight to success
-        router.push('/intake/success')
-        return
-      }
-
-      // Step 3: Insert camper record (strip password fields)
+      // Step 2: Persist the application. The server action creates the linked
+      // people / event_applications / campers records in one place.
       const { password: _pw, confirmPassword: _cpw, ...camperFields } = data
-      const camperData = {
-        ...camperFields,
-        shelter_height_ft: camperFields.shelter_height_ft || null,
-        playa_name: camperFields.playa_name || null,
-        phone: camperFields.phone || null,
-        special_requests: camperFields.special_requests || null,
-        tools_bringing: camperFields.tools_bringing || [],
-        vehicle_info: camperFields.vehicle_info || null,
-        custom_skills: camperFields.custom_skills || null,
-        tent_make_model: camperFields.tent_make_model || null,
-        tent_entrance_count: camperFields.tent_entrance_count || null,
-        tent_opening_side: camperFields.tent_opening_side || null,
-        sharing_tent_with: camperFields.sharing_tent_with || null,
-        sharing_tent_with_2: camperFields.sharing_tent_with_2 || null,
-      }
-      
-      const { error } = await supabase
-        .from('campers')
-        .insert(camperData as never)
+      const result = await submitIntakeAction(camperFields)
 
-      if (error) throw error
+      if (!result.success) throw new Error(result.error)
 
       router.push('/intake/success')
     } catch (err) {

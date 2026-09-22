@@ -6,6 +6,7 @@ import {
   Badge, Input, Alert, Button, Tabs, TabPanel
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
 import { cn, formatDate, formatTime } from '@/lib/utils'
 import type { KitchenRole, KitchenShift, ScheduleAssignment, Camper } from '@/types/database'
 
@@ -112,10 +113,10 @@ export default function SchedulePage() {
 
     try {
       const [rolesRes, shiftsRes, assignmentsRes, campersRes] = await Promise.all([
-        supabase.from('kitchen_roles').select('*'),
-        supabase.from('kitchen_shifts').select('*').order('date').order('start_time'),
+        withOpsScope(supabase.from('kitchen_roles').select('*')),
+        withOpsScope(supabase.from('kitchen_shifts').select('*').order('date').order('start_time')),
         supabase.from('schedule_assignments').select('*'),
-        supabase.from('campers').select('*'),
+        withOpsScope(supabase.from('campers').select('*')),
       ])
 
       const roles = (rolesRes.data as KitchenRole[]) || []
@@ -147,11 +148,12 @@ export default function SchedulePage() {
     if (!email) return
     
     const supabase = createClient()
-    const { data: camperData } = await supabase
-      .from('campers')
-      .select('*')
-      .eq('email', email.toLowerCase())
-      .single()
+    const { data: camperData } = await withOpsScope(
+      supabase
+        .from('campers')
+        .select('*')
+        .eq('email', email.toLowerCase())
+    ).then(q => q.maybeSingle())
 
     const camper = camperData as Camper | null
     if (camper) {

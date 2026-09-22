@@ -145,6 +145,11 @@ const intakeFormBase = z.object({
 
 export type IntakeFormData = z.infer<typeof intakeFormBase>
 
+/** Server-side validation for an intake submission (passwords stay on the client). */
+export const camperIntakeSchema = intakeFormBase.omit({ password: true, confirmPassword: true })
+
+export type CamperIntakeData = z.infer<typeof camperIntakeSchema>
+
 // Combined full intake form schema with cross-field validations
 export const intakeFormSchema = intakeFormBase.refine(
   (data) => data.password === data.confirmPassword,

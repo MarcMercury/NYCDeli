@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { getOpsEventId, scopeToEvent } from '@/lib/active-event'
 import type {
   FloorplanConfigRow,
   FloorplanObjectRow,
@@ -17,12 +18,15 @@ const supabase = () => createClient() as any
 // ========== Floorplan Configs ==========
 
 export async function fetchActiveFloorplan(): Promise<FloorplanConfigRow | null> {
-  const { data, error } = await supabase()
-    .from('floorplan_configs')
-    .select('*')
-    .eq('is_active', true)
+  const { data, error } = await scopeToEvent(
+    supabase()
+      .from('floorplan_configs')
+      .select('*')
+      .eq('is_active', true),
+    await getOpsEventId()
+  )
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error('Error fetching active floorplan:', error)
@@ -32,10 +36,13 @@ export async function fetchActiveFloorplan(): Promise<FloorplanConfigRow | null>
 }
 
 export async function fetchAllFloorplans(): Promise<FloorplanConfigRow[]> {
-  const { data, error } = await supabase()
-    .from('floorplan_configs')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const { data, error } = await scopeToEvent(
+    supabase()
+      .from('floorplan_configs')
+      .select('*')
+      .order('created_at', { ascending: false }),
+    await getOpsEventId()
+  )
 
   if (error) {
     console.error('Error fetching floorplans:', error)
@@ -47,7 +54,7 @@ export async function fetchAllFloorplans(): Promise<FloorplanConfigRow[]> {
 export async function createFloorplan(config: FloorplanConfigInsert): Promise<FloorplanConfigRow | null> {
   const { data, error } = await supabase()
     .from('floorplan_configs')
-    .insert(config)
+    .insert({ event_id: await getOpsEventId(), ...config })
     .select()
     .single()
 

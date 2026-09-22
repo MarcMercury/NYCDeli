@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badg
 import { createClient } from '@/lib/supabase/client'
 import { cn, getInitials } from '@/lib/utils'
 import { fetchCampDimensions, type CampDimensions } from '@/lib/settings'
+import { withOpsScope } from '@/lib/active-event'
 import type { Camper } from '@/types/database'
 
 interface PlacedCamper extends Camper {
@@ -110,10 +111,12 @@ export default function LayoutPage() {
     const supabase = createClient()
     const campDims = await fetchCampDimensions()
     setDims(campDims)
-    const { data, error } = await supabase
-      .from('campers')
-      .select('*')
-      .order('arrival_date', { ascending: true })
+    const { data, error } = await withOpsScope(
+      supabase
+        .from('campers')
+        .select('*')
+        .order('arrival_date', { ascending: true })
+    )
 
     if (error) {
       console.error('Error fetching campers:', error)

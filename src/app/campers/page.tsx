@@ -9,6 +9,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { resolveTentMateIds } from '@/lib/tent-mates'
+import { withOpsScope } from '@/lib/active-event'
 import type { UserProfileRow, CamperRow, CamperPhotoRow } from '@/types/database'
 
 interface CamperDirectory {
@@ -35,9 +36,9 @@ export default function CampersPage() {
       .order('email') as unknown as { data: UserProfileRow[] | null }
 
     // Get all campers
-    const { data: campers } = await supabase
-      .from('campers')
-      .select('*') as unknown as { data: CamperRow[] | null }
+    const { data: campers } = await withOpsScope(
+      supabase.from('campers').select('*')
+    ) as unknown as { data: CamperRow[] | null }
 
     // Get all photos
     const { data: photos } = await supabase

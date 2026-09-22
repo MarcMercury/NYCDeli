@@ -3,7 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
+import { fetchOpsEvent } from '@/lib/active-event'
 import { parse as csvParse } from 'csv-parse/sync'
+import type { DeliSupabase } from '@/lib/events'
 import type { CamperInsert, CamperUpdate, UserRole, UserProfileUpdate } from '@/types/database'
 
 export type AdminActionResult = {
@@ -390,9 +392,10 @@ export async function createApplicantAction(params: {
   }
 
   // 2. Camper record
+  const opsEventId = (await fetchOpsEvent(adminClient as unknown as DeliSupabase))?.id ?? null
   const { data: camperData, error: camperError } = await adminClient
     .from('campers')
-    .upsert({ ...params.camper, email, full_name: fullName } as never, { onConflict: 'email' })
+    .upsert({ ...params.camper, email, full_name: fullName, event_id: opsEventId } as never, { onConflict: 'email' })
     .select('id')
     .single()
 
@@ -591,6 +594,7 @@ export async function importCampersFromCSVAction(
   }
 
   const adminClient = createServiceClient()
+  const importEventId = (await fetchOpsEvent(adminClient as unknown as DeliSupabase))?.id ?? null
   const rows = parseCSVText(csvContent)
   if (rows.length < 2) return { success: false, error: 'CSV has no data rows' }
 
@@ -669,6 +673,7 @@ export async function importCampersFromCSVAction(
           strike_participation: true,
           skills: [],
           tools_bringing: [],
+          event_id: importEventId,
         } as never, { onConflict: 'email' })
         .select('id')
         .single()

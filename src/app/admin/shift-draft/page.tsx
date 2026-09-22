@@ -7,6 +7,7 @@ import {
   Badge, Alert, Button, Input, Tabs,
 } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { withOpsScope } from '@/lib/active-event'
 import { cn } from '@/lib/utils'
 import type {
   Camper,
@@ -93,7 +94,7 @@ export default function AdminShiftDraftPage() {
     try {
       const [list, { data: camperData }] = await Promise.all([
         fetchAllDrafts(),
-        supabase.from('campers').select('*').order('full_name'),
+        withOpsScope(supabase.from('campers').select('*').order('full_name')),
       ])
       setDrafts(list)
       setCampers((camperData ?? []) as Camper[])

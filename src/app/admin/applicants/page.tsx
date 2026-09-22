@@ -9,6 +9,8 @@ import {
 import { cn } from '@/lib/utils'
 import type { UserProfileRow, CamperRow } from '@/types/database'
 import { adminResetPasswordAction } from '@/app/actions/admin'
+import { syncApplicantDecisionAction } from '@/app/actions/events'
+import { withOpsScope } from '@/lib/active-event'
 import AddApplicantForm from './add-applicant-form'
 
 interface ApplicantWithCamper extends UserProfileRow {
@@ -54,7 +56,9 @@ export default function ApplicantReviewPage() {
     }
 
     // Fetch camper data for each profile by matching email
-    const { data: campers } = await supabase.from('campers').select('*') as unknown as { data: CamperRow[] | null }
+    const { data: campers } = await withOpsScope(
+      supabase.from('campers').select('*')
+    ) as unknown as { data: CamperRow[] | null }
 
     const campersByEmail = new Map<string, CamperRow>()
     campers?.forEach(c => campersByEmail.set(c.email, c))
@@ -94,6 +98,7 @@ export default function ApplicantReviewPage() {
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
+      await syncApplicantDecisionAction(applicant.email, 'approved')
       setMessage({ type: 'success', text: `${applicant.email} has been approved!` })
       setSelectedApplicant(null)
       fetchApplicants()
@@ -117,6 +122,7 @@ export default function ApplicantReviewPage() {
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
+      await syncApplicantDecisionAction(applicant.email, 'denied', denyReason)
       setMessage({ type: 'success', text: `${applicant.email} has been denied.` })
       setSelectedApplicant(null)
       setDenyReason('')
